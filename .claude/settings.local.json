@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:dojoengine.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.cartridge.gg)",
+      "Bash(npm create:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build:*)",
+      "Bash(open:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(node -e:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
