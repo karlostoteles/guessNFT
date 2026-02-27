@@ -1,56 +1,72 @@
 /**
- * Cartridge Controller integration — via starkzap's standard onboarding API.
+ * Cartridge Controller integration.
  *
- * Uses StarkSDK.connectCartridge() which handles the Cartridge auth popup
- * correctly across localhost and deployed domains.
+ * Uses @cartridge/controller directly and calls connect() immediately,
+ * bypassing the isReady() wait that starkzap imposes (which times out
+ * before the popup can open).
  */
-import { StarkSDK } from 'starkzap';
-import { RPC_URL, SESSION_POLICIES } from './config';
+import { RPC_URL, SESSION_POLICIES, SN_MAIN_CHAIN_ID } from './config';
 
-/** Return type for wallet connection */
 export interface ConnectedWallet {
   address: string;
   username?: () => Promise<string>;
 }
 
-// Singleton SDK instance
-let sdkInstance: StarkSDK | null = null;
+let controllerInstance: any = null;
 
-function getSDK(): StarkSDK {
-  if (!sdkInstance) {
-    sdkInstance = new StarkSDK({ rpcUrl: RPC_URL });
-  }
-  return sdkInstance;
+async function getController(): Promise<any> {
+  if (controllerInstance) return controllerInstance;
+
+  const mod = await import('@cartridge/controller');
+  const CtrlClass = (mod as any).default ?? (mod as any).Controller ?? (mod as any).ControllerProvider;
+  if (!CtrlClass) throw new Error('Cartridge Controller not found');
+
+  const policies = SESSION_POLICIES.length > 0
+    ? SESSION_POLICIES.map(p => ({ target: p.target, method: p.method }))
+    : undefined;
+
+  controllerInstance = new CtrlClass({
+    defaultChainId: SN_MAIN_CHAIN_ID,
+    chains: [{ rpcUrl: RPC_URL }],
+    ...(policies ? { policies } : {}),
+  });
+
+  return controllerInstance;
 }
 
 /**
- * Connect wallet via Cartridge Controller using starkzap's standard flow.
- * Opens the Cartridge authentication popup for social login or passkeys.
+ * Connect via Cartridge Controller.
+ * Opens the Cartridge auth popup directly — no isReady() wait.
  */
 export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
-  const sdk = getSDK();
+  const ctrl = await getController();
 
-  const wallet = await sdk.connectCartridge({
-    policies: SESSION_POLICIES,
-  });
+  // Try to reuse an existing session first (silent)
+  try {
+    const existing = await ctrl.probe?.();
+    if (existing?.address) {
+      console.log('[cartridge] Reusing session:', existing.address);
+      return {
+        address: String(existing.address),
+        username: ctrl.username ? async () => String(await ctrl.username()) : undefined,
+      };
+    }
+  } catch {
+    // No existing session — open popup
+  }
 
-  const address = String(wallet.address);
-  if (!address) throw new Error('No address returned from Cartridge Controller');
+  // Open Cartridge auth UI directly
+  const account = await ctrl.connect();
+  if (!account?.address) throw new Error('Cartridge login cancelled or failed');
 
-  console.log('[cartridge] Connected:', address);
-
+  console.log('[cartridge] Connected:', account.address);
   return {
-    address,
-    username: async () => {
-      const name = await wallet.username();
-      return name ?? address.slice(0, 6) + '...' + address.slice(-4);
-    },
+    address: String(account.address),
+    username: ctrl.username ? async () => String(await ctrl.username()) : undefined,
   };
 }
 
-/**
- * Disconnect wallet and reset SDK instance.
- */
 export function resetSDK() {
-  sdkInstance = null;
+  try { controllerInstance?.disconnect?.(); } catch { /* ignore */ }
+  controllerInstance = null;
 }

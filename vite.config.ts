@@ -16,4 +16,17 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+  build: {
+    chunkSizeWarningLimit: 2500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'three': ['three'],
+          'cartridge': ['@cartridge/controller'],
+          'starknet': ['starknet', 'starkzap'],
+          'react-vendor': ['react', 'react-dom', 'framer-motion'],
+        },
+      },
+    },
+  },
 })
