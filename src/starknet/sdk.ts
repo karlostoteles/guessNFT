@@ -1,13 +1,11 @@
 /**
- * Cartridge Controller integration — direct @cartridge/controller usage.
+ * Cartridge Controller integration — via starkzap's standard onboarding API.
  *
- * Uses the Cartridge Controller class directly for reliable connection,
- * session reuse (probe), and proper mainnet chain configuration.
+ * Uses StarkSDK.connectCartridge() which handles the Cartridge auth popup
+ * correctly across localhost and deployed domains.
  */
-import { RPC_URL, SESSION_POLICIES, SN_MAIN_CHAIN_ID } from './config';
-
-// Controller singleton — typed as any since @cartridge/controller is dynamic
-let controllerInstance: any = null;
+import { StarkSDK } from 'starkzap';
+import { RPC_URL, SESSION_POLICIES } from './config';
 
 /** Return type for wallet connection */
 export interface ConnectedWallet {
@@ -15,98 +13,44 @@ export interface ConnectedWallet {
   username?: () => Promise<string>;
 }
 
-async function loadControllerClass(): Promise<any | null> {
-  try {
-    const mod = await import('@cartridge/controller');
-    // The default export is the ControllerProvider class
-    return (mod as any).default ?? (mod as any).ControllerProvider ?? (mod as any).Controller;
-  } catch {
-    return null;
+// Singleton SDK instance
+let sdkInstance: StarkSDK | null = null;
+
+function getSDK(): StarkSDK {
+  if (!sdkInstance) {
+    sdkInstance = new StarkSDK({ rpcUrl: RPC_URL });
   }
+  return sdkInstance;
 }
 
 /**
- * Connect wallet via Cartridge Controller.
- * Returns an object with address and username getter.
+ * Connect wallet via Cartridge Controller using starkzap's standard flow.
+ * Opens the Cartridge authentication popup for social login or passkeys.
  */
 export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
-  // Lazy-load the Controller class if not yet initialized
-  if (!controllerInstance) {
-    const CtrlClass = await loadControllerClass();
+  const sdk = getSDK();
 
-    if (!CtrlClass) {
-      // Fallback: try starkzap's connectCartridge
-      return connectViaStarkzap();
-    }
+  const wallet = await sdk.connectCartridge({
+    policies: SESSION_POLICIES,
+  });
 
-    controllerInstance = new CtrlClass({
-      defaultChainId: SN_MAIN_CHAIN_ID,
-      chains: [{ rpcUrl: RPC_URL }],
-      policies: SESSION_POLICIES,
-      slot: 'whoiswho',
-    });
+  const address = String(wallet.address);
+  if (!address) throw new Error('No address returned from Cartridge Controller');
 
-    console.log('[cartridge] Controller initialized');
-  }
-
-  const ctrl = controllerInstance;
-
-  // Try to reuse an existing session first (probe)
-  try {
-    const existingAccount = await ctrl.probe?.();
-    if (existingAccount?.address) {
-      console.log('[cartridge] Reusing existing session:', existingAccount.address);
-      return {
-        address: String(existingAccount.address),
-        username: ctrl.username ? async () => String(await ctrl.username()) : undefined,
-      };
-    }
-  } catch {
-    console.log('[cartridge] No existing session, opening connect UI...');
-  }
-
-  // Open Cartridge Controller auth UI
-  const account = await ctrl.connect?.();
-
-  if (!account) {
-    throw new Error('Cartridge connection cancelled or failed — no account returned');
-  }
-
-  console.log('[cartridge] Connected:', account.address);
+  console.log('[cartridge] Connected:', address);
 
   return {
-    address: String(account.address),
-    username: ctrl.username ? async () => String(await ctrl.username()) : undefined,
+    address,
+    username: async () => {
+      const name = await wallet.username();
+      return name ?? address.slice(0, 6) + '...' + address.slice(-4);
+    },
   };
 }
 
 /**
- * Fallback: use starkzap's built-in connectCartridge.
- */
-async function connectViaStarkzap(): Promise<ConnectedWallet> {
-  console.warn('[cartridge] Falling back to starkzap connectCartridge');
-  const { StarkSDK } = await import('starkzap');
-  const sdk = new StarkSDK({ network: 'mainnet', rpcUrl: RPC_URL });
-  const wallet: any = await sdk.connectCartridge({ policies: SESSION_POLICIES });
-
-  const address = String(wallet.address ?? '');
-  if (!address) throw new Error('No address from starkzap wallet');
-
-  const usernameGetter = wallet.username
-    ? async () => String(typeof wallet.username === 'function' ? await wallet.username() : wallet.username)
-    : undefined;
-
-  return { address, username: usernameGetter };
-}
-
-/**
- * Disconnect wallet and clear controller instance.
+ * Disconnect wallet and reset SDK instance.
  */
 export function resetSDK() {
-  try {
-    controllerInstance?.disconnect?.();
-  } catch {
-    // ignore
-  }
-  controllerInstance = null;
+  sdkInstance = null;
 }

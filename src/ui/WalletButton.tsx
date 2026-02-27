@@ -4,19 +4,20 @@ import { useWalletConnection } from '../starknet/hooks';
 
 /**
  * Persistent wallet status widget — shows in the top-left corner.
- * Shows connect button when disconnected, or wallet info when connected.
+ * Only visible when connected; login is handled directly by the Play Online button.
  */
 export function WalletButton() {
   const status = useWalletStatus();
   const username = useWalletUsername();
   const address = useWalletAddress();
   const nfts = useOwnedNFTs();
-  const { connectWallet, disconnectWallet } = useWalletConnection();
+  const { disconnectWallet } = useWalletConnection();
 
-  const isConnecting = status === 'connecting' || status === 'loading_nfts';
   const isConnected = status === 'connected' || status === 'ready' || status === 'loading_nfts';
 
   const displayName = username || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '');
+
+  if (!isConnected) return null;
 
   return (
     <div style={{
@@ -27,45 +28,7 @@ export function WalletButton() {
       pointerEvents: 'auto',
     }}>
       <AnimatePresence mode="wait">
-        {!isConnected ? (
-          <motion.button
-            key="connect"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={connectWallet}
-            disabled={isConnecting}
-            style={{
-              background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
-              border: '1px solid rgba(124, 58, 237, 0.4)',
-              borderRadius: 12,
-              padding: '10px 20px',
-              color: '#FFFFFE',
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: isConnecting ? 'wait' : 'pointer',
-              outline: 'none',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              opacity: isConnecting ? 0.7 : 1,
-            }}
-          >
-            {isConnecting ? (
-              <>
-                <Spinner /> Connecting...
-              </>
-            ) : (
-              <>
-                <WalletIcon /> Login
-              </>
-            )}
-          </motion.button>
-        ) : (
+        {isConnected && (
           <motion.div
             key="connected"
             initial={{ opacity: 0, x: -20 }}
@@ -143,28 +106,3 @@ export function WalletButton() {
   );
 }
 
-function WalletIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="6" width="20" height="14" rx="2" />
-      <path d="M2 10h20" />
-      <circle cx="16" cy="14" r="1.5" fill="currentColor" />
-    </svg>
-  );
-}
-
-function Spinner() {
-  return (
-    <motion.div
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-      style={{
-        width: 14,
-        height: 14,
-        border: '2px solid rgba(255,255,255,0.2)',
-        borderTop: '2px solid #FFFFFE',
-        borderRadius: '50%',
-      }}
-    />
-  );
-}

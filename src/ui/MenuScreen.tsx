@@ -1,76 +1,34 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from './common/Button';
-import { SchizodioPickerScreen } from './SchizodioPickerScreen';
-import { NoNFTScreen } from './NoNFTScreen';
 import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '../store/selectors';
-import { useWalletStatus, useOwnedNFTs, useIsWalletReady, useWalletStore } from '../starknet/walletStore';
+import { useWalletStatus, useIsWalletReady } from '../starknet/walletStore';
 import { useWalletConnection } from '../starknet/hooks';
 import { MEME_CHARACTERS } from '../data/memeCharacters';
-import { selectGameCharacters, nftToCharacter } from '../data/nftCharacterAdapter';
-import type { SchizodioNFT } from '../starknet/types';
 
-type View = 'menu' | 'picker' | 'no-nft' | 'online';
+type View = 'menu' | 'online';
 
 export function MenuScreen() {
   const [view, setView] = useState<View>('menu');
-  const { startSetup, setGameMode, selectSecretCharacter } = useGameActions();
+  const { startSetup, setGameMode } = useGameActions();
   const walletStatus = useWalletStatus();
-  const ownedNFTs = useOwnedNFTs();
   const isWalletReady = useIsWalletReady();
   const { connectWallet } = useWalletConnection();
 
-  const hasNFTs = isWalletReady && ownedNFTs.length > 0;
   const isConnecting = walletStatus === 'connecting' || walletStatus === 'loading_nfts';
 
-  // Free play uses meme crypto characters vs CPU
   const handleFreePlay = () => {
     setGameMode('free', MEME_CHARACTERS);
     startSetup();
   };
 
-  // "Play for Real" button handler
-  const handlePlayForReal = async () => {
+  const handlePlayOnline = async () => {
     if (isConnecting) return;
-
     if (!isWalletReady) {
-      // Not connected — trigger Cartridge Controller login
       await connectWallet();
-      // Re-read store state after async connect
-      const state = useWalletStore.getState();
-      if (state.status === 'ready') {
-        if (state.ownedNFTs.length > 0) {
-          setView('picker');
-        } else {
-          setView('no-nft');
-        }
-      }
-      return;
     }
-
-    if (hasNFTs) {
-      setView('picker');
-    } else {
-      setView('no-nft');
-    }
-  };
-
-  // Player selected their Schizodio to play as (secret character)
-  const handleSchizodioSelected = (nft: SchizodioNFT) => {
-    const gameChars = selectGameCharacters(ownedNFTs, MEME_CHARACTERS);
-    const selectedChar = nftToCharacter(nft);
-
-    // Ensure selected character appears on the board
-    let finalChars = gameChars;
-    if (!gameChars.find((c) => c.id === selectedChar.id)) {
-      finalChars = [...gameChars.slice(0, -1), selectedChar];
-    }
-
-    setGameMode('nft', finalChars);
-    startSetup();
-    // Pre-select their chosen NFT as P1's secret character
-    selectSecretCharacter('player1', selectedChar.id);
+    setView('online');
   };
 
   return (
@@ -78,40 +36,15 @@ export function MenuScreen() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        pointerEvents: 'auto',
-        zIndex: 20,
-      }}
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'auto', zIndex: 20 }}
     >
       <AnimatePresence mode="wait">
         {view === 'menu' && (
           <MenuMain
             key="menu"
-            hasNFTs={hasNFTs}
             isConnecting={isConnecting}
-            isWalletReady={isWalletReady}
-            ownedNFTs={ownedNFTs}
             onFreePlay={handleFreePlay}
-            onPlayForReal={handlePlayForReal}
-            onPlayOnline={() => setView('online')}
-          />
-        )}
-
-        {view === 'picker' && (
-          <SchizodioPickerScreen
-            key="picker"
-            nfts={ownedNFTs}
-            onSelect={handleSchizodioSelected}
-            onBack={() => setView('menu')}
-          />
-        )}
-
-        {view === 'no-nft' && (
-          <NoNFTScreen
-            key="no-nft"
-            onBack={() => setView('menu')}
+            onPlayOnline={handlePlayOnline}
           />
         )}
 
@@ -129,24 +62,12 @@ export function MenuScreen() {
 // ─── Main menu view ───────────────────────────────────────────────────────────
 
 interface MenuMainProps {
-  hasNFTs: boolean;
   isConnecting: boolean;
-  isWalletReady: boolean;
-  ownedNFTs: SchizodioNFT[];
   onFreePlay: () => void;
-  onPlayForReal: () => void;
   onPlayOnline: () => void;
 }
 
-function MenuMain({
-  hasNFTs,
-  isConnecting,
-  isWalletReady,
-  ownedNFTs,
-  onFreePlay,
-  onPlayForReal,
-  onPlayOnline,
-}: MenuMainProps) {
+function MenuMain({ isConnecting, onFreePlay, onPlayOnline }: MenuMainProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -178,7 +99,6 @@ function MenuMain({
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           marginBottom: 4,
-          textShadow: 'none',
           filter: 'drop-shadow(0 0 40px rgba(232,164,68,0.3))',
         }}>
           WhoisWho
@@ -210,106 +130,65 @@ function MenuMain({
           The classic family game, made schizo
         </div>
 
-        {/* Dual-mode buttons */}
+        {/* Buttons */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            alignItems: 'center',
-          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
         >
-          {/* Free Play vs CPU */}
-          <Button variant="accent" size="lg" onClick={onFreePlay} style={{
-            fontSize: 18,
-            padding: '18px 48px',
-            minWidth: 280,
-          }}>
-            Play Free{' '}
-            <span style={{ opacity: 0.6, fontSize: 13 }}>vs CPU</span>
-          </Button>
-
-          {/* Play for Real — requires wallet + NFTs */}
-          <motion.button
-            onClick={onPlayForReal}
-            disabled={isConnecting}
-            whileHover={isConnecting ? {} : { scale: 1.03, filter: 'brightness(1.1)' }}
-            whileTap={isConnecting ? {} : { scale: 0.97 }}
-            style={{
-              fontSize: hasNFTs ? 16 : 14,
-              padding: '14px 36px',
-              minWidth: 280,
-              background: hasNFTs
-                ? 'linear-gradient(135deg, #7C3AED, #5B21B6)'
-                : 'rgba(255,255,255,0.05)',
-              border: hasNFTs
-                ? '1px solid rgba(124, 58, 237, 0.4)'
-                : '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 12,
-              color: hasNFTs ? '#FFFFFE' : 'rgba(255,255,254,0.5)',
-              fontFamily: "'Space Grotesk', 'Inter', sans-serif",
-              fontWeight: 600,
-              cursor: isConnecting ? 'not-allowed' : 'pointer',
-              opacity: isConnecting ? 0.6 : 1,
-              backdropFilter: 'blur(10px)',
-              letterSpacing: '0.02em',
-              outline: 'none',
-            }}
-          >
-            {isConnecting
-              ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                  <ConnectingSpinner />
-                  Connecting...
-                </span>
-              )
-              : hasNFTs
-                ? (
-                  <>
-                    Play for Real{' '}
-                    <span style={{ opacity: 0.6, fontSize: 13 }}>
-                      {ownedNFTs.length} SCHIZO{ownedNFTs.length > 1 ? 's' : ''}
-                    </span>
-                  </>
-                )
-                : isWalletReady
-                  ? '🫙 No SCHIZODIO found — get one!'
-                  : 'Login to Play for Real'
-            }
-          </motion.button>
-        </motion.div>
-
-          {/* Play Online */}
+          {/* Play Online — primary CTA */}
           <motion.button
             onClick={onPlayOnline}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+            disabled={isConnecting}
+            whileHover={isConnecting ? {} : { scale: 1.03, filter: 'brightness(1.15)' }}
+            whileTap={isConnecting ? {} : { scale: 0.97 }}
             style={{
-              fontSize: 14,
-              padding: '12px 36px',
+              fontSize: 18,
+              padding: '18px 48px',
               minWidth: 280,
-              background: 'rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.3)',
-              borderRadius: 12,
-              color: '#A5B4FC',
-              fontFamily: "'Space Grotesk', 'Inter', sans-serif",
-              fontWeight: 600,
-              cursor: 'pointer',
+              background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+              border: '1px solid rgba(124,58,237,0.5)',
+              borderRadius: 14,
+              color: '#FFFFFE',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              cursor: isConnecting ? 'not-allowed' : 'pointer',
+              opacity: isConnecting ? 0.7 : 1,
               backdropFilter: 'blur(10px)',
-              letterSpacing: '0.02em',
+              letterSpacing: '0.01em',
               outline: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 10,
+              boxShadow: '0 0 40px rgba(124,58,237,0.3)',
             }}
           >
-            🌐 Play Online{' '}
-            <span style={{ opacity: 0.6, fontSize: 12 }}>1v1 anywhere</span>
+            {isConnecting ? (
+              <>
+                <ConnectingSpinner />
+                Connecting…
+              </>
+            ) : (
+              <>
+                🌐 Play Online
+                <span style={{ opacity: 0.6, fontSize: 13, fontWeight: 500 }}>1v1</span>
+              </>
+            )}
           </motion.button>
+
+          {/* Play Free vs CPU — secondary */}
+          <Button
+            variant="accent"
+            size="lg"
+            onClick={onFreePlay}
+            style={{ minWidth: 280, fontSize: 15, opacity: 0.85 }}
+          >
+            Play Free{' '}
+            <span style={{ opacity: 0.55, fontSize: 13 }}>vs CPU</span>
+          </Button>
+        </motion.div>
       </motion.div>
     </motion.div>
   );
@@ -321,12 +200,11 @@ function ConnectingSpinner() {
       animate={{ rotate: 360 }}
       transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
       style={{
-        width: 14,
-        height: 14,
-        border: '2px solid rgba(255,255,255,0.15)',
-        borderTopColor: 'rgba(255,255,255,0.7)',
+        width: 16,
+        height: 16,
+        border: '2px solid rgba(255,255,255,0.2)',
+        borderTopColor: 'rgba(255,255,255,0.8)',
         borderRadius: '50%',
-        display: 'inline-block',
       }}
     />
   );
