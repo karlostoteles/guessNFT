@@ -15,6 +15,7 @@ import { GuessWrongOverlay } from './GuessWrongOverlay';
 import { ResultScreen } from './ResultScreen';
 import { RiskItButton } from './RiskItButton';
 import { WalletButton } from './WalletButton';
+import { CPUThinkingIndicator } from './CPUThinkingIndicator';
 
 export function UIOverlay() {
   const phase = usePhase();
@@ -33,6 +34,9 @@ export function UIOverlay() {
 
       {/* Always-visible Risk It button during gameplay */}
       <RiskItButton />
+
+      {/* CPU thinking indicator — free mode only */}
+      <CPUThinkingIndicator />
 
       <AnimatePresence mode="wait">
         {phase === GamePhase.MENU && <MenuScreen key="menu" />}
