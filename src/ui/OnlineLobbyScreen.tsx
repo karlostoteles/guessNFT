@@ -112,12 +112,78 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     );
   }
 
-  const getCharacters = () => {
-    if (ownedNFTs.length > 0) {
-      return selectGameCharacters(ownedNFTs, MEME_CHARACTERS);
-    }
-    return MEME_CHARACTERS;
-  };
+  // NFT loading — wallet connected but still checking ownership
+  if (walletStatus === 'loading_nfts') {
+    return (
+      <LobbyWrapper onBack={onBack}>
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <Spinner large />
+          <div style={{
+            marginTop: 20,
+            color: 'rgba(255,255,254,0.5)',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: 14,
+          }}>
+            Checking your SCHIZODIO collection…
+          </div>
+        </div>
+      </LobbyWrapper>
+    );
+  }
+
+  // NFT gate — logged in but holds no SCHIZODIO
+  if (walletStatus === 'ready' && ownedNFTs.length === 0) {
+    return (
+      <LobbyWrapper onBack={onBack}>
+        <div style={{ textAlign: 'center', padding: 32 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🪬</div>
+          <div style={{
+            color: '#FFFFFE',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 800,
+            fontSize: 22,
+            marginBottom: 12,
+          }}>
+            You need to be SCHIZO to play this
+          </div>
+          <div style={{
+            color: 'rgba(255,255,254,0.4)',
+            fontSize: 13,
+            lineHeight: 1.6,
+            maxWidth: 300,
+            margin: '0 auto 28px',
+          }}>
+            Online mode is exclusive to SCHIZODIO NFT holders.
+            Get your SCHIZODIO to join the game.
+          </div>
+          <motion.a
+            href="https://unframed.co/collection/0x077485a949c130cf0d98819d2b0749f5860b0734ea28cb678dd3f39379131bfa"
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              display: 'inline-block',
+              background: 'linear-gradient(135deg, #E8A444, #C47B1A)',
+              borderRadius: 12,
+              padding: '12px 28px',
+              color: '#0F0E17',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: 'none',
+              boxShadow: '0 0 24px rgba(232,164,68,0.3)',
+            }}
+          >
+            Get SCHIZODIO →
+          </motion.a>
+        </div>
+      </LobbyWrapper>
+    );
+  }
+
+  // Characters = only the player's own NFTs (mapped to game chars)
+  const getCharacters = () => selectGameCharacters(ownedNFTs, MEME_CHARACTERS);
 
   const handleCreate = async () => {
     setError('');
@@ -394,16 +460,18 @@ function LobbyWrapper({ children, onBack }: { children: React.ReactNode; onBack:
   );
 }
 
-function Spinner() {
+function Spinner({ large }: { large?: boolean }) {
+  const size = large ? 36 : 16;
   return (
     <motion.div
       animate={{ rotate: 360 }}
       transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
       style={{
-        width: 16, height: 16,
-        border: '2px solid rgba(255,255,255,0.2)',
-        borderTopColor: 'rgba(255,255,255,0.8)',
+        width: size, height: size,
+        border: `${large ? 3 : 2}px solid rgba(255,255,255,0.15)`,
+        borderTopColor: large ? '#E8A444' : 'rgba(255,255,255,0.8)',
         borderRadius: '50%',
+        margin: large ? '0 auto' : undefined,
       }}
     />
   );

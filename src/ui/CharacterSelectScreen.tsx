@@ -3,14 +3,23 @@ import { Card } from './common/Card';
 import { useCharacterPreviews } from '../hooks/useCharacterPreviews';
 import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '../store/selectors';
 import { GamePhase, PlayerId } from '../store/types';
+import { useOwnedNFTs } from '../starknet/walletStore';
+import { nftToCharacter } from '../data/nftCharacterAdapter';
 
 export function CharacterSelectScreen() {
   const phase = usePhase();
   const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
   const { selectSecretCharacter } = useGameActions();
+  const ownedNFTs = useOwnedNFTs();
+  const gameCharacters = useGameCharacters();
+
+  // In online mode each player picks only from their own NFTs
+  const characters = mode === 'online' && ownedNFTs.length > 0
+    ? ownedNFTs.map(nftToCharacter)
+    : gameCharacters;
+
   const previews = useCharacterPreviews();
-  const characters = useGameCharacters();
 
   // In online mode, I always select for my own seat regardless of phase
   const player: PlayerId =
