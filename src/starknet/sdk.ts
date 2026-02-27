@@ -1,41 +1,55 @@
 /**
- * StarkZap SDK singleton for wallet connection.
+ * Cartridge Controller integration — via starkzap's standard onboarding API.
  *
- * Uses starkzap's built-in Cartridge Controller integration
- * for social login, passkeys, and gasless transactions.
+ * Uses StarkSDK.connectCartridge() which handles the Cartridge auth popup
+ * correctly across localhost and deployed domains.
  */
-import { SESSION_POLICIES } from './config';
+import { StarkSDK } from 'starkzap';
+import { RPC_URL, SESSION_POLICIES } from './config';
 
-// Lazy-loaded to avoid import errors when starkzap is not yet installed
-let sdkInstance: any = null;
+/** Return type for wallet connection */
+export interface ConnectedWallet {
+  address: string;
+  username?: () => Promise<string>;
+}
 
-export async function getStarkzapSDK() {
-  if (sdkInstance) return sdkInstance;
+// Singleton SDK instance
+let sdkInstance: StarkSDK | null = null;
 
-  try {
-    const { StarkZap } = await import('starkzap');
-    sdkInstance = new StarkZap({ network: 'mainnet' });
-    return sdkInstance;
-  } catch (err) {
-    console.warn('[starkzap] SDK not available — starkzap may not be installed yet');
-    throw new Error('starkzap not available');
+function getSDK(): StarkSDK {
+  if (!sdkInstance) {
+    sdkInstance = new StarkSDK({ rpcUrl: RPC_URL });
   }
+  return sdkInstance;
 }
 
 /**
- * Connect wallet via Cartridge Controller (social login, passkeys).
- * Returns the connected wallet object with address and methods.
+ * Connect wallet via Cartridge Controller using starkzap's standard flow.
+ * Opens the Cartridge authentication popup for social login or passkeys.
  */
-export async function connectCartridgeWallet() {
-  const sdk = await getStarkzapSDK();
+export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
+  const sdk = getSDK();
+
   const wallet = await sdk.connectCartridge({
     policies: SESSION_POLICIES,
   });
-  return wallet;
+
+  const address = String(wallet.address);
+  if (!address) throw new Error('No address returned from Cartridge Controller');
+
+  console.log('[cartridge] Connected:', address);
+
+  return {
+    address,
+    username: async () => {
+      const name = await wallet.username();
+      return name ?? address.slice(0, 6) + '...' + address.slice(-4);
+    },
+  };
 }
 
 /**
- * Disconnect and clean up SDK state.
+ * Disconnect wallet and reset SDK instance.
  */
 export function resetSDK() {
   sdkInstance = null;

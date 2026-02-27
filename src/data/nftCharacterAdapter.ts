@@ -5,6 +5,10 @@
  * If NFT metadata has matching trait_types → map directly.
  * Otherwise → hash tokenId to deterministically assign traits.
  * Same NFT always produces same traits → consistent gameplay.
+ *
+ * SCHIZODIO trait_type names observed from contract metadata:
+ *   Background, Body, Head, Eyes, Mouth, Accessories
+ * These map to our game traits via the keyword mappings below.
  */
 import type { Character } from './characters';
 import type { CharacterTraits, HairColor, HairStyle, SkinTone, EyeColor, Gender } from './traits';
@@ -30,9 +34,7 @@ const SKIN_TONES: SkinTone[] = ['light', 'medium', 'tan', 'dark', 'very_dark'];
 const EYE_COLORS: EyeColor[] = ['brown', 'blue', 'green', 'hazel'];
 const GENDERS: Gender[] = ['male', 'female'];
 
-/**
- * Simple deterministic hash from a string.
- */
+/** Deterministic hash from a string → positive integer */
 function hashString(s: string): number {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
@@ -46,6 +48,10 @@ function pickFromArray<T>(arr: T[], seed: number, offset: number): T {
   return arr[(seed + offset * 7) % arr.length];
 }
 
+/**
+ * Find a trait value by trying multiple possible trait_type names (case-insensitive).
+ * Logs found trait for debugging during NFT flow development.
+ */
 function findAttribute(attrs: NFTAttribute[], ...traitTypes: string[]): string | undefined {
   for (const tt of traitTypes) {
     const found = attrs.find(
@@ -64,9 +70,15 @@ function mapToEnum<T extends string>(
 ): T {
   if (!attrValue) return pickFromArray(options, seed, offset);
 
-  const lower = attrValue.toLowerCase();
-  const match = options.find((o) => o.toLowerCase() === lower);
-  if (match !== undefined) return match;
+  const lower = attrValue.toLowerCase().replace(/[-_\s]/g, '');
+
+  // Try exact match first
+  const exact = options.find((o) => o.toLowerCase().replace(/[-_\s]/g, '') === lower);
+  if (exact !== undefined) return exact;
+
+  // Try substring match (e.g. "dark brown" → 'brown', "light skin" → 'light')
+  const partial = options.find((o) => lower.includes(o.toLowerCase()) || o.toLowerCase().includes(lower));
+  if (partial !== undefined) return partial;
 
   return pickFromArray(options, seed, offset);
 }
@@ -74,27 +86,68 @@ function mapToEnum<T extends string>(
 function deriveBool(attrValue: string | undefined, seed: number, offset: number): boolean {
   if (!attrValue) return (seed + offset * 13) % 3 === 0; // ~33% chance
   const lower = attrValue.toLowerCase();
-  if (lower === 'none' || lower === 'no' || lower === 'false' || lower === '0') return false;
+  if (lower === 'none' || lower === 'no' || lower === 'false' || lower === '0' || lower === '-') return false;
   return true;
 }
 
 /**
  * Convert a SCHIZODIO NFT to a game Character with derived traits.
+ * Tries many known trait_type names before falling back to hash-based assignment.
  */
 export function nftToCharacter(nft: SchizodioNFT): NFTCharacter {
   const seed = hashString(nft.tokenId);
   const attrs = nft.attributes;
 
+  // Log trait types present in this NFT for development debugging
+  if (import.meta.env.DEV && attrs.length > 0) {
+    console.log(`[nftAdapter] Token #${nft.tokenId} traits:`,
+      attrs.map((a) => `${a.trait_type}=${a.value}`).join(', ')
+    );
+  }
+
   const traits: CharacterTraits = {
-    hair_color: mapToEnum(findAttribute(attrs, 'Hair Color', 'Hair', 'Head'), HAIR_COLORS, seed, 0),
-    hair_style: mapToEnum(findAttribute(attrs, 'Hair Style', 'Hairstyle'), HAIR_STYLES, seed, 1),
-    skin_tone: mapToEnum(findAttribute(attrs, 'Skin', 'Skin Tone', 'Body'), SKIN_TONES, seed, 2),
-    gender: mapToEnum(findAttribute(attrs, 'Gender', 'Sex'), GENDERS, seed, 3),
-    eye_color: mapToEnum(findAttribute(attrs, 'Eye Color', 'Eyes'), EYE_COLORS, seed, 4),
-    has_glasses: deriveBool(findAttribute(attrs, 'Glasses', 'Eyewear'), seed, 5),
-    has_hat: deriveBool(findAttribute(attrs, 'Hat', 'Head Accessory', 'Headwear'), seed, 6),
-    has_beard: deriveBool(findAttribute(attrs, 'Beard', 'Facial Hair'), seed, 7),
-    has_earrings: deriveBool(findAttribute(attrs, 'Earrings', 'Ear'), seed, 8),
+    // Hair color — SCHIZODIO may encode hair in "Head" or "Hair" trait
+    hair_color: mapToEnum(
+      findAttribute(attrs, 'Hair Color', 'Hair Color', 'Hair', 'Head Hair', 'HairColor'),
+      HAIR_COLORS, seed, 0
+    ),
+    // Hair style — may be in a separate style trait or encoded in the hair value
+    hair_style: mapToEnum(
+      findAttribute(attrs, 'Hair Style', 'Hairstyle', 'Hair Style', 'HairStyle', 'Hair Type'),
+      HAIR_STYLES, seed, 1
+    ),
+    // Skin tone — SCHIZODIO "Body" or "Skin" trait
+    skin_tone: mapToEnum(
+      findAttribute(attrs, 'Skin', 'Skin Tone', 'Body', 'Skin Color', 'Body Color', 'SkinTone'),
+      SKIN_TONES, seed, 2
+    ),
+    // Gender — often not explicit in NFTs, fall back to hash
+    gender: mapToEnum(
+      findAttribute(attrs, 'Gender', 'Sex', 'Type', 'Character Type'),
+      GENDERS, seed, 3
+    ),
+    // Eye color — SCHIZODIO "Eyes" trait
+    eye_color: mapToEnum(
+      findAttribute(attrs, 'Eye Color', 'Eyes', 'Eye', 'EyeColor'),
+      EYE_COLORS, seed, 4
+    ),
+    // Boolean accessories
+    has_glasses: deriveBool(
+      findAttribute(attrs, 'Glasses', 'Eyewear', 'Accessory', 'Accessories'),
+      seed, 5
+    ),
+    has_hat: deriveBool(
+      findAttribute(attrs, 'Hat', 'Head Accessory', 'Headwear', 'Cap', 'Head'),
+      seed, 6
+    ),
+    has_beard: deriveBool(
+      findAttribute(attrs, 'Beard', 'Facial Hair', 'Mouth', 'Face Hair'),
+      seed, 7
+    ),
+    has_earrings: deriveBool(
+      findAttribute(attrs, 'Earrings', 'Ear', 'Ear Accessory', 'Jewelry'),
+      seed, 8
+    ),
   };
 
   return {

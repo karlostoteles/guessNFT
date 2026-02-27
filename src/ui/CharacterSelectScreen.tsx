@@ -1,17 +1,27 @@
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
 import { useCharacterPreviews } from '../hooks/useCharacterPreviews';
-import { usePhase, useGameActions, useGameCharacters } from '../store/selectors';
+import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '../store/selectors';
 import { GamePhase, PlayerId } from '../store/types';
 
 export function CharacterSelectScreen() {
   const phase = usePhase();
+  const mode = useGameMode();
+  const onlinePlayerNum = useOnlinePlayerNum();
   const { selectSecretCharacter } = useGameActions();
   const previews = useCharacterPreviews();
   const characters = useGameCharacters();
 
-  const player: PlayerId = phase === GamePhase.SETUP_P1 ? 'player1' : 'player2';
-  const playerLabel = player === 'player1' ? 'Player 1' : 'Player 2';
+  // In online mode, I always select for my own seat regardless of phase
+  const player: PlayerId =
+    mode === 'online'
+      ? (onlinePlayerNum === 2 ? 'player2' : 'player1')
+      : (phase === GamePhase.SETUP_P1 ? 'player1' : 'player2');
+
+  const playerLabel =
+    mode === 'online'
+      ? 'Your Character'
+      : player === 'player1' ? 'Player 1' : 'Player 2';
 
   return (
     <motion.div

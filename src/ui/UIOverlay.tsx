@@ -11,12 +11,19 @@ import { AnswerRevealed } from './AnswerRevealed';
 import { AutoEliminatingOverlay } from './AutoEliminatingOverlay';
 import { EliminationPrompt } from './EliminationPrompt';
 import { GuessPanel } from './GuessPanel';
+import { GuessWrongOverlay } from './GuessWrongOverlay';
 import { ResultScreen } from './ResultScreen';
 import { RiskItButton } from './RiskItButton';
 import { WalletButton } from './WalletButton';
+import { CPUThinkingIndicator } from './CPUThinkingIndicator';
+import { OnlineWaitingScreen } from './OnlineWaitingScreen';
+import { useOnlineGameSync } from '../hooks/useOnlineGameSync';
 
 export function UIOverlay() {
   const phase = usePhase();
+
+  // Mount the online sync hook for the lifetime of the overlay
+  useOnlineGameSync();
 
   return (
     <div style={{
@@ -33,12 +40,18 @@ export function UIOverlay() {
       {/* Always-visible Risk It button during gameplay */}
       <RiskItButton />
 
+      {/* CPU thinking indicator — free mode only */}
+      <CPUThinkingIndicator />
+
       <AnimatePresence mode="wait">
         {phase === GamePhase.MENU && <MenuScreen key="menu" />}
 
         {(phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2) && (
           <CharacterSelectScreen key="select" />
         )}
+
+        {/* Online: waiting for opponent to commit character */}
+        {phase === GamePhase.ONLINE_WAITING && <OnlineWaitingScreen key="online-waiting" />}
 
         {(phase === GamePhase.HANDOFF_P1_TO_P2 ||
           phase === GamePhase.HANDOFF_START ||
@@ -58,6 +71,8 @@ export function UIOverlay() {
         {phase === GamePhase.ELIMINATION && <EliminationPrompt key="elimination" />}
 
         {phase === GamePhase.GUESS_SELECT && <GuessPanel key="guess" />}
+
+        {phase === GamePhase.GUESS_WRONG && <GuessWrongOverlay key="guess-wrong" />}
 
         {(phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER) && (
           <ResultScreen key="result" />

@@ -1,11 +1,21 @@
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { useCurrentQuestion, useGameActions } from '../store/selectors';
+import { sfx } from '../audio/sfx';
 
 export function AnswerRevealed() {
   const question = useCurrentQuestion();
   const { advancePhase } = useGameActions();
+
+  // Play yes/no SFX once when the answer is revealed
+  useEffect(() => {
+    if (!question) return;
+    if (question.answer) sfx.answerYes();
+    else sfx.answerNo();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!question) return null;
 

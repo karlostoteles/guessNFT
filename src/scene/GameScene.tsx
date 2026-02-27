@@ -9,8 +9,10 @@ import { CameraController } from './CameraController';
 import { useCharacterTextures, useCardBackTexture } from '../hooks/useCharacterTextures';
 import { useBoardRotation } from '../store/selectors';
 import { BOARD } from '../utils/constants';
+import { useCPUPlayer } from '../hooks/useCPUPlayer';
 
 export function GameScene() {
+  useCPUPlayer(); // Drive CPU opponent in free mode
   const textures = useCharacterTextures();
   const cardBackTexture = useCardBackTexture();
   const boardRotation = useBoardRotation();

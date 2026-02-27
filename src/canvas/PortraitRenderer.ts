@@ -5,10 +5,43 @@ import { drawHair } from './drawHair';
 import { drawAccessories } from './drawAccessories';
 
 const SIZE = 512;
-const BG_COLORS = [
-  '#E8D5B7', '#D5C4A1', '#C9B8A0', '#BFAE96',
-  '#D6C5B0', '#E0D0BC', '#CCBDA8', '#D3C2AD',
+const NAME_HEIGHT = 80; // bottom name banner height
+
+// Default palette — vibrant, distinct pastels
+const DEFAULT_BG_COLORS = [
+  '#C5DCE8', '#D5E8C5', '#E8C5D5', '#D5C5E8',
+  '#E8E0B7', '#C5E8E0', '#E8CDB7', '#B7D5E8',
+  '#D5E8B7', '#E8B7C5', '#C5B7E8', '#E8D8B0',
+  '#C0D5E8', '#D8E8C0', '#E8C0D0', '#C8E8D0',
 ];
+
+// Per-character config for meme crypto characters
+const MEME_CONFIG: Record<string, { bg: string; badge: string }> = {
+  m01: { bg: '#627EEA', badge: 'Ξ' },       // Vitalik
+  m02: { bg: '#F7931A', badge: '₿' },       // Satoshi
+  m03: { bg: '#F0B90B', badge: '🔶' },      // CZ
+  m04: { bg: '#1A9BAC', badge: '💸' },      // SBF
+  m05: { bg: '#3D9BE9', badge: '🌙' },      // Do Kwon
+  m06: { bg: '#FF6B00', badge: '⚡' },      // Saylor
+  m07: { bg: '#9945FF', badge: '◎' },       // Ansem — SOL
+  m08: { bg: '#00A876', badge: '📈' },      // Cobie
+  m09: { bg: '#4CAF50', badge: '🔮' },      // Hsaka
+  m10: { bg: '#D4A017', badge: '💪' },      // Gigachad
+  m11: { bg: '#34495E', badge: '🏛️' },      // Gensler
+  m12: { bg: '#E74C3C', badge: '☀️' },      // Justin Sun
+  m13: { bg: '#FF007A', badge: '🦄' },      // Hayden
+  m14: { bg: '#B6509E', badge: '👻' },      // Stani
+  m15: { bg: '#0052FF', badge: '🧪' },      // Andre
+  m16: { bg: '#E6007A', badge: '⬛' },      // Gavin
+  m17: { bg: '#FF9900', badge: '💻' },      // PajeetDev
+  m18: { bg: '#607D8B', badge: '🤖' },      // NPC Trader
+  m19: { bg: '#CC2200', badge: '🐱' },      // Roaringkitty
+  m20: { bg: '#1A237E', badge: '❄️' },      // Zhu Su
+  m21: { bg: '#0288D1', badge: '🔍' },      // ZachXBT
+  m22: { bg: '#1565C0', badge: '🏴' },      // Rune
+  m23: { bg: '#5D4037', badge: '☕' },      // Coffeezilla
+  m24: { bg: '#6A1B9A', badge: '🪬' },      // Murad
+};
 
 export function renderPortrait(character: Character): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -16,23 +49,26 @@ export function renderPortrait(character: Character): THREE.CanvasTexture {
   canvas.height = SIZE;
   const ctx = canvas.getContext('2d')!;
 
-  // Background
-  const bgIdx = Math.abs(hashCode(character.id)) % BG_COLORS.length;
-  const bg = BG_COLORS[bgIdx];
+  // Resolve background color
+  const memeConf = MEME_CONFIG[character.id];
+  const bg = memeConf
+    ? memeConf.bg
+    : DEFAULT_BG_COLORS[Math.abs(hashCode(character.id)) % DEFAULT_BG_COLORS.length];
+
+  // Portrait area background
+  const portraitH = SIZE - NAME_HEIGHT;
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  ctx.fillRect(0, 0, SIZE, portraitH);
 
-  // Subtle radial gradient overlay
-  const grad = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 50, SIZE / 2, SIZE / 2, SIZE / 2);
-  grad.addColorStop(0, 'rgba(255,255,255,0.1)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.05)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  // Vignette on portrait area
+  const vgGrad = ctx.createRadialGradient(SIZE / 2, portraitH / 2, 60, SIZE / 2, portraitH / 2, SIZE / 2);
+  vgGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+  vgGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+  ctx.fillStyle = vgGrad;
+  ctx.fillRect(0, 0, SIZE, portraitH);
 
-  // Draw in order: hair back, face, hair front, accessories
+  // Draw portrait
   const traits = character.traits;
-
-  // Hair drawn first (behind face for long/curly styles)
   if (traits.hair_style === 'long' || traits.hair_style === 'curly') {
     drawHair(ctx, traits);
     drawFace(ctx, traits);
@@ -40,8 +76,55 @@ export function renderPortrait(character: Character): THREE.CanvasTexture {
     drawFace(ctx, traits);
     drawHair(ctx, traits);
   }
-
   drawAccessories(ctx, traits);
+
+  // ── Badge (top-right, meme characters only) ──────────────────────────────
+  if (memeConf?.badge) {
+    const bRadius = 34;
+    const bx = SIZE - bRadius - 10;
+    const by = bRadius + 10;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bx, by, bRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.font = `${bRadius * 1.0}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(memeConf.badge, bx, by + 2);
+    ctx.restore();
+  }
+
+  // ── Name banner ───────────────────────────────────────────────────────────
+  const bannerY = portraitH;
+
+  // Dark banner fill
+  const bannerGrad = ctx.createLinearGradient(0, bannerY, 0, SIZE);
+  bannerGrad.addColorStop(0, 'rgba(8,8,18,0.93)');
+  bannerGrad.addColorStop(1, 'rgba(8,8,18,0.98)');
+  ctx.fillStyle = bannerGrad;
+  ctx.fillRect(0, bannerY, SIZE, NAME_HEIGHT);
+
+  // Coloured accent line at top of banner
+  ctx.fillStyle = lighten(bg, 50);
+  ctx.fillRect(0, bannerY, SIZE, 3);
+
+  // Name text
+  const nameLen = character.name.length;
+  const fontSize = nameLen > 12 ? 38 : nameLen > 9 ? 44 : 52;
+  ctx.save();
+  ctx.font = `bold ${fontSize}px "Space Grotesk", "Inter", Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = lighten(bg, 40);
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(character.name, SIZE / 2, bannerY + NAME_HEIGHT / 2 + 2);
+  ctx.restore();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -62,26 +145,26 @@ export function renderCardBack(): THREE.CanvasTexture {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Pattern
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  // Diagonal line pattern
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
-  for (let i = 0; i < SIZE; i += 20) {
+  for (let i = -SIZE; i < SIZE * 2; i += 28) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
-    ctx.lineTo(i, SIZE);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(SIZE, i);
+    ctx.lineTo(i + SIZE, SIZE);
     ctx.stroke();
   }
 
   // Question mark
+  ctx.save();
   ctx.font = 'bold 200px "Space Grotesk", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(232, 164, 68, 0.6)';
+  ctx.fillStyle = 'rgba(232, 164, 68, 0.55)';
+  ctx.shadowColor = 'rgba(232,164,68,0.3)';
+  ctx.shadowBlur = 40;
   ctx.fillText('?', SIZE / 2, SIZE / 2);
+  ctx.restore();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -96,4 +179,11 @@ function hashCode(s: string): number {
     hash |= 0;
   }
   return hash;
+}
+
+function lighten(hex: string, amount: number): string {
+  const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + amount);
+  const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + amount);
+  const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + amount);
+  return `rgb(${r},${g},${b})`;
 }

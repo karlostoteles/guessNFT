@@ -52,7 +52,7 @@ export function GuessPanel() {
             color: 'rgba(255,255,254,0.4)',
             marginBottom: 12,
           }}>
-            Pick the secret character — guess wrong and you lose!
+            Guess wrong and you lose your turn — get it right to win!
           </div>
           <Button variant="secondary" size="sm" onClick={cancelGuess}>
             {midTurn ? 'Nevermind, end turn' : 'Go Back'}
