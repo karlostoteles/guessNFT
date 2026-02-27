@@ -161,8 +161,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
             onClick={onFreePlay}
             style={{ minWidth: 280, fontSize: 15, opacity: 0.85 }}
           >
-            Play Free{' '}
-            <span style={{ opacity: 0.55, fontSize: 13 }}>vs CPU</span>
+            Try CT version for Free
           </Button>
         </motion.div>
       </motion.div>
