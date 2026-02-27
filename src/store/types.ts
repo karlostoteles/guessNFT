@@ -1,12 +1,13 @@
 import type { Character } from '../data/characters';
 
-export type GameMode = 'free' | 'nft';
+export type GameMode = 'free' | 'nft' | 'online';
 
 export enum GamePhase {
   MENU = 'MENU',
   SETUP_P1 = 'SETUP_P1',
   HANDOFF_P1_TO_P2 = 'HANDOFF_P1_TO_P2',
   SETUP_P2 = 'SETUP_P2',
+  ONLINE_WAITING = 'ONLINE_WAITING', // waiting for opponent to commit (online mode)
   HANDOFF_START = 'HANDOFF_START',
   QUESTION_SELECT = 'QUESTION_SELECT',
   HANDOFF_TO_OPPONENT = 'HANDOFF_TO_OPPONENT',
@@ -54,6 +55,10 @@ export interface GameState {
   gameSessionId: string;
   // Whether both players have valid on-chain (or local) commitments
   commitmentStatus: 'none' | 'partial' | 'both';
+  // Online multiplayer metadata (null in free/nft mode)
+  onlineGameId: string | null;
+  onlineRoomCode: string | null;
+  onlinePlayerNum: 1 | 2 | null;
 }
 
 export interface GameActions {
@@ -69,4 +74,11 @@ export interface GameActions {
   makeGuess: (characterId: string) => void;
   cancelGuess: () => void;
   resetGame: () => void;
+  // Online-specific actions (called by useOnlineGameSync hook)
+  setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2) => void;
+  advanceToGameStart: () => void;
+  receiveOpponentQuestion: (questionId: string, answer: boolean) => void;
+  applyOpponentAnswer: (answer: boolean) => void;
+  receiveOpponentGuess: (characterId: string, isCorrect: boolean, winnerPlayerNum: 1 | 2 | null) => void;
+  applyGuessResult: (isCorrect: boolean, winner: PlayerId | null) => void;
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './common/Card';
 import { QUESTIONS, Question } from '../data/questions';
-import { useGameActions, useQuestionHistory, useActivePlayer } from '../store/selectors';
+import { useGameActions, useQuestionHistory, useActivePlayer, useGameMode, useOnlinePlayerNum } from '../store/selectors';
 import { sfx } from '../audio/sfx';
 
 const CATEGORIES = [
@@ -18,6 +18,14 @@ export function QuestionPanel() {
   const { askQuestion } = useGameActions();
   const history = useQuestionHistory();
   const activePlayer = useActivePlayer();
+  const mode = useGameMode();
+  const onlinePlayerNum = useOnlinePlayerNum();
+
+  // In online mode, check if it's actually my turn
+  const isMyTurn = mode !== 'online' || (
+    (activePlayer === 'player1' && onlinePlayerNum === 1) ||
+    (activePlayer === 'player2' && onlinePlayerNum === 2)
+  );
 
   // Questions already asked by the current player this game
   const askedIds = new Set(
@@ -27,6 +35,33 @@ export function QuestionPanel() {
   const filteredQuestions = QUESTIONS.filter((q) => q.category === activeCategory);
   const askedInCategory = filteredQuestions.filter((q) => askedIds.has(q.id)).length;
   const totalInCategory = filteredQuestions.length;
+
+  // Online mode: show "waiting for opponent" panel when it's not my turn
+  if (!isMyTurn) {
+    return (
+      <Card style={{
+        position: 'fixed',
+        bottom: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'min(600px, calc(100vw - 32px))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        padding: '20px 24px',
+        pointerEvents: 'auto',
+      }}>
+        <motion.div
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+          style={{ fontSize: 14, color: 'rgba(255,255,254,0.5)' }}
+        >
+          ⏳ Waiting for opponent's question…
+        </motion.div>
+      </Card>
+    );
+  }
 
   return (
     <Card style={{

@@ -13,6 +13,9 @@ export const useWinner = () => useGameStore((s) => s.winner);
 export const useGuessedCharacterId = () => useGameStore((s) => s.guessedCharacterId);
 export const useGameSessionId = () => useGameStore((s) => s.gameSessionId);
 export const useCommitmentStatus = () => useGameStore((s) => s.commitmentStatus);
+export const useOnlineGameId = () => useGameStore((s) => s.onlineGameId);
+export const useOnlineRoomCode = () => useGameStore((s) => s.onlineRoomCode);
+export const useOnlinePlayerNum = () => useGameStore((s) => s.onlinePlayerNum);
 
 export const usePlayerState = (player: PlayerId) =>
   useGameStore((s) => s.players[player]);
@@ -35,6 +38,12 @@ const actions = {
   get makeGuess() { return useGameStore.getState().makeGuess; },
   get cancelGuess() { return useGameStore.getState().cancelGuess; },
   get resetGame() { return useGameStore.getState().resetGame; },
+  get setOnlineGame() { return useGameStore.getState().setOnlineGame; },
+  get advanceToGameStart() { return useGameStore.getState().advanceToGameStart; },
+  get receiveOpponentQuestion() { return useGameStore.getState().receiveOpponentQuestion; },
+  get applyOpponentAnswer() { return useGameStore.getState().applyOpponentAnswer; },
+  get receiveOpponentGuess() { return useGameStore.getState().receiveOpponentGuess; },
+  get applyGuessResult() { return useGameStore.getState().applyGuessResult; },
 };
 
 export const useGameActions = () => actions;

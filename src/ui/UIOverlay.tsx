@@ -16,9 +16,14 @@ import { ResultScreen } from './ResultScreen';
 import { RiskItButton } from './RiskItButton';
 import { WalletButton } from './WalletButton';
 import { CPUThinkingIndicator } from './CPUThinkingIndicator';
+import { OnlineWaitingScreen } from './OnlineWaitingScreen';
+import { useOnlineGameSync } from '../hooks/useOnlineGameSync';
 
 export function UIOverlay() {
   const phase = usePhase();
+
+  // Mount the online sync hook for the lifetime of the overlay
+  useOnlineGameSync();
 
   return (
     <div style={{
@@ -44,6 +49,9 @@ export function UIOverlay() {
         {(phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2) && (
           <CharacterSelectScreen key="select" />
         )}
+
+        {/* Online: waiting for opponent to commit character */}
+        {phase === GamePhase.ONLINE_WAITING && <OnlineWaitingScreen key="online-waiting" />}
 
         {(phase === GamePhase.HANDOFF_P1_TO_P2 ||
           phase === GamePhase.HANDOFF_START ||

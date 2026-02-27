@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from './common/Button';
 import { SchizodioPickerScreen } from './SchizodioPickerScreen';
 import { NoNFTScreen } from './NoNFTScreen';
+import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '../store/selectors';
 import { useWalletStatus, useOwnedNFTs, useIsWalletReady, useWalletStore } from '../starknet/walletStore';
 import { useWalletConnection } from '../starknet/hooks';
@@ -10,7 +11,7 @@ import { MEME_CHARACTERS } from '../data/memeCharacters';
 import { selectGameCharacters, nftToCharacter } from '../data/nftCharacterAdapter';
 import type { SchizodioNFT } from '../starknet/types';
 
-type View = 'menu' | 'picker' | 'no-nft';
+type View = 'menu' | 'picker' | 'no-nft' | 'online';
 
 export function MenuScreen() {
   const [view, setView] = useState<View>('menu');
@@ -94,6 +95,7 @@ export function MenuScreen() {
             ownedNFTs={ownedNFTs}
             onFreePlay={handleFreePlay}
             onPlayForReal={handlePlayForReal}
+            onPlayOnline={() => setView('online')}
           />
         )}
 
@@ -112,6 +114,13 @@ export function MenuScreen() {
             onBack={() => setView('menu')}
           />
         )}
+
+        {view === 'online' && (
+          <OnlineLobbyScreen
+            key="online"
+            onBack={() => setView('menu')}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -126,6 +135,7 @@ interface MenuMainProps {
   ownedNFTs: SchizodioNFT[];
   onFreePlay: () => void;
   onPlayForReal: () => void;
+  onPlayOnline: () => void;
 }
 
 function MenuMain({
@@ -135,6 +145,7 @@ function MenuMain({
   ownedNFTs,
   onFreePlay,
   onPlayForReal,
+  onPlayOnline,
 }: MenuMainProps) {
   return (
     <motion.div
@@ -271,18 +282,34 @@ function MenuMain({
           </motion.button>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          style={{
-            marginTop: 40,
-            fontSize: 12,
-            color: 'rgba(255,255,254,0.2)',
-          }}
-        >
-          Online 1v1 — Play against a friend anywhere in the world
-        </motion.div>
+          {/* Play Online */}
+          <motion.button
+            onClick={onPlayOnline}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              fontSize: 14,
+              padding: '12px 36px',
+              minWidth: 280,
+              background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              borderRadius: 12,
+              color: '#A5B4FC',
+              fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+              fontWeight: 600,
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)',
+              letterSpacing: '0.02em',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            🌐 Play Online{' '}
+            <span style={{ opacity: 0.6, fontSize: 12 }}>1v1 anywhere</span>
+          </motion.button>
       </motion.div>
     </motion.div>
   );
