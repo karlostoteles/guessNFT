@@ -2,6 +2,8 @@ import { useGameStore } from './gameStore';
 import { PlayerId } from './types';
 
 export const usePhase = () => useGameStore((s) => s.phase);
+export const useGameMode = () => useGameStore((s) => s.mode);
+export const useGameCharacters = () => useGameStore((s) => s.characters);
 export const useActivePlayer = () => useGameStore((s) => s.activePlayer);
 export const useTurnNumber = () => useGameStore((s) => s.turnNumber);
 export const useBoardRotation = () => useGameStore((s) => s.boardRotation);
@@ -19,6 +21,7 @@ export const useEliminatedIds = (player: PlayerId) =>
 // Actions are stable — grab them directly from the store, not via selector
 // This avoids creating a new object each render (which causes infinite loops)
 const actions = {
+  get setGameMode() { return useGameStore.getState().setGameMode; },
   get startSetup() { return useGameStore.getState().startSetup; },
   get selectSecretCharacter() { return useGameStore.getState().selectSecretCharacter; },
   get advancePhase() { return useGameStore.getState().advancePhase; },

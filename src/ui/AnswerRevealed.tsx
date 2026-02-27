@@ -46,7 +46,7 @@ export function AnswerRevealed() {
       </motion.div>
 
       <Button variant="accent" size="md" onClick={advancePhase}>
-        Eliminate Characters
+        Continue
       </Button>
     </Card>
   );

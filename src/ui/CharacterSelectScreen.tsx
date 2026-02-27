@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
-import { CHARACTERS } from '../data/characters';
 import { useCharacterPreviews } from '../hooks/useCharacterPreviews';
-import { usePhase, useGameActions } from '../store/selectors';
+import { usePhase, useGameActions, useGameCharacters } from '../store/selectors';
 import { GamePhase, PlayerId } from '../store/types';
 
 export function CharacterSelectScreen() {
   const phase = usePhase();
   const { selectSecretCharacter } = useGameActions();
   const previews = useCharacterPreviews();
+  const characters = useGameCharacters();
 
   const player: PlayerId = phase === GamePhase.SETUP_P1 ? 'player1' : 'player2';
   const playerLabel = player === 'player1' ? 'Player 1' : 'Player 2';
@@ -58,7 +58,7 @@ export function CharacterSelectScreen() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
           gap: 10,
         }}>
-          {CHARACTERS.map((char) => (
+          {characters.map((char) => (
             <motion.button
               key={char.id}
               onClick={() => selectSecretCharacter(player, char.id)}

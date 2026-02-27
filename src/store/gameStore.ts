@@ -11,6 +11,8 @@ function getOpponent(player: PlayerId): PlayerId {
 
 const initialState: GameState = {
   phase: GamePhase.MENU,
+  mode: 'free',
+  characters: CHARACTERS,
   activePlayer: 'player1',
   turnNumber: 1,
   boardRotation: 0,
@@ -27,6 +29,16 @@ const initialState: GameState = {
 export const useGameStore = create<GameState & GameActions>()(
   immer((set) => ({
     ...initialState,
+
+    setGameMode: (mode, characters) =>
+      set((state) => {
+        state.mode = mode;
+        if (characters) {
+          state.characters = characters;
+        } else {
+          state.characters = CHARACTERS; // Default to mock characters
+        }
+      }),
 
     startSetup: () =>
       set((state) => {
@@ -57,9 +69,38 @@ export const useGameStore = create<GameState & GameActions>()(
           case GamePhase.HANDOFF_TO_OPPONENT:
             state.phase = GamePhase.ANSWER_PENDING;
             break;
-          case GamePhase.ANSWER_REVEALED:
-            state.phase = GamePhase.ELIMINATION;
+          case GamePhase.ANSWER_REVEALED: {
+            // Auto-eliminate: compute which characters don't match the answer
+            const q = state.currentQuestion;
+            if (q) {
+              const eliminated = state.players[state.activePlayer].eliminatedCharacterIds;
+              const fullQuestion = QUESTIONS.find((qn) => qn.id === q.questionId);
+              if (fullQuestion) {
+                for (const char of state.characters) {
+                  if (eliminated.includes(char.id)) continue; // already eliminated
+                  const matchesQuestion = evaluateQuestion(fullQuestion, char);
+                  // If answer is YES → eliminate those who DON'T match
+                  // If answer is NO  → eliminate those who DO match
+                  const shouldEliminate = q.answer ? !matchesQuestion : matchesQuestion;
+                  if (shouldEliminate) {
+                    eliminated.push(char.id);
+                  }
+                }
+              }
+            }
+            state.phase = GamePhase.AUTO_ELIMINATING;
             break;
+          }
+          case GamePhase.AUTO_ELIMINATING: {
+            // Auto-advance: switch turns
+            const next = getOpponent(state.activePlayer);
+            state.activePlayer = next;
+            state.boardRotation = next === 'player1' ? 0 : Math.PI;
+            state.turnNumber += 1;
+            state.currentQuestion = null;
+            state.phase = GamePhase.TURN_TRANSITION;
+            break;
+          }
           case GamePhase.TURN_TRANSITION:
             state.phase = GamePhase.QUESTION_SELECT;
             break;
@@ -77,7 +118,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // Auto-evaluate the answer based on the opponent's secret character
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
-        const secretChar = CHARACTERS.find((c) => c.id === secretId);
+        const secretChar = state.characters.find((c) => c.id === secretId);
         const autoAnswer = secretChar ? evaluateQuestion(q, secretChar) : false;
 
         const record = {
@@ -131,7 +172,18 @@ export const useGameStore = create<GameState & GameActions>()(
 
     cancelGuess: () =>
       set((state) => {
-        state.phase = GamePhase.QUESTION_SELECT;
+        if (state.currentQuestion) {
+          // Already asked a question this turn — advance to next player
+          const next = getOpponent(state.activePlayer);
+          state.activePlayer = next;
+          state.boardRotation = next === 'player1' ? 0 : Math.PI;
+          state.turnNumber += 1;
+          state.currentQuestion = null;
+          state.phase = GamePhase.TURN_TRANSITION;
+        } else {
+          // Hadn't asked a question yet — go back to question select
+          state.phase = GamePhase.QUESTION_SELECT;
+        }
       }),
 
     makeGuess: (characterId) =>
@@ -149,7 +201,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
     resetGame: () =>
       set((state) => {
+        // Preserve mode and characters across game resets
+        const currentMode = state.mode;
+        const currentChars = state.characters;
         Object.assign(state, initialState);
+        state.mode = currentMode;
+        state.characters = currentChars;
         // Reset nested objects explicitly since immer uses proxies
         state.players = {
           player1: { secretCharacterId: null, eliminatedCharacterIds: [] },

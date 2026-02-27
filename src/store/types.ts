@@ -1,3 +1,7 @@
+import type { Character } from '../data/characters';
+
+export type GameMode = 'free' | 'nft';
+
 export enum GamePhase {
   MENU = 'MENU',
   SETUP_P1 = 'SETUP_P1',
@@ -8,6 +12,7 @@ export enum GamePhase {
   HANDOFF_TO_OPPONENT = 'HANDOFF_TO_OPPONENT',
   ANSWER_PENDING = 'ANSWER_PENDING',
   ANSWER_REVEALED = 'ANSWER_REVEALED',
+  AUTO_ELIMINATING = 'AUTO_ELIMINATING', // tiles flipping down automatically
   ELIMINATION = 'ELIMINATION',
   TURN_TRANSITION = 'TURN_TRANSITION',
   GUESS_SELECT = 'GUESS_SELECT',
@@ -34,6 +39,8 @@ export interface PlayerState {
 
 export interface GameState {
   phase: GamePhase;
+  mode: GameMode;
+  characters: Character[];
   activePlayer: PlayerId;
   turnNumber: number;
   boardRotation: number; // Y-axis rotation in radians, 0 or PI
@@ -45,6 +52,7 @@ export interface GameState {
 }
 
 export interface GameActions {
+  setGameMode: (mode: GameMode, characters?: Character[]) => void;
   startSetup: () => void;
   selectSecretCharacter: (player: PlayerId, characterId: string) => void;
   advancePhase: () => void;

@@ -16,7 +16,10 @@
     "immer": "^11.1.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "starknet": "^9.2.1",
+    "starkzap": "^1.0.0",
     "three": "^0.183.1",
+    "vite-plugin-node-polyfills": "^0.25.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

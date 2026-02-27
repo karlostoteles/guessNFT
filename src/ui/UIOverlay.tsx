@@ -8,9 +8,12 @@ import { TurnIndicator } from './TurnIndicator';
 import { QuestionPanel } from './QuestionPanel';
 import { AnswerPanel } from './AnswerPanel';
 import { AnswerRevealed } from './AnswerRevealed';
+import { AutoEliminatingOverlay } from './AutoEliminatingOverlay';
 import { EliminationPrompt } from './EliminationPrompt';
 import { GuessPanel } from './GuessPanel';
 import { ResultScreen } from './ResultScreen';
+import { RiskItButton } from './RiskItButton';
+import { WalletButton } from './WalletButton';
 
 export function UIOverlay() {
   const phase = usePhase();
@@ -23,6 +26,12 @@ export function UIOverlay() {
       zIndex: 1,
     }}>
       <TurnIndicator />
+
+      {/* Wallet connection status — always visible */}
+      <WalletButton />
+
+      {/* Always-visible Risk It button during gameplay */}
+      <RiskItButton />
 
       <AnimatePresence mode="wait">
         {phase === GamePhase.MENU && <MenuScreen key="menu" />}
@@ -43,6 +52,8 @@ export function UIOverlay() {
         {phase === GamePhase.ANSWER_PENDING && <AnswerPanel key="answer" />}
 
         {phase === GamePhase.ANSWER_REVEALED && <AnswerRevealed key="revealed" />}
+
+        {phase === GamePhase.AUTO_ELIMINATING && <AutoEliminatingOverlay key="auto-elim" />}
 
         {phase === GamePhase.ELIMINATION && <EliminationPrompt key="elimination" />}
 

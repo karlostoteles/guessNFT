@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CHARACTERS } from '../data/characters';
+import { useGameCharacters } from '../store/selectors';
 import { renderPortrait } from '../canvas/PortraitRenderer';
 
 /**
@@ -8,9 +8,10 @@ import { renderPortrait } from '../canvas/PortraitRenderer';
  * 2D thumbnails rather than Three.js textures.
  */
 export function useCharacterPreviews(): Map<string, string> {
+  const characters = useGameCharacters();
   return useMemo(() => {
     const map = new Map<string, string>();
-    for (const char of CHARACTERS) {
+    for (const char of characters) {
       const texture = renderPortrait(char);
       if (texture.image instanceof HTMLCanvasElement) {
         const small = document.createElement('canvas');
@@ -23,5 +24,5 @@ export function useCharacterPreviews(): Map<string, string> {
       texture.dispose();
     }
     return map;
-  }, []);
+  }, [characters]);
 }

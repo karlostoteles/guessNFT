@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CHARACTERS } from '../data/characters';
+import { useGameCharacters } from '../store/selectors';
 import { TILE, BOARD } from '../utils/constants';
 import { CharacterTile } from './CharacterTile';
 
@@ -8,6 +8,7 @@ interface CharacterGridProps {
 }
 
 export function CharacterGrid({ textures }: CharacterGridProps) {
+  const characters = useGameCharacters();
   const totalWidth = TILE.cols * TILE.width + (TILE.cols - 1) * TILE.gap;
   const totalDepth = TILE.rows * TILE.height + (TILE.rows - 1) * TILE.gap;
   const startX = -totalWidth / 2 + TILE.width / 2;
@@ -15,7 +16,7 @@ export function CharacterGrid({ textures }: CharacterGridProps) {
 
   return (
     <group position={[0, BOARD.height / 2 + 0.01, 0]}>
-      {CHARACTERS.map((char, i) => {
+      {characters.map((char, i) => {
         const col = i % TILE.cols;
         const row = Math.floor(i / TILE.cols);
         const x = startX + col * (TILE.width + TILE.gap);

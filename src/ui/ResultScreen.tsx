@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
-import { useWinner, useGuessedCharacterId, useActivePlayer, useGameActions, usePlayerState } from '../store/selectors';
-import { CHARACTERS } from '../data/characters';
+import { useWinner, useGuessedCharacterId, useActivePlayer, useGameActions, usePlayerState, useGameCharacters } from '../store/selectors';
 import { COLORS } from '../utils/constants';
 
 export function ResultScreen() {
@@ -11,15 +10,16 @@ export function ResultScreen() {
   const { resetGame } = useGameActions();
   const p1State = usePlayerState('player1');
   const p2State = usePlayerState('player2');
+  const characters = useGameCharacters();
 
   if (!winner) return null;
 
   const winnerLabel = winner === 'player1' ? 'Player 1' : 'Player 2';
   const winnerColor = winner === 'player1' ? COLORS.player1.primary : COLORS.player2.primary;
 
-  const p1Secret = CHARACTERS.find((c) => c.id === p1State.secretCharacterId);
-  const p2Secret = CHARACTERS.find((c) => c.id === p2State.secretCharacterId);
-  const guessedChar = CHARACTERS.find((c) => c.id === guessedId);
+  const p1Secret = characters.find((c) => c.id === p1State.secretCharacterId);
+  const p2Secret = characters.find((c) => c.id === p2State.secretCharacterId);
+  const guessedChar = characters.find((c) => c.id === guessedId);
 
   return (
     <motion.div

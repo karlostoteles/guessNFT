@@ -1,15 +1,17 @@
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
-import { CHARACTERS } from '../data/characters';
 import { useCharacterPreviews } from '../hooks/useCharacterPreviews';
-import { useActivePlayer, useEliminatedIds, useGameActions } from '../store/selectors';
+import { useActivePlayer, useEliminatedIds, useCurrentQuestion, useGameActions, useGameCharacters } from '../store/selectors';
 
 export function GuessPanel() {
   const activePlayer = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
+  const currentQuestion = useCurrentQuestion();
   const { makeGuess, cancelGuess } = useGameActions();
   const previews = useCharacterPreviews();
+  const characters = useGameCharacters();
+  const midTurn = currentQuestion !== null;
 
   return (
     <motion.div
@@ -38,20 +40,22 @@ export function GuessPanel() {
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: 24,
             fontWeight: 800,
-            color: '#E8A444',
+            background: 'linear-gradient(135deg, #E8A444, #E05555)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
             marginBottom: 4,
           }}>
-            Make Your Guess
+            🎯 Risk It All!
           </div>
           <div style={{
             fontSize: 13,
             color: 'rgba(255,255,254,0.4)',
             marginBottom: 12,
           }}>
-            If you're wrong, you lose!
+            Pick the secret character — guess wrong and you lose!
           </div>
           <Button variant="secondary" size="sm" onClick={cancelGuess}>
-            Go Back
+            {midTurn ? 'Nevermind, end turn' : 'Go Back'}
           </Button>
         </div>
 
@@ -60,7 +64,7 @@ export function GuessPanel() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
           gap: 10,
         }}>
-          {CHARACTERS.map((char) => {
+          {characters.map((char) => {
             const isEliminated = eliminatedIds.includes(char.id);
             return (
               <motion.button

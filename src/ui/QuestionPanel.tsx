@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './common/Card';
-import { Button } from './common/Button';
 import { QUESTIONS, Question } from '../data/questions';
 import { useGameActions } from '../store/selectors';
 
@@ -15,7 +14,7 @@ type Category = typeof CATEGORIES[number]['key'];
 
 export function QuestionPanel() {
   const [activeCategory, setActiveCategory] = useState<Category>('hair');
-  const { askQuestion, startGuess } = useGameActions();
+  const { askQuestion } = useGameActions();
 
   const filteredQuestions = QUESTIONS.filter((q) => q.category === activeCategory);
 
@@ -33,9 +32,6 @@ export function QuestionPanel() {
     }}>
       {/* Header */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         marginBottom: 16,
       }}>
         <h3 style={{
@@ -46,9 +42,6 @@ export function QuestionPanel() {
         }}>
           Ask a Question
         </h3>
-        <Button variant="accent" size="sm" onClick={startGuess}>
-          Make a Guess
-        </Button>
       </div>
 
       {/* Category tabs */}
