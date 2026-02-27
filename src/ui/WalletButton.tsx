@@ -61,7 +61,7 @@ export function WalletButton() {
               </>
             ) : (
               <>
-                <WalletIcon /> Connect Wallet
+                <WalletIcon /> Login
               </>
             )}
           </motion.button>

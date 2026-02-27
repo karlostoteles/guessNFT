@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { CSSProperties, ReactNode } from 'react';
+import { sfx } from '../../audio/sfx';
 
 interface ButtonProps {
   children: ReactNode;
@@ -54,7 +55,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <motion.button
-      onClick={onClick}
+      onClick={disabled ? onClick : () => { sfx.click(); onClick?.(); }}
       disabled={disabled}
       whileHover={disabled ? {} : { scale: 1.03, filter: 'brightness(1.15)' }}
       whileTap={disabled ? {} : { scale: 0.97 }}

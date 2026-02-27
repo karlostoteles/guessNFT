@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePhase, useGameActions } from '../store/selectors';
 import { GamePhase } from '../store/types';
+import { sfx } from '../audio/sfx';
 
 const VISIBLE_PHASES = new Set([
   GamePhase.QUESTION_SELECT,
@@ -14,6 +15,11 @@ export function RiskItButton() {
   const { startGuess } = useGameActions();
   const visible = VISIBLE_PHASES.has(phase);
 
+  const handleClick = () => {
+    sfx.riskIt();
+    startGuess();
+  };
+
   return (
     <AnimatePresence>
       {visible && (
@@ -23,7 +29,7 @@ export function RiskItButton() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 20 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          onClick={startGuess}
+          onClick={handleClick}
           style={{
             position: 'fixed',
             top: 16,

@@ -49,7 +49,15 @@ export const useGameStore = create<GameState & GameActions>()(
       set((state) => {
         state.players[player].secretCharacterId = characterId;
         if (player === 'player1') {
-          state.phase = GamePhase.HANDOFF_P1_TO_P2;
+          if (state.mode === 'free') {
+            // CPU (player2) picks a random character automatically
+            const pool = state.characters.filter((c) => c.id !== characterId);
+            const cpuPick = pool[Math.floor(Math.random() * pool.length)];
+            if (cpuPick) state.players.player2.secretCharacterId = cpuPick.id;
+            state.phase = GamePhase.HANDOFF_START;
+          } else {
+            state.phase = GamePhase.HANDOFF_P1_TO_P2;
+          }
         } else {
           state.phase = GamePhase.HANDOFF_START;
         }
@@ -104,6 +112,17 @@ export const useGameStore = create<GameState & GameActions>()(
           case GamePhase.TURN_TRANSITION:
             state.phase = GamePhase.QUESTION_SELECT;
             break;
+          case GamePhase.GUESS_WRONG: {
+            // Wrong Risk It — end the guesser's turn, opponent continues
+            const next = getOpponent(state.activePlayer);
+            state.activePlayer = next;
+            state.boardRotation = next === 'player1' ? 0 : Math.PI;
+            state.turnNumber += 1;
+            state.currentQuestion = null;
+            state.guessedCharacterId = null;
+            state.phase = GamePhase.TURN_TRANSITION;
+            break;
+          }
           case GamePhase.GUESS_RESULT:
             state.phase = GamePhase.GAME_OVER;
             break;
@@ -192,11 +211,13 @@ export const useGameStore = create<GameState & GameActions>()(
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
         if (characterId === secretId) {
+          // Correct! Declare winner
           state.winner = state.activePlayer;
+          state.phase = GamePhase.GUESS_RESULT;
         } else {
-          state.winner = opponent;
+          // Wrong — show reveal briefly, then turn passes
+          state.phase = GamePhase.GUESS_WRONG;
         }
-        state.phase = GamePhase.GUESS_RESULT;
       }),
 
     resetGame: () =>

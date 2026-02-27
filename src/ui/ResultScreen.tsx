@@ -1,12 +1,18 @@
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { useWinner, useGuessedCharacterId, useActivePlayer, useGameActions, usePlayerState, useGameCharacters } from '../store/selectors';
 import { COLORS } from '../utils/constants';
+import { sfx } from '../audio/sfx';
 
 export function ResultScreen() {
   const winner = useWinner();
   const guessedId = useGuessedCharacterId();
+
+  // Play win fanfare on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { sfx.win(); }, []);
   const { resetGame } = useGameActions();
   const p1State = usePlayerState('player1');
   const p2State = usePlayerState('player2');

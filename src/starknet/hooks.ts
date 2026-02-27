@@ -23,7 +23,7 @@ export function useWalletConnection() {
       const wallet = await connectCartridgeWallet();
 
       // Extract address from the wallet
-      const address = wallet.address || wallet.account?.address;
+      const address = wallet.address;
       if (!address) throw new Error('No address returned from wallet');
 
       state.setAddress(address);

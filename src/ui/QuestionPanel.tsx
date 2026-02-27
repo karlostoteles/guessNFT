@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './common/Card';
 import { QUESTIONS, Question } from '../data/questions';
 import { useGameActions } from '../store/selectors';
+import { sfx } from '../audio/sfx';
 
 const CATEGORIES = [
   { key: 'hair', label: 'Hair', icon: '/' },
@@ -102,7 +103,7 @@ export function QuestionPanel() {
             }}
           >
             {filteredQuestions.map((q) => (
-              <QuestionButton key={q.id} question={q} onClick={() => askQuestion(q.id)} />
+              <QuestionButton key={q.id} question={q} onClick={() => { sfx.question(); askQuestion(q.id); }} />
             ))}
           </motion.div>
         </AnimatePresence>

@@ -11,6 +11,7 @@ import { AnswerRevealed } from './AnswerRevealed';
 import { AutoEliminatingOverlay } from './AutoEliminatingOverlay';
 import { EliminationPrompt } from './EliminationPrompt';
 import { GuessPanel } from './GuessPanel';
+import { GuessWrongOverlay } from './GuessWrongOverlay';
 import { ResultScreen } from './ResultScreen';
 import { RiskItButton } from './RiskItButton';
 import { WalletButton } from './WalletButton';
@@ -58,6 +59,8 @@ export function UIOverlay() {
         {phase === GamePhase.ELIMINATION && <EliminationPrompt key="elimination" />}
 
         {phase === GamePhase.GUESS_SELECT && <GuessPanel key="guess" />}
+
+        {phase === GamePhase.GUESS_WRONG && <GuessWrongOverlay key="guess-wrong" />}
 
         {(phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER) && (
           <ResultScreen key="result" />
