@@ -157,7 +157,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             Get your SCHIZODIO to join the game.
           </div>
           <motion.a
-            href="https://unframed.co/collection/0x077485a949c130cf0d98819d2b0749f5860b0734ea28cb678dd3f39379131bfa"
+            href="https://schizodio.art/"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.04 }}
