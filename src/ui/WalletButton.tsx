@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWalletStatus, useWalletUsername, useWalletAddress, useOwnedNFTs } from '../starknet/walletStore';
 import { useWalletConnection } from '../starknet/hooks';
+import { IPFS_GATEWAYS, resolveUrl } from '../starknet/nftService';
 import type { SchizodioNFT } from '../starknet/types';
 
 /**
@@ -14,10 +15,10 @@ export function WalletButton() {
   const username = useWalletUsername();
   const address  = useWalletAddress();
   const nfts     = useOwnedNFTs();
-  const { disconnectWallet } = useWalletConnection();
-
-  const [open, setOpen]     = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { disconnectWallet, refreshNFTs } = useWalletConnection();
+  const [open, setOpen]         = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const isConnected = status === 'connected' || status === 'ready' || status === 'loading_nfts';
   const displayName = username || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '');
@@ -34,6 +35,13 @@ export function WalletButton() {
   const handleDisconnect = () => {
     disconnectWallet();
     setOpen(false);
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    await refreshNFTs();
+    setRefreshing(false);
   };
 
   return (
@@ -277,15 +285,41 @@ export function WalletButton() {
                 {nfts.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{
-                      fontSize: 10,
-                      color: 'rgba(255,255,254,0.3)',
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       marginBottom: 8,
                     }}>
-                      SCHIZODIO · {nfts.length} token{nfts.length > 1 ? 's' : ''}
+                      <span style={{
+                        fontSize: 10,
+                        color: 'rgba(255,255,254,0.3)',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                      }}>
+                        SCHIZODIO · {nfts.length} token{nfts.length > 1 ? 's' : ''}
+                      </span>
+                      <motion.button
+                        onClick={handleRefresh}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        title="Refresh NFT images"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: refreshing ? 'default' : 'pointer',
+                          color: 'rgba(255,255,254,0.3)',
+                          fontSize: 13,
+                          padding: '2px 4px',
+                          outline: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          animation: refreshing ? 'spin 1s linear infinite' : 'none',
+                        }}
+                      >
+                        ↻
+                      </motion.button>
                     </div>
                     <div style={{
                       display: 'grid',
@@ -350,10 +384,36 @@ export function WalletButton() {
 
 // ─── NFT Card ─────────────────────────────────────────────────────────────────
 
-function NftCard({ nft }: { nft: SchizodioNFT }) {
-  const [imgError, setImgError] = useState(false);
-  const showImage = nft.imageUrl && !imgError;
+/**
+ * Displays one NFT thumbnail, cycling through IPFS gateways on load failure.
+ * rawImageIpfs is the original ipfs:// URL (stored alongside imageUrl for retries).
+ */
+function NftCard({ nft }: { nft: SchizodioNFT & { rawImageIpfs?: string } }) {
+  const rawIpfs = (nft as any).rawImageIpfs as string | undefined;
+  // gatewayIdx = 0 → nft.imageUrl (already resolved with gateway 0)
+  // gatewayIdx = 1..N → try next gateways using raw ipfs:// path
+  const [gatewayIdx, setGatewayIdx] = useState(0);
   const hue = (parseInt(nft.tokenId, 10) * 47) % 360;
+
+  const resolvedSrc = (() => {
+    if (!nft.imageUrl && !rawIpfs) return '';
+    if (gatewayIdx === 0) return nft.imageUrl;
+    if (rawIpfs) return resolveUrl(rawIpfs, gatewayIdx);
+    return '';
+  })();
+
+  const showImage = !!resolvedSrc;
+  const allGatewaysFailed = gatewayIdx >= IPFS_GATEWAYS.length;
+
+  const handleError = () => {
+    if (rawIpfs && gatewayIdx < IPFS_GATEWAYS.length - 1) {
+      console.warn(`[NftCard] gateway ${gatewayIdx} failed for #${nft.tokenId}, trying next`);
+      setGatewayIdx((i) => i + 1);
+    } else {
+      console.warn(`[NftCard] all gateways failed for #${nft.tokenId}`);
+      setGatewayIdx(IPFS_GATEWAYS.length); // mark as exhausted
+    }
+  };
 
   return (
     <motion.div
@@ -370,7 +430,7 @@ function NftCard({ nft }: { nft: SchizodioNFT }) {
     >
       <div style={{
         aspectRatio: '1/1',
-        background: showImage
+        background: (showImage && !allGatewaysFailed)
           ? '#000'
           : `linear-gradient(135deg, hsl(${hue},55%,16%), hsl(${hue + 40},45%,10%))`,
         display: 'flex',
@@ -378,11 +438,12 @@ function NftCard({ nft }: { nft: SchizodioNFT }) {
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        {showImage ? (
+        {showImage && !allGatewaysFailed ? (
           <img
-            src={nft.imageUrl}
+            key={gatewayIdx}
+            src={resolvedSrc}
             alt={nft.name}
-            onError={() => setImgError(true)}
+            onError={handleError}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (

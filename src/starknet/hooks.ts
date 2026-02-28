@@ -63,5 +63,20 @@ export function useWalletConnection() {
     resetSDK();
   }, [store]);
 
-  return { connectWallet, disconnectWallet };
+  /** Re-fetch NFT metadata for the current address without disconnecting. */
+  const refreshNFTs = useCallback(async () => {
+    const state = store.getState();
+    if (!state.address || state.status !== 'ready') return;
+    state.setStatus('loading_nfts');
+    try {
+      const nfts = await fetchAllOwnedNFTs(state.address);
+      state.setOwnedNFTs(nfts);
+    } catch (err) {
+      console.warn('[wallet] NFT refresh failed:', err);
+    } finally {
+      store.getState().setStatus('ready');
+    }
+  }, [store]);
+
+  return { connectWallet, disconnectWallet, refreshNFTs };
 }

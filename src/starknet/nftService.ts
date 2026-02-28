@@ -14,8 +14,14 @@ import {
 import { SCHIZODIO_CONTRACT, RPC_URL } from './config';
 import type { SchizodioNFT, NFTAttribute } from './types';
 
-// ── IPFS gateway — cloudflare is more reliable and CORS-permissive ────────────
-const IPFS_GATEWAY = 'https://cloudflare-ipfs.com/ipfs/';
+// ── IPFS gateways — tried in order until one responds ─────────────────────────
+// cloudflare-ipfs.com was deprecated/shut down in 2024, do NOT use it.
+export const IPFS_GATEWAYS = [
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://nftstorage.link/ipfs/',
+];
 
 // Minimal ERC-721 ABI for read operations (both camelCase and snake_case)
 const ERC721_ABI: Abi = [
@@ -146,15 +152,50 @@ function decodeStarknetString(raw: any): string {
 
 /**
  * Resolve IPFS and HTTP URIs to usable HTTP URLs.
- * Also handles base64-encoded data URIs (on-chain metadata).
+ * gatewayIndex lets callers retry with the next gateway on failure.
  */
-function resolveUrl(url: string): string {
+export function resolveUrl(url: string, gatewayIndex = 0): string {
   if (!url) return '';
   if (url.startsWith('ipfs://')) {
-    return url.replace('ipfs://', IPFS_GATEWAY);
+    const gateway = IPFS_GATEWAYS[gatewayIndex % IPFS_GATEWAYS.length];
+    return url.replace('ipfs://', gateway);
   }
   // Already HTTP/HTTPS or data URI
   return url;
+}
+
+/**
+ * Fetch a URL trying all IPFS gateways until one succeeds.
+ * Only applies the gateway rotation if the URL contains an IPFS path.
+ */
+async function fetchWithGatewayFallback(url: string): Promise<Response> {
+  // For non-IPFS URLs, just fetch directly
+  if (!url.startsWith('ipfs://') && !IPFS_GATEWAYS.some((g) => url.startsWith(g))) {
+    return fetch(url);
+  }
+
+  // Extract the raw IPFS path (cid/path)
+  let ipfsPath = url;
+  if (url.startsWith('ipfs://')) {
+    ipfsPath = url.slice('ipfs://'.length);
+  } else {
+    for (const g of IPFS_GATEWAYS) {
+      if (url.startsWith(g)) { ipfsPath = url.slice(g.length); break; }
+    }
+  }
+
+  let lastErr: unknown;
+  for (const gateway of IPFS_GATEWAYS) {
+    try {
+      const resp = await fetch(gateway + ipfsPath);
+      if (resp.ok) return resp;
+      lastErr = new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    console.warn(`[nftService] gateway ${gateway} failed, trying next…`);
+  }
+  throw lastErr;
 }
 
 /**
@@ -292,23 +333,27 @@ export async function fetchTokenMetadata(tokenId: string): Promise<{
     }
   }
 
-  // External metadata URI — fetch it
+  // External metadata URI — fetch with gateway fallback
   try {
-    const httpUrl = resolveUrl(uri);
-    console.log(`[nftService] Token #${tokenId} fetching metadata from:`, httpUrl);
-    const response = await fetch(httpUrl);
+    console.log(`[nftService] Token #${tokenId} fetching metadata from:`, uri);
+    const response = await fetchWithGatewayFallback(uri);
     const metadata = parseMetadata(await response.text());
 
-    const imageUrl = resolveUrl(
-      metadata.image || metadata.image_url || metadata.image_data || metadata.animation_url || '',
-    );
+    // Keep raw ipfs:// URL so the NftCard can rotate gateways on error.
+    // Fall back to a resolved HTTP URL for plain HTTP images.
+    const rawImage = metadata.image || metadata.image_url || metadata.image_data || metadata.animation_url || '';
+    const imageUrl = rawImage.startsWith('ipfs://')
+      ? resolveUrl(rawImage, 0)   // start with ipfs.io gateway
+      : resolveUrl(rawImage);
     console.log(`[nftService] Token #${tokenId} imageUrl:`, imageUrl);
 
     return {
       name: metadata.name || `SCHIZODIO #${tokenId}`,
       imageUrl,
+      // Store raw ipfs path for gateway fallback in the UI
+      rawImageIpfs: rawImage.startsWith('ipfs://') ? rawImage : undefined,
       attributes: metadata.attributes || [],
-    };
+    } as any;
   } catch (err) {
     console.warn(`[nftService] Metadata fetch failed for #${tokenId}:`, err);
     return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
