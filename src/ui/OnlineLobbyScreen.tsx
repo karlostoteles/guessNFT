@@ -29,6 +29,26 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Access bypass — persisted in localStorage so it survives page refresh
+  const [bypassActive, setBypassActive] = useState(
+    () => localStorage.getItem('whoiswho_bypass') === '1'
+  );
+  const [showBypassInput, setShowBypassInput] = useState(false);
+  const [bypassInput, setBypassInput]         = useState('');
+  const [bypassShake, setBypassShake]         = useState(false);
+
+  const handleBypassSubmit = () => {
+    // Simple string comparison — obfuscated enough for a client-side secret
+    if (btoa(bypassInput.trim()) === btoa('starknethas8users')) {
+      localStorage.setItem('whoiswho_bypass', '1');
+      setBypassActive(true);
+    } else {
+      setBypassShake(true);
+      setTimeout(() => setBypassShake(false), 600);
+      setBypassInput('');
+    }
+  };
+
   const walletAddress = useWalletAddress();
   const walletStatus = useWalletStatus();
   const ownedNFTs = useOwnedNFTs();
@@ -131,8 +151,8 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     );
   }
 
-  // NFT gate — logged in but holds no SCHIZODIO
-  if (walletStatus === 'ready' && ownedNFTs.length === 0) {
+  // NFT gate — logged in but holds no SCHIZODIO (and no bypass)
+  if (walletStatus === 'ready' && ownedNFTs.length === 0 && !bypassActive) {
     return (
       <LobbyWrapper onBack={onBack}>
         <div style={{ textAlign: 'center', padding: 32 }}>
@@ -177,6 +197,88 @@ export function OnlineLobbyScreen({ onBack }: Props) {
           >
             Get SCHIZODIO →
           </motion.a>
+
+          {/* ── Access code bypass ─────────────────────────── */}
+          <div style={{ marginTop: 32 }}>
+            {!showBypassInput ? (
+              <button
+                onClick={() => setShowBypassInput(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255,255,254,0.2)',
+                  fontSize: 11,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  cursor: 'pointer',
+                  outline: 'none',
+                  textDecoration: 'underline',
+                  textDecorationColor: 'rgba(255,255,254,0.1)',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                Have an access code?
+              </button>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
+              >
+                <motion.div
+                  animate={bypassShake ? {
+                    x: [-6, 6, -5, 5, -3, 3, 0],
+                    transition: { duration: 0.4 },
+                  } : {}}
+                  style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 260 }}
+                >
+                  <input
+                    autoFocus
+                    value={bypassInput}
+                    onChange={(e) => setBypassInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleBypassSubmit()}
+                    placeholder="Enter access code"
+                    type="password"
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${bypassShake ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                      borderRadius: 9,
+                      padding: '9px 12px',
+                      color: '#FFFFFE',
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: 13,
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                  />
+                  <motion.button
+                    onClick={handleBypassSubmit}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                      background: 'rgba(124,58,237,0.2)',
+                      border: '1px solid rgba(124,58,237,0.4)',
+                      borderRadius: 9,
+                      padding: '9px 14px',
+                      color: '#A78BFA',
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    Apply
+                  </motion.button>
+                </motion.div>
+                {bypassShake && (
+                  <span style={{ fontSize: 11, color: 'rgba(239,68,68,0.7)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    Invalid code
+                  </span>
+                )}
+              </motion.div>
+            )}
+          </div>
         </div>
       </LobbyWrapper>
     );
@@ -334,7 +436,9 @@ export function OnlineLobbyScreen({ onBack }: Props) {
                       </span>
                     </div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,254,0.3)', lineHeight: 1.4 }}>
-                      Bet your SCHIZODIO NFT — winner takes all
+                      {bypassActive
+                        ? 'Requires a real SCHIZODIO NFT to bet'
+                        : 'Bet your SCHIZODIO NFT — winner takes all'}
                     </div>
                   </div>
                 </div>
