@@ -15,6 +15,7 @@ import { isSupabaseConfigured, supabase } from '../supabase/client';
 import { useGameActions } from '../store/selectors';
 import { MEME_CHARACTERS } from '../data/memeCharacters';
 import { selectGameCharacters } from '../data/nftCharacterAdapter';
+import { generateAllCollectionCharacters } from '../starknet/collectionService';
 
 interface Props {
   onBack: () => void;
@@ -284,8 +285,9 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     );
   }
 
-  // Characters = only the player's own NFTs (mapped to game chars)
-  const getCharacters = () => selectGameCharacters(ownedNFTs, MEME_CHARACTERS);
+  // Characters = full 999-token collection (adaptive board shows all SCHIZODIOs)
+  // Own NFTs determine eligibility (gated above) but the BOARD uses all 999 tokens.
+  const getCharacters = () => generateAllCollectionCharacters();
 
   const handleCreate = async () => {
     setError('');

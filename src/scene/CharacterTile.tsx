@@ -1,134 +1,159 @@
+/**
+ * CharacterTile — renders a single character tile at 2 LOD tiers.
+ *
+ * LOD is determined by `tileW` (world-space width of the tile):
+ *
+ *   flat  (< 1.0)   plain card front + portrait plane, no depth, click events.
+ *   full  (>= 1.0)  3D card with depth + name label + full effects.
+ *
+ * Position and flip animation are driven by the PARENT CharacterGrid's
+ * single useFrame (via group refs).  The `pivotRef` callback lets
+ * CharacterGrid store and control the flip group directly.
+ */
+
 import { useRef, useState, useCallback } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { TILE } from '../utils/constants';
 import { GamePhase } from '../store/types';
 import { usePhase, useActivePlayer, useEliminatedIds, useGameActions } from '../store/selectors';
 
 interface CharacterTileProps {
-  characterId: string;
+  characterId:   string;
   characterName: string;
-  texture: THREE.Texture;
-  position: [number, number, number];
+  texture:       THREE.Texture | undefined;
+  tileW:         number;
+  tileH:         number;
+  /** Callback so CharacterGrid can control the flip rotation */
+  pivotRef:      (el: THREE.Group | null) => void;
 }
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-export function CharacterTile({ characterId, characterName, texture, position }: CharacterTileProps) {
-  const phase = usePhase();
-  const activePlayer = useActivePlayer();
+export function CharacterTile({
+  characterId, characterName, texture, tileW, tileH, pivotRef,
+}: CharacterTileProps) {
+  const phase         = usePhase();
+  const activePlayer  = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
   const { toggleElimination } = useGameActions();
   const [hovered, setHovered] = useState(false);
 
-  const pivotRef = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
-  const labelRef = useRef<THREE.Mesh>(null);
 
-  const isEliminated = eliminatedIds.includes(characterId);
   const isInteractive = phase === GamePhase.ELIMINATION;
+  const isFlat        = tileW < 1.0;
+  const DEPTH         = Math.min(0.06, tileW * 0.04);
 
-  // Animate flip and emissive with useFrame
+  // Hover glow (emissive) animation
   useFrame((_, delta) => {
-    if (pivotRef.current) {
-      const target = isEliminated ? -Math.PI / 2.2 : 0;
-      pivotRef.current.rotation.x = lerp(pivotRef.current.rotation.x, target, 1 - Math.pow(0.001, delta));
-    }
     if (matRef.current) {
       const target = hovered && isInteractive ? 0.35 : 0;
-      matRef.current.emissiveIntensity = lerp(matRef.current.emissiveIntensity, target, 1 - Math.pow(0.001, delta));
+      matRef.current.emissiveIntensity = lerp(
+        matRef.current.emissiveIntensity, target, 1 - Math.pow(0.001, delta),
+      );
     }
   });
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    if (isInteractive) {
-      toggleElimination(characterId);
-    }
+    if (isInteractive) toggleElimination(characterId);
   }, [isInteractive, toggleElimination, characterId]);
 
-  const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
+  const handleOver = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    if (isInteractive) {
-      setHovered(true);
-      document.body.style.cursor = 'pointer';
-    }
+    if (isInteractive) { setHovered(true); document.body.style.cursor = 'pointer'; }
   }, [isInteractive]);
 
-  const handlePointerOut = useCallback(() => {
+  const handleOut = useCallback(() => {
     setHovered(false);
     document.body.style.cursor = 'auto';
   }, []);
 
   return (
-    <group position={position}>
-      {/* Pivot point at bottom of tile */}
-      <group ref={pivotRef}>
-        <group position={[0, TILE.height / 2, 0]}>
-          {/* Card body */}
-          <mesh
-            onClick={handleClick}
-            onPointerOver={handlePointerOver}
-            onPointerOut={handlePointerOut}
-          >
-            <boxGeometry args={[TILE.width, TILE.height, TILE.depth]} />
+    /* Pivot at tile bottom — parent CharacterGrid controls rotation.x for flip */
+    <group ref={pivotRef}>
+      <group position={[0, tileH / 2, 0]}>
+
+        {/* Card body */}
+        {isFlat ? (
+          <mesh onClick={handleClick} onPointerOver={handleOver} onPointerOut={handleOut}>
+            <planeGeometry args={[tileW, tileH]} />
             <meshStandardMaterial
               ref={matRef}
-              color="#FFFFFF"
+              color={texture ? '#FFFFFF' : '#8899BB'}
+              roughness={0.55}
+              emissive="#E8A444"
+              emissiveIntensity={0}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        ) : (
+          <mesh onClick={handleClick} onPointerOver={handleOver} onPointerOut={handleOut}>
+            <boxGeometry args={[tileW, tileH, DEPTH]} />
+            <meshStandardMaterial
+              ref={matRef}
+              color={texture ? '#FFFFFF' : '#8899BB'}
               roughness={0.5}
               metalness={0.05}
               emissive="#E8A444"
               emissiveIntensity={0}
             />
           </mesh>
+        )}
 
-          {/* Portrait on front face */}
-          <mesh position={[0, 0, TILE.depth / 2 + 0.001]}>
-            <planeGeometry args={[TILE.width - 0.15, TILE.height - 0.3]} />
-            <meshStandardMaterial map={texture} roughness={0.6} />
+        {/* Portrait */}
+        {texture && (
+          <mesh position={[0, 0, (isFlat ? 0 : DEPTH / 2) + 0.001]}>
+            <planeGeometry args={[tileW * 0.92, tileH * 0.84]} />
+            <meshStandardMaterial map={texture} roughness={0.6} transparent />
           </mesh>
+        )}
 
-          {/* Card back */}
-          <mesh position={[0, 0, -TILE.depth / 2 - 0.001]} rotation={[0, Math.PI, 0]}>
-            <planeGeometry args={[TILE.width - 0.15, TILE.height - 0.3]} />
+        {/* Card back (full LOD only) */}
+        {!isFlat && (
+          <mesh position={[0, 0, -DEPTH / 2 - 0.001]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[tileW * 0.92, tileH * 0.84]} />
             <meshStandardMaterial color="#2d1810" roughness={0.8} />
           </mesh>
-        </group>
-      </group>
+        )}
 
-      {/* Name label using canvas texture */}
-      <NameLabel name={characterName} />
+        {/* Name label (full LOD only) */}
+        {!isFlat && (
+          <NameLabel name={characterName} tileW={tileW} tileH={tileH} depth={DEPTH} />
+        )}
+      </group>
     </group>
   );
 }
 
-/** Simple name label using a canvas texture instead of drei Text (avoids font loading issues) */
-function NameLabel({ name }: { name: string }) {
+function NameLabel({ name, tileW, tileH, depth }: {
+  name: string; tileW: number; tileH: number; depth: number;
+}) {
   const texture = useRef<THREE.CanvasTexture | null>(null);
 
   if (!texture.current) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 256;
     canvas.height = 64;
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, 256, 64);
-    ctx.font = 'bold 32px Inter, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4;
+    ctx.font = 'bold 30px Inter, Arial, sans-serif';
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
+    ctx.strokeStyle   = '#000000';
+    ctx.lineWidth     = 4;
     ctx.strokeText(name, 128, 32);
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(name, 128, 32);
     texture.current = new THREE.CanvasTexture(canvas);
     texture.current.colorSpace = THREE.SRGBColorSpace;
   }
 
   return (
-    <mesh position={[0, -0.12, 0.08]}>
-      <planeGeometry args={[1.2, 0.3]} />
+    <mesh position={[0, -tileH * 0.42, depth / 2 + 0.08]}>
+      <planeGeometry args={[tileW * 0.85, tileH * 0.17]} />
       <meshBasicMaterial map={texture.current} transparent depthWrite={false} />
     </mesh>
   );

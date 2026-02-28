@@ -5,6 +5,7 @@ import { QUESTIONS } from '../data/questions';
 import { CHARACTERS } from '../data/characters';
 import { evaluateQuestion } from '../utils/evaluateQuestion';
 import { createCommitment, generateGameSessionId, clearCommitments } from '../starknet/commitReveal';
+import { generateAllCollectionCharacters } from '../starknet/collectionService';
 
 function getOpponent(player: PlayerId): PlayerId {
   return player === 'player1' ? 'player2' : 'player1';
@@ -41,6 +42,9 @@ export const useGameStore = create<GameState & GameActions>()(
         state.mode = mode;
         if (characters) {
           state.characters = characters;
+        } else if (mode === 'nft' || mode === 'online') {
+          // Full 999-token SCHIZODIO collection — adaptive board uses all tokens
+          state.characters = generateAllCollectionCharacters();
         } else {
           state.characters = CHARACTERS;
         }

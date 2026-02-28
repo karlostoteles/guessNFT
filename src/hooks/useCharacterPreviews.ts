@@ -15,6 +15,10 @@ export function useCharacterPreviews(): Map<string, string> {
 
   return useMemo(() => {
     const map = new Map<string, string>();
+    // For large collections (>50 tokens), skip expensive canvas generation.
+    // Characters without an imageUrl will show a colour swatch in CharacterSelectScreen.
+    const skipCanvas = characters.length > 50;
+
     for (const char of characters) {
       // Prefer real NFT image URL when available
       const imageUrl = (char as any).imageUrl as string | undefined;
@@ -23,7 +27,9 @@ export function useCharacterPreviews(): Map<string, string> {
         continue;
       }
 
-      // Fall back to procedural canvas portrait
+      if (skipCanvas) continue; // Large collection — colour swatch used instead
+
+      // Fall back to procedural canvas portrait (small collections only)
       const texture = renderPortrait(char);
       if (texture.image instanceof HTMLCanvasElement) {
         const small = document.createElement('canvas');

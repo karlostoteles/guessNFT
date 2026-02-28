@@ -2,40 +2,47 @@ import { useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameCharacters } from '../store/selectors';
 import { renderPortrait, renderCardBack } from '../canvas/PortraitRenderer';
+import { getTileLOD } from '../utils/constants';
 
 /**
  * Returns a texture map for all game characters.
  *
- * Strategy:
- * 1. Immediately provide procedural canvas textures so the board renders
- *    without any delay.
- * 2. For NFT characters with a real imageUrl, asynchronously load the
- *    actual artwork and swap it in once loaded.
+ * LOD-aware strategy:
+ *  minimal (tileW < 0.38) → no textures; CharacterGrid renders coloured planes via InstancedMesh
+ *  flat    (tileW < 1.0)  → procedural canvas portrait; real NFT art skipped (too small to matter)
+ *  full    (tileW ≥ 1.0)  → canvas portrait + async real NFT image upgrade
  *
- * This means the board starts with procedural art (instant) and upgrades
- * to real SCHIZODIO art as each image arrives from IPFS/HTTP.
+ * At 999 tiles we create zero canvas objects → instant render, zero GC pressure.
+ * As tiles grow (eliminations shrink the pool) we progressively load real artwork.
  */
-export function useCharacterTextures(): Map<string, THREE.Texture> {
+export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Texture> {
   const characters = useGameCharacters();
+  const lod = getTileLOD(tileW);
+  const isMinimal = lod === 'minimal';
 
-  // Build initial procedural textures synchronously
+  // Build initial procedural textures — only when NOT minimal LOD
   const initialTextures = useMemo(() => {
+    if (isMinimal) return new Map<string, THREE.Texture>();
     const map = new Map<string, THREE.Texture>();
     for (const char of characters) {
       map.set(char.id, renderPortrait(char));
     }
     return map;
-  }, [characters]);
+    // We intentionally include isMinimal as a dep to reset textures when LOD changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMinimal, characters]);
 
   const [textures, setTextures] = useState<Map<string, THREE.Texture>>(initialTextures);
 
-  // Sync procedural textures when characters change
+  // Sync procedural textures when characters change or LOD crosses the minimal threshold
   useEffect(() => {
     setTextures(initialTextures);
   }, [initialTextures]);
 
-  // Async: replace procedural textures with real NFT images
+  // Async: upgrade to real NFT images — only for full LOD (tiles are big enough to see)
   useEffect(() => {
+    if (lod !== 'full') return;
+
     let cancelled = false;
     const loader = new THREE.TextureLoader();
 
@@ -57,7 +64,7 @@ export function useCharacterTextures(): Map<string, THREE.Texture> {
         },
         undefined,
         () => {
-          // Image failed to load — keep the procedural canvas texture
+          // Load failed — keep procedural canvas texture
         },
       );
     }
@@ -65,7 +72,7 @@ export function useCharacterTextures(): Map<string, THREE.Texture> {
     return () => {
       cancelled = true;
     };
-  }, [characters]);
+  }, [characters, lod]);
 
   return textures;
 }
