@@ -283,13 +283,54 @@ function parseMetadata(raw: string): any {
 }
 
 /**
+ * Serverless proxy endpoints (Netlify / Vercel) that scrape schizodio.art
+ * server-side and return the image URL without CORS issues.
+ *
+ * The on-chain tokenURI points to techshaman.42024769.xyz which is currently
+ * down (broken SSL + backend offline).  The proxy is our primary image source.
+ */
+const PROXY_ENDPOINTS = [
+  '/.netlify/functions/schizodio-meta',
+  '/api/schizodio-meta',
+];
+
+async function fetchViaProxy(tokenId: string): Promise<{
+  imageUrl: string;
+  name: string;
+} | null> {
+  for (const endpoint of PROXY_ENDPOINTS) {
+    try {
+      const resp = await fetch(`${endpoint}?id=${tokenId}`);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data.imageUrl) {
+        console.log(`[nftService] #${tokenId} proxy hit → ${data.imageUrl}`);
+        return { imageUrl: data.imageUrl, name: data.name };
+      }
+    } catch { /* try next endpoint */ }
+  }
+  return null;
+}
+
+/**
  * Fetch metadata for a single token.
+ * Strategy:
+ *   1. Try the serverless proxy (schizodio.art scraper — reliable, no CORS).
+ *   2. Fall back to on-chain tokenURI → metadata fetch (works if server is up).
  */
 export async function fetchTokenMetadata(tokenId: string): Promise<{
   name: string;
   imageUrl: string;
   attributes: NFTAttribute[];
 }> {
+  // ── 1. Try proxy first (schizodio.art, server-side) ──────────────────────
+  const proxyResult = await fetchViaProxy(tokenId);
+  if (proxyResult) {
+    return { ...proxyResult, attributes: [] };
+  }
+
+  // ── 2. Fall back to on-chain tokenURI → external metadata server ─────────
+  console.log(`[nftService] proxy miss for #${tokenId}, trying on-chain tokenURI`);
   const contract = getContract();
 
   let rawUriResult: any;
@@ -301,11 +342,9 @@ export async function fetchTokenMetadata(tokenId: string): Promise<{
       [uint256.bnToUint256(BigInt(tokenId))],
     );
   } catch (err) {
-    console.warn(`[nftService] token_uri call failed for #${tokenId}:`, err);
+    console.warn(`[nftService] tokenURI RPC failed for #${tokenId}:`, err);
     return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
   }
-
-  console.log(`[nftService] Token #${tokenId} raw URI result (type: ${typeof rawUriResult}):`, rawUriResult);
 
   const uri = decodeStarknetString(rawUriResult);
   console.log(`[nftService] Token #${tokenId} decoded URI:`, uri);
@@ -314,48 +353,39 @@ export async function fetchTokenMetadata(tokenId: string): Promise<{
     return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
   }
 
-  // If the URI itself is a data URI (on-chain metadata), parse directly
+  // On-chain data URI (base64 encoded JSON)
   if (uri.startsWith('data:')) {
     try {
       const metadata = parseMetadata(uri);
-      const imageUrl = resolveUrl(
-        metadata.image || metadata.image_url || metadata.image_data || '',
-      );
-      console.log(`[nftService] Token #${tokenId} on-chain image:`, imageUrl);
+      const imageUrl = resolveUrl(metadata.image || metadata.image_url || metadata.image_data || '');
       return {
         name: metadata.name || `SCHIZODIO #${tokenId}`,
         imageUrl,
         attributes: metadata.attributes || [],
       };
     } catch (err) {
-      console.warn(`[nftService] Failed to parse on-chain metadata for #${tokenId}:`, err);
+      console.warn(`[nftService] on-chain metadata parse failed for #${tokenId}:`, err);
       return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
     }
   }
 
-  // External metadata URI — fetch with gateway fallback
+  // External HTTP metadata URI
   try {
-    console.log(`[nftService] Token #${tokenId} fetching metadata from:`, uri);
     const response = await fetchWithGatewayFallback(uri);
     const metadata = parseMetadata(await response.text());
-
-    // Keep raw ipfs:// URL so the NftCard can rotate gateways on error.
-    // Fall back to a resolved HTTP URL for plain HTTP images.
     const rawImage = metadata.image || metadata.image_url || metadata.image_data || metadata.animation_url || '';
     const imageUrl = rawImage.startsWith('ipfs://')
-      ? resolveUrl(rawImage, 0)   // start with ipfs.io gateway
+      ? resolveUrl(rawImage, 0)
       : resolveUrl(rawImage);
-    console.log(`[nftService] Token #${tokenId} imageUrl:`, imageUrl);
-
+    console.log(`[nftService] #${tokenId} imageUrl (fallback):`, imageUrl);
     return {
       name: metadata.name || `SCHIZODIO #${tokenId}`,
       imageUrl,
-      // Store raw ipfs path for gateway fallback in the UI
       rawImageIpfs: rawImage.startsWith('ipfs://') ? rawImage : undefined,
       attributes: metadata.attributes || [],
     } as any;
   } catch (err) {
-    console.warn(`[nftService] Metadata fetch failed for #${tokenId}:`, err);
+    console.warn(`[nftService] metadata fetch failed for #${tokenId}:`, err);
     return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
   }
 }
