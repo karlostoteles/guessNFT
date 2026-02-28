@@ -20,10 +20,10 @@ interface Props {
   onBack: () => void;
 }
 
-type LobbyView = 'choice' | 'create' | 'join' | 'waiting-p2';
+type LobbyView = 'mode_select' | 'choice' | 'create' | 'join' | 'waiting-p2';
 
 export function OnlineLobbyScreen({ onBack }: Props) {
-  const [view, setView] = useState<LobbyView>('choice');
+  const [view, setView] = useState<LobbyView>('mode_select');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [createdRoomCode, setCreatedRoomCode] = useState('');
   const [error, setError] = useState('');
@@ -231,9 +231,118 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     }
   };
 
+  const handleBack = () => {
+    if (view === 'mode_select') return onBack();
+    if (view === 'choice') return setView('mode_select');
+    setView('choice');
+  };
+
   return (
-    <LobbyWrapper onBack={view === 'choice' ? onBack : () => setView('choice')}>
+    <LobbyWrapper onBack={handleBack}>
       <AnimatePresence mode="wait">
+
+        {/* ── Mode selection ──────────────────────────────── */}
+        {view === 'mode_select' && (
+          <motion.div
+            key="mode_select"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+          >
+            <div style={{
+              textAlign: 'center',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 13,
+              color: 'rgba(255,255,254,0.35)',
+              marginBottom: 4,
+            }}>
+              Choose your game mode
+            </div>
+
+            {/* Normal Mode */}
+            <motion.button
+              onClick={() => setView('choice')}
+              whileHover={{ scale: 1.02, borderColor: 'rgba(124,58,237,0.6)' }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(91,33,182,0.1))',
+                border: '1px solid rgba(124,58,237,0.35)',
+                borderRadius: 14,
+                padding: '18px 20px',
+                color: '#FFFFFE',
+                fontFamily: "'Space Grotesk', sans-serif",
+                cursor: 'pointer',
+                outline: 'none',
+                textAlign: 'left',
+                width: '100%',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 28 }}>🎮</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>
+                    Normal Mode
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,254,0.45)', lineHeight: 1.4 }}>
+                    Classic 1v1 — guess your opponent's SCHIZODIO first
+                  </div>
+                </div>
+              </div>
+            </motion.button>
+
+            {/* SCHIZO Mode — coming soon */}
+            <div style={{ position: 'relative' }}>
+              <motion.button
+                disabled
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 14,
+                  padding: '18px 20px',
+                  color: 'rgba(255,255,254,0.35)',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  cursor: 'not-allowed',
+                  outline: 'none',
+                  textAlign: 'left',
+                  width: '100%',
+                  opacity: 0.7,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 28 }}>⚔️</span>
+                  <div>
+                    <div style={{
+                      fontWeight: 700,
+                      fontSize: 15,
+                      marginBottom: 3,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}>
+                      SCHIZO Mode
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        background: 'linear-gradient(135deg, #E8A444, #C47B1A)',
+                        color: '#0F0E17',
+                        padding: '2px 7px',
+                        borderRadius: 20,
+                        letterSpacing: '0.04em',
+                      }}>
+                        SOON
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,254,0.3)', lineHeight: 1.4 }}>
+                      Bet your SCHIZODIO NFT — winner takes all
+                    </div>
+                  </div>
+                </div>
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+
         {view === 'choice' && (
           <motion.div
             key="choice"
