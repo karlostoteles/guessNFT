@@ -48,6 +48,27 @@ export function useOnlineGameSync() {
     }
   };
 
+  // ─── Helper: poll game status and advance if in_progress ─────────────────
+  // Used as a fallback when Supabase realtime is slow or not configured.
+  async function checkAndAdvanceIfReady(gameId: string) {
+    try {
+      const { data: game } = await supabase
+        .from('games')
+        .select('status')
+        .eq('id', gameId)
+        .single();
+      if (game?.status === 'in_progress') {
+        const s = useGameStore.getState();
+        if (s.phase === GamePhase.ONLINE_WAITING) {
+          console.log('[sync] Advancing to game start (direct check)');
+          s.advanceToGameStart();
+        }
+      }
+    } catch (e) {
+      console.error('[sync] checkAndAdvanceIfReady error', e);
+    }
+  }
+
   // ─── Subscribe to realtime when in online game ────────────────────────────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
@@ -71,15 +92,40 @@ export function useOnlineGameSync() {
     const commitment = getCommitment(myPlayerKey, state.gameSessionId);
     if (!commitment) return;
 
+    const gameId = onlineGameId;   // capture for async closure
+    const playerNum = onlinePlayerNum;
+
     submitCommitment(
-      onlineGameId,
-      onlinePlayerNum,
+      gameId,
+      playerNum,
       commitment.commitment,
       myAddress(),
       1 // turn 0 / setup
-    ).catch(console.error);
+    ).then(() => {
+      // Direct check as fallback — the player who committed last will see 'in_progress'
+      // immediately without waiting for realtime to deliver the update.
+      return checkAndAdvanceIfReady(gameId);
+    }).catch(console.error);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, mode, onlineGameId, onlinePlayerNum]);
+
+  // ─── Poll for game start while on ONLINE_WAITING ──────────────────────────
+  // Belt-and-suspenders fallback: every 3 s, check if the game has started.
+  // This handles the case where Supabase Postgres Changes realtime is not
+  // enabled on the 'games' table or the update event was missed.
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+    if (phase !== GamePhase.ONLINE_WAITING) return;
+
+    const gameId = onlineGameId;
+    const intervalId = setInterval(() => {
+      checkAndAdvanceIfReady(gameId);
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, mode, onlineGameId, onlinePlayerNum]);
 
   // ─── Send QUESTION_ASKED when I ask a question ────────────────────────────
   useEffect(() => {
@@ -139,6 +185,7 @@ export function useOnlineGameSync() {
   function handleGameUpdate(game: SupabaseGame) {
     const state = useGameStore.getState();
     if (game.status === 'in_progress' && state.phase === GamePhase.ONLINE_WAITING) {
+      console.log('[sync] Game started via realtime subscription');
       state.advanceToGameStart();
     }
   }
@@ -151,6 +198,17 @@ export function useOnlineGameSync() {
     const state = useGameStore.getState();
 
     switch (event.event_type) {
+      case 'CHARACTER_COMMITTED': {
+        // Opponent has committed their character.
+        // Check game status directly — this fires before (or instead of) the
+        // games-table realtime update, so it's the fastest path to advancing.
+        if (state.phase === GamePhase.ONLINE_WAITING && state.onlineGameId) {
+          console.log('[sync] Opponent committed — checking game status');
+          checkAndAdvanceIfReady(state.onlineGameId);
+        }
+        break;
+      }
+
       case 'QUESTION_ASKED': {
         const { question_id } = event.payload as { question_id: string };
 
