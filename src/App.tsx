@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { GameScene } from './scene/GameScene';
+import { GameScene } from './rendering/scene/GameScene';
 import { UIOverlay } from './ui/UIOverlay';
 
 function LoadingFallback() {
