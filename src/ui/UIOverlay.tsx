@@ -19,12 +19,15 @@ import { RiskItButton } from './widgets/RiskItButton';
 import { WalletButton } from './widgets/WalletButton';
 import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
 import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
+import { useNFTTraitLoader } from '@/shared/hooks/useNFTTraitLoader';
 
 export function UIOverlay() {
   const phase = usePhase();
 
   // Mount the online sync hook for the lifetime of the overlay
   useOnlineGameSync();
+  // Enrich stub NFT characters with real traits when owned NFTs are available
+  useNFTTraitLoader();
 
   return (
     <div style={{

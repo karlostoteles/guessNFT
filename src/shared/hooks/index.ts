@@ -5,3 +5,4 @@ export { useCharacterPreviews } from './useCharacterPreviews';
 export { useCharacterTextures, useCardBackTexture } from './useCharacterTextures';
 export { useNFTTextures } from './useNFTTextures';
 export { useOnlineGameSync } from './useOnlineGameSync';
+export { useNFTTraitLoader } from './useNFTTraitLoader';

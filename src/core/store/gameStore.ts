@@ -6,6 +6,7 @@ import { CHARACTERS } from '@/core/data/characters';
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { createCommitment, generateGameSessionId, clearCommitments } from '@/services/starknet/commitReveal';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
+import { enrichCharacters } from '@/core/data/nftCharacterAdapter';
 
 function getOpponent(player: PlayerId): PlayerId {
   return player === 'player1' ? 'player2' : 'player1';
@@ -345,6 +346,11 @@ export const useGameStore = create<GameState & GameActions>()(
         } else {
           state.phase = GamePhase.GUESS_WRONG;
         }
+      }),
+
+    enrichNFTCharacters: (traitMap) =>
+      set((state) => {
+        enrichCharacters(state.characters, traitMap);
       }),
   }))
 );

@@ -297,6 +297,7 @@ const PROXY_ENDPOINTS = [
 async function fetchViaProxy(tokenId: string): Promise<{
   imageUrl: string;
   name: string;
+  attributes: NFTAttribute[];
 } | null> {
   for (const endpoint of PROXY_ENDPOINTS) {
     try {
@@ -304,8 +305,12 @@ async function fetchViaProxy(tokenId: string): Promise<{
       if (!resp.ok) continue;
       const data = await resp.json();
       if (data.imageUrl) {
-        console.log(`[nftService] #${tokenId} proxy hit → ${data.imageUrl}`);
-        return { imageUrl: data.imageUrl, name: data.name };
+        console.log(`[nftService] #${tokenId} proxy hit → ${data.imageUrl}, ${(data.attributes ?? []).length} traits`);
+        return {
+          imageUrl: data.imageUrl,
+          name: data.name,
+          attributes: data.attributes ?? [],
+        };
       }
     } catch { /* try next endpoint */ }
   }
@@ -326,7 +331,7 @@ export async function fetchTokenMetadata(tokenId: string): Promise<{
   // ── 1. Try proxy first (schizodio.art, server-side) ──────────────────────
   const proxyResult = await fetchViaProxy(tokenId);
   if (proxyResult) {
-    return { ...proxyResult, attributes: [] };
+    return proxyResult; // already includes attributes (may be [] if proxy couldn't parse)
   }
 
   // ── 2. Fall back to on-chain tokenURI → external metadata server ─────────
@@ -388,6 +393,36 @@ export async function fetchTokenMetadata(tokenId: string): Promise<{
     console.warn(`[nftService] metadata fetch failed for #${tokenId}:`, err);
     return { name: `SCHIZODIO #${tokenId}`, imageUrl: '', attributes: [] };
   }
+}
+
+/**
+ * Fetch trait attributes for a list of token IDs in parallel batches.
+ * Used to enrich stub characters with real traits before gameplay begins.
+ * Returns a map of tokenId → attributes array.
+ */
+export async function fetchTraitsBatch(
+  tokenIds: string[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<Map<string, NFTAttribute[]>> {
+  const result = new Map<string, NFTAttribute[]>();
+  const BATCH_SIZE = 6;
+
+  for (let i = 0; i < tokenIds.length; i += BATCH_SIZE) {
+    const batch = tokenIds.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (tokenId) => {
+        try {
+          const meta = await fetchTokenMetadata(tokenId);
+          result.set(tokenId, meta.attributes);
+        } catch {
+          result.set(tokenId, []);
+        }
+      }),
+    );
+    onProgress?.(Math.min(i + BATCH_SIZE, tokenIds.length), tokenIds.length);
+  }
+
+  return result;
 }
 
 /**

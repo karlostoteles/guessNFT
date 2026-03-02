@@ -1,4 +1,5 @@
 import type { Character } from '@/core/data/characters';
+import type { NFTAttribute } from '@/services/starknet/types';
 
 export type GameMode = 'free' | 'nft' | 'online';
 
@@ -81,4 +82,6 @@ export interface GameActions {
   applyOpponentAnswer: (answer: boolean) => void;
   receiveOpponentGuess: (characterId: string, isCorrect: boolean, winnerPlayerNum: 1 | 2 | null) => void;
   applyGuessResult: (isCorrect: boolean, winner: PlayerId | null) => void;
+  /** Enrich stub NFT characters with real trait attributes from fetchTraitsBatch(). */
+  enrichNFTCharacters: (traitMap: Map<string, NFTAttribute[]>) => void;
 }

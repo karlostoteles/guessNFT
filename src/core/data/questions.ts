@@ -148,12 +148,15 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => nftEyes(c).includes('schizo'),
   },
   {
+    // Covers: Fire Devil, Stoned Red, Bionic, Ekubo, Whirlpool, Hazelnut — rare/weird eyes
     id: 'nq_eyes_special', zone: 'face', category: 'face', icon: '🤖',
-    text: 'Does your character have special eyes? (bionic, whirlpool…)',
+    text: 'Does your character have special or demonic eyes? (fire, stoned, bionic…)',
     traitKey: 'nft_eyes', traitValue: 'special',
     matchFn: (c) => {
       const e = nftEyes(c);
-      return e.includes('bionic') || e.includes('ekubo') || e.includes('whirlpool') || e.includes('hazelnut');
+      return e.includes('fire') || e.includes('devil') || e.includes('stoned')
+          || e.includes('bionic') || e.includes('ekubo')
+          || e.includes('whirlpool') || e.includes('hazelnut');
     },
   },
   {
@@ -175,10 +178,14 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => nftMouth(c).includes('squig'),
   },
   {
+    // Covers: Neutral, Happy, Rectangle, V — anything that's not U/W/squiggle
     id: 'nq_mouth_other', zone: 'face', category: 'face', icon: '😐',
-    text: 'Does your character have a neutral or V-shaped mouth?',
-    traitKey: 'nft_mouth', traitValue: 'neutral_v',
-    matchFn: (c) => { const m = nftMouth(c); return m === 'neutral' || m === 'v'; },
+    text: 'Does your character have a neutral, happy, or rectangular mouth?',
+    traitKey: 'nft_mouth', traitValue: 'neutral_happy_rect',
+    matchFn: (c) => {
+      const m = nftMouth(c);
+      return m === 'neutral' || m === 'happy' || m === 'rectangle' || m === 'v';
+    },
   },
   {
     id: 'nq_brows_sad', zone: 'face', category: 'face', icon: '😢',
@@ -187,6 +194,7 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => nftBrows(c).includes('sad'),
   },
   {
+    // Covers: Notched Slits, Camo, Funky — non-standard brow shapes
     id: 'nq_brows_funky', zone: 'face', category: 'face', icon: '🤨',
     text: 'Does your character have funky, notched, or camo eyebrows?',
     traitKey: 'nft_eyebrows', traitValue: 'funky',
@@ -200,11 +208,20 @@ export const NFT_QUESTIONS: Question[] = [
   },
 
   // ══ BODY zone ══════════════════════════════════════════════════════════════
+  // Body values verified from schizodio.art (March 2026):
+  // Brother, Boy Who Cried Wolf, Greeny, Schizo Blue, Gora, Purple Urkle,
+  // Snowflake, Cyborg, Stone, Lobster Pink (10 types per collection page)
   {
-    id: 'nq_body_gora', zone: 'body', category: 'body', icon: '💪',
-    text: 'Is your character a Gora body type?',
-    traitKey: 'nft_body', traitValue: 'gora',
-    matchFn: (c) => nftBody(c) === 'gora',
+    id: 'nq_body_schizo', zone: 'body', category: 'body', icon: '🔵',
+    text: 'Is your character a Schizo Blue body type?',
+    traitKey: 'nft_body', traitValue: 'schizo',
+    matchFn: (c) => nftBody(c).includes('schizo'),
+  },
+  {
+    id: 'nq_body_greeny', zone: 'body', category: 'body', icon: '🟢',
+    text: 'Is your character a Greeny body type?',
+    traitKey: 'nft_body', traitValue: 'greeny',
+    matchFn: (c) => nftBody(c).includes('greeny') || nftBody(c).includes('green'),
   },
   {
     id: 'nq_body_purple', zone: 'body', category: 'body', icon: '🟣',
@@ -229,6 +246,16 @@ export const NFT_QUESTIONS: Question[] = [
     text: 'Is your character a Lobster Pink body type?',
     traitKey: 'nft_body', traitValue: 'lobster',
     matchFn: (c) => nftBody(c).includes('lobster'),
+  },
+  {
+    // Covers: Brother, Boy Who Cried Wolf, Gora — human/organic body types
+    id: 'nq_body_human', zone: 'body', category: 'body', icon: '🧍',
+    text: 'Is your character a human body type? (Brother, Boy Who Cried Wolf, Gora…)',
+    traitKey: 'nft_body', traitValue: 'human',
+    matchFn: (c) => {
+      const b = nftBody(c);
+      return b.includes('brother') || b.includes('wolf') || b === 'gora';
+    },
   },
   {
     id: 'nq_clothing_tshirt', zone: 'body', category: 'body', icon: '👕',
