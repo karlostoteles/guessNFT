@@ -78,10 +78,11 @@ export const handler = async (event) => {
 
     const html = await resp.text();
 
-    // Extract full-resolution image path: /static/images_webp_512/{sha256}.webp
-    const imageMatch = html.match(/\/static\/images_webp_512\/([0-9a-f]{64}\.webp)/);
+    // Extract full-resolution image hash: /static/images_webp_512/{sha256}.webp
+    // Serve from the v1assets.schizod.io CDN (faster, reliable) as .png
+    const imageMatch = html.match(/\/static\/images_webp_512\/([0-9a-f]{64})\.webp/);
     const imageUrl = imageMatch
-      ? `https://schizodio.art/static/images_webp_512/${imageMatch[1]}`
+      ? `https://v1assets.schizod.io/images/revealed/${imageMatch[1]}.png`
       : null;
 
     // Extract name from <title>Schizodio #292 • ...</title>
