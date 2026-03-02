@@ -2,132 +2,164 @@
 
 ## What Is This?
 
-WhoisWho is a browser-based "Guess Who?" game built for Starknet NFT collections. Players pick a secret character, ask yes/no questions about traits, and eliminate characters until they guess the opponent's pick. Supports local (vs CPU), and online (vs player via Supabase realtime + on-chain commit-reveal).
+WhoisWho is a browser-based 1v1 deduction game — "Guess Who?" for Starknet NFT collections. Each player secretly picks a character from a shared board of NFT portraits. On your turn you ask a yes/no question about a trait (e.g. "Does your character have a hat?"); the answer lets you eliminate characters who don't match. First player to correctly guess their opponent's secret character wins.
 
-## Role Context
-
-You are the CTO and CSO of the project, acting also as game designer and product manager. It's imperative that this game works and it's beautiful. Use any resource you need and ask when needed.
+Supports three modes: **local pass-and-play**, **vs CPU**, and **online multiplayer** via Supabase Realtime. Starknet wallet + commit-reveal provides a tamper-evident hidden choice (on-chain enforcement is Phase 2).
 
 ## Tech Stack
 
-- **Runtime:** React 19 + TypeScript 5.9, Vite 7
-- **3D:** Three.js 0.183 via @react-three/fiber 9 + drei 10
-- **State:** Zustand 5 (single store with immer middleware)
-- **Blockchain:** Starknet 9 + starkzap, Cartridge Controller wallet
-- **Backend:** Supabase (Postgres + Realtime channels)
-- **Animation:** Framer Motion 12
+| Layer | Technology |
+|---|---|
+| UI framework | React 19 + TypeScript 5.9, Vite 7 |
+| 3D board | Three.js 0.183 via @react-three/fiber 9 + Drei 10 |
+| State management | Zustand 5 with Immer middleware |
+| UI animations | Framer Motion 12 |
+| Online multiplayer | Supabase (Postgres + Realtime channels) |
+| Wallet + NFT | Starknet.js 6, Cartridge Controller, starkzap |
+| Crypto primitives | Pedersen hash (starknet.js) for commit-reveal |
 
 ## Project Structure
 
 ```
 src/
-  ai/          → CPU opponent logic (cpuAgent.ts)
-  audio/       → Procedural SFX engine (sfx.ts)
-  canvas/      → 2D portrait rendering (PortraitRenderer, drawFace/Hair/Accessories)
-  data/        → Game data: characters, questions, traits, NFT adapter
-  hooks/       → React hooks: grid, CPU, textures, online sync
-  scene/       → 3D scene: Board, CharacterGrid, CharacterTile, Camera, Environment
-  starknet/    → Wallet, NFT fetching, commit-reveal, collection service
-  store/       → Zustand game store, selectors, types (GamePhase state machine)
-  supabase/    → Supabase client, game service, realtime subscriptions
-  utils/       → Constants (board/tile/camera), evaluateQuestion
-  ui/
-    screens/   → Full-page views (Menu, CharacterSelect, OnlineLobby, Result, etc.)
-    panels/    → Docked gameplay panels (Question, Answer, Guess, Elimination, SecretCard)
-    overlays/  → Transient auto-dismiss (GuessWrong, AutoEliminating, PhaseTransition)
-    widgets/   → Small persistent elements (TurnIndicator, RiskIt, CPUThinking, Wallet)
-    common/    → Shared components (Button, Card)
-    UIOverlay.tsx → Root UI component, mounts all UI based on GamePhase
-  styles/      → global.css
-  App.tsx      → Mounts GameScene + UIOverlay
-  main.tsx     → Entry point
+  core/         ← game brain
+    store/      → Zustand store, selectors, types, GamePhase enum
+    data/       → characters, traits, questions, NFT adapter
+    ai/         → CPU opponent logic
+    rules/      → evaluateQuestion, game constants
+  services/     ← external integrations (no game logic here)
+    starknet/   → wallet, NFT fetching, commit-reveal, collection service
+    supabase/   → client, game service, realtime subscriptions, types
+  rendering/    ← visuals only
+    scene/      → Three.js: Board, CharacterGrid, CharacterTile, Camera
+    canvas/     → 2D portrait generation (PortraitRenderer, drawFace/Hair/Accessories)
+  shared/       ← cross-cutting concerns
+    audio/      → procedural SFX engine
+    hooks/      → useAdaptiveGrid, useCPUPlayer, useOnlineGameSync, useCharacterTextures
+  ui/           ← React UI components (no game logic)
+    screens/    → full-page views: Menu, CharacterSelect, OnlineLobby, Result, etc.
+    panels/     → docked gameplay panels: Question, Answer, Guess, SecretCard, etc.
+    overlays/   → transient auto-dismiss overlays: GuessWrong, AutoEliminating, etc.
+    widgets/    → small persistent HUD elements: TurnIndicator, RiskIt, CPUThinking
+    common/     → shared primitives: Button, Card
+    UIOverlay.tsx → root UI, mounts screens/panels/overlays based on GamePhase
+  App.tsx       → mounts GameScene (3D) + UIOverlay (2D)
+  main.tsx      → entry point
 ```
 
 ## Import Conventions
 
-- **Cross-module:** Always use `@/module/file` (e.g., `import { usePhase } from '@/store/selectors'`)
-- **Intra-module:** Use relative `./file` (e.g., `import { drawFace } from './drawFace'`)
-- **Barrel exports:** Every module has an `index.ts`. Prefer importing from barrel when adding new consumers.
-- **Path alias:** `@/` maps to `src/` (configured in tsconfig.json + vite.config.ts)
+- **Cross-module:** Always use `@/` alias (e.g. `import { usePhase } from '@/core/store/selectors'`)
+- **Intra-module:** Use relative `./` (e.g. `import { drawFace } from './drawFace'`)
+- **Never** use `../` to cross module boundaries — that breaks the layering
+- **Barrel exports:** Every module directory has an `index.ts`. Import from the barrel when adding new consumers
+
+The `@/` alias maps to `src/` and is configured in both `tsconfig.json` and `vite.config.ts`.
 
 ## State Machine (GamePhase)
 
-The game is driven by a `GamePhase` enum in `store/types.ts`. Phases flow:
+All game flow is driven by the `GamePhase` enum in `src/core/store/types.ts`.
 
 ```
-MENU → SETUP_P1 → SETUP_P2 → HANDOFF_START →
-  QUESTION_SELECT → ANSWER_PENDING → ANSWER_REVEALED →
-  AUTO_ELIMINATING → ELIMINATION → TURN_TRANSITION → (loop back to QUESTION_SELECT)
-  GUESS_SELECT → GUESS_WRONG (loop) | GUESS_RESULT → GAME_OVER
+MENU → SETUP_P1 → SETUP_P2 → HANDOFF_START
+  → QUESTION_SELECT → ANSWER_PENDING → ANSWER_REVEALED
+  → AUTO_ELIMINATING → TURN_TRANSITION → (back to QUESTION_SELECT)
+  → GUESS_SELECT → GUESS_WRONG (loops) | GUESS_RESULT → GAME_OVER
 ```
 
 Online mode adds: `ONLINE_WAITING`, `HANDOFF_TO_OPPONENT`
 
-All phase transitions go through `useGameStore` actions. Never set phase directly.
+Rules:
+- All phase transitions go through `useGameStore` actions in `src/core/store/gameStore.ts`
+- Never set `phase` directly on the store
+- `UIOverlay.tsx` reads the current phase and mounts the right screen/panel/overlay
 
 ## Key Patterns
 
-1. **Zustand selectors** — Use the pre-built selector hooks from `store/selectors.ts` (`usePhase()`, `useGameCharacters()`, etc.). Don't access the raw store.
-2. **LOD system** — `CharacterTile` renders at 3 tiers (minimal/flat/full) based on tile width. `getTileLOD()` in utils decides.
-3. **Procedural portraits** — `canvas/PortraitRenderer.ts` generates character face textures from trait data. Runs on Canvas 2D, returns THREE.CanvasTexture.
-4. **Commit-reveal** — Client-side for now. `starknet/commitReveal.ts` hashes (characterId + salt) to create commitments. On-chain submission is stubbed for Phase 2.
-5. **Online sync** — `hooks/useOnlineGameSync.ts` bridges Supabase realtime events ↔ Zustand store. It's the single hook that manages online game state.
+**Selectors** — Read state via pre-built hooks from `src/core/store/selectors.ts` (`usePhase()`, `useGameCharacters()`, `useActivePlayer()`, etc.). UI components must never access the raw Zustand store.
 
-## Common Tasks
+**LOD system** — `CharacterTile` in `rendering/scene/` renders at three tiers (minimal / flat / full) based on tile pixel width. The tier is decided by `getTileLOD()` in `core/rules/`.
 
-### Add a new UI component
-1. Create file in the appropriate `ui/` subdirectory
-2. Export from the subdirectory's `index.ts`
-3. Import in `UIOverlay.tsx` if it needs to appear based on GamePhase
-4. Use `@/store/selectors` for state, `@/data/` for game data
+**Procedural portraits** — `rendering/canvas/PortraitRenderer.ts` generates character face textures from trait data using Canvas 2D and returns a `THREE.CanvasTexture`. Call `.dispose()` when tiles unmount to avoid memory leaks.
 
-### Add a new game phase
-1. Add to `GamePhase` enum in `store/types.ts`
-2. Add transition logic in `store/gameStore.ts`
-3. Create selector if needed in `store/selectors.ts`
-4. Add UI rendering in `UIOverlay.tsx`
+**Commit-reveal** — `services/starknet/commitReveal.ts` computes `Pedersen(characterId, salt)` client-side. `submitCommitmentOnChain()` and `revealCharacterOnChain()` are Phase 2 stubs — not yet live.
 
-### Add a new character trait
-1. Add type to `data/traits.ts`
-2. Update `data/characters.ts` entries
-3. Add question in `data/questions.ts`
-4. Update `utils/evaluateQuestion.ts` matcher
-5. Update `canvas/drawFace.ts` or `drawHair.ts` or `drawAccessories.ts` for rendering
+**Online sync** — `shared/hooks/useOnlineGameSync.ts` is the single hook bridging Supabase Realtime events to Zustand store actions. All online state flows through it.
 
-### Add a new Starknet feature
-1. Add to appropriate file in `starknet/`
-2. Export from `starknet/index.ts`
-3. Reference contracts: `SCHIZODIO_CONTRACT` in `starknet/config.ts`
-4. Cairo tools available: `mcp__cairo-coder__assist_with_cairo`
+## How to Add Things
 
-## Scripts
+### New yes/no question
+Edit `src/core/data/questions.ts` and add the question object. If it tests a new trait, also update `src/core/rules/evaluateQuestion.ts`.
 
-- `npm run dev` — Start dev server
-- `npm run build` — TypeScript check + Vite production build
-- `npm run preview` — Preview production build
+### New character trait
+1. Add the type to `src/core/data/traits.ts`
+2. Update character entries in `src/core/data/characters.ts`
+3. Add a question in `src/core/data/questions.ts`
+4. Update `src/core/rules/evaluateQuestion.ts` matcher
+5. Add rendering in `src/rendering/canvas/drawFace.ts`, `drawHair.ts`, or `drawAccessories.ts`
 
-## Known Issues (from review)
+### New UI screen
+1. Create component in `src/ui/screens/`
+2. Export from `src/ui/screens/index.ts`
+3. Mount in `src/ui/UIOverlay.tsx` under the appropriate `GamePhase` condition
 
-### Critical
-- Hardcoded bypass secret `'starknethas8users'` in OnlineLobbyScreen.tsx:39
-- Supabase RLS wide open (`for all using (true)`)
-- Texture memory leak — old Three.js textures never `.dispose()`'d
-- O(n²) elimination checks — `eliminatedIds.includes()` should be `Set`
+### New game phase
+1. Add value to `GamePhase` enum in `src/core/store/types.ts`
+2. Add transition action(s) in `src/core/store/gameStore.ts`
+3. Add selector in `src/core/store/selectors.ts` if needed
+4. Mount UI in `src/ui/UIOverlay.tsx`
 
-### High Priority
-- Commit-reveal is client-side only (anti-cheat is theater until Phase 2 contracts)
-- Answer evaluation on receiver's client (opponent can lie)
-- No event authorization on Supabase game_events
+### New Starknet feature
+1. Add to appropriate file in `src/services/starknet/`
+2. Export from `src/services/starknet/index.ts`
+3. Reference deployed contract addresses in `src/services/starknet/config.ts`
+4. Use `mcp__cairo-coder__assist_with_cairo` for Cairo contract work
 
-### Dead Code (~777 lines, preserved intentionally)
-- `useNFTTextures.ts`, `SchizodioPickerScreen.tsx`, `NoNFTScreen.tsx` — never imported
-- `HANDOFF_TO_OPPONENT` + `ELIMINATION` phases — unreachable states
-- 4 unused Supabase functions, Phase 2 stubs in commitReveal.ts
+### New online multiplayer event
+1. Add the event type to `src/services/supabase/types.ts`
+2. Send it via the Supabase client in `src/shared/hooks/useOnlineGameSync.ts`
+3. Handle it in the `handleEvent()` function in the same file
 
-## Starknet/Cairo Tools
+## Build & Dev Commands
 
-| Tool | Purpose |
-|---|---|
-| `mcp__cairo-coder__assist_with_cairo` | Write Cairo contracts, debug, refactor |
-| `/projects/beefchain-zypherpunk/starknet/src/` | Reference Cairo contracts |
-| `/projects/tu-vaca/packages/snfoundry/` | More Cairo patterns (ERC721, factory, oracle) |
+```bash
+npm run dev      # start Vite dev server
+npm run build    # TypeScript check + production build
+npm run preview  # preview the production build locally
+```
+
+## Rules for AI Agents
+
+- **State reads:** Always go through selectors in `src/core/store/selectors.ts`. Never destructure from `useGameStore` directly in UI components.
+- **State writes:** Only through store actions. Never mutate store state outside of `gameStore.ts`.
+- **Separation of concerns:** `ui/` components contain no game logic. `services/` modules contain no game rules. Logic lives in `core/`.
+- **Three.js:** Scene components stay in `rendering/scene/`. Do not import Three.js or R3F in `ui/` components.
+- **Texture cleanup:** Always call `.dispose()` on `THREE.CanvasTexture` and `THREE.Texture` instances when components unmount.
+- **Elimination performance:** Use `Set<string>` for `eliminatedIds` lookups, not `Array.includes()`.
+
+## Starknet Phase 2 — What's Not Done Yet
+
+- `GAME_CONTRACT = '0x0'` in `src/services/starknet/config.ts` — Cairo contract not deployed
+- `submitCommitmentOnChain()` and `revealCharacterOnChain()` in `src/services/starknet/commitReveal.ts` are stubs
+- Answer evaluation currently happens on the receiver's client (no on-chain verification)
+- Supabase `game_events` has no event authorization — RLS is wide open
+
+Cairo tools: `mcp__cairo-coder__assist_with_cairo`
+Reference contracts: `/projects/beefchain-zypherpunk/starknet/src/`, `/projects/tu-vaca/packages/snfoundry/`
+
+## Known Issues (Prioritized)
+
+**Critical**
+- Hardcoded bypass secret `'starknethas8users'` in `OnlineLobbyScreen.tsx:39` — remove before production
+- Supabase RLS is `for all using (true)` — anyone can read/write any game row
+- Three.js textures are never `.dispose()`'d — memory leaks over long sessions
+- `eliminatedIds.includes()` is O(n) inside loops — switch to `Set`
+
+**High**
+- Commit-reveal is client-side only — anti-cheat requires Phase 2 contracts
+- No Supabase event authorization — opponent can send any event type
+
+**Dead code (preserved intentionally — do not delete without discussion)**
+- `useNFTTextures.ts`, `SchizodioPickerScreen.tsx`, `NoNFTScreen.tsx` — not yet wired in
+- `HANDOFF_TO_OPPONENT` and `ELIMINATION` phases — reserved for future game modes
+- Phase 2 stubs in `commitReveal.ts` and several unused Supabase functions
