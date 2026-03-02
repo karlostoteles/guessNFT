@@ -44,12 +44,8 @@ export const useGameStore = create<GameState & GameActions>()(
         if (characters) {
           state.characters = characters;
         } else if (mode === 'nft' || mode === 'online') {
-          // Pick 24 random tokens from the 999-token collection.
-          // 24 tiles hit the full LOD tier (portrait textures) and match
-          // classic Guess Who! gameplay. Full 999 browse is a future feature.
-          const all = generateAllCollectionCharacters();
-          const shuffled = [...all].sort(() => Math.random() - 0.5);
-          state.characters = shuffled.slice(0, 24);
+          // Full 999-token SCHIZODIO collection — adaptive board uses all tokens
+          state.characters = generateAllCollectionCharacters();
         } else {
           state.characters = CHARACTERS;
         }

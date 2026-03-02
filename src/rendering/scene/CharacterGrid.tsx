@@ -155,7 +155,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
       matBuf.current.compose(posBuf.current, quatBuf.current, sclBuf.current);
       mesh.setMatrixAt(idx, matBuf.current);
 
-      colorBuf.current.setHSL(idToHue(char.id) / 360, 0.68, 0.52);
+      colorBuf.current.setHSL(idToHue(char.id) / 360, 0.9, 0.72);
       mesh.setColorAt(idx, colorBuf.current);
       idx++;
     }
