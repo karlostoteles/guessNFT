@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameActions, useGameCharacters, useGuessedCharacterId } from '@/core/store/selectors';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 /**
  * Wrong Risk It overlay — shows the guessed character with an X,

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../common/Card';
-import { useCharacterPreviews } from '@/hooks/useCharacterPreviews';
+import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
 import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';

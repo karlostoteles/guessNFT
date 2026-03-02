@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { CSSProperties, ReactNode } from 'react';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 interface ButtonProps {
   children: ReactNode;

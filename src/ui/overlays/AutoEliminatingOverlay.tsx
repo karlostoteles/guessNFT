@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { useCurrentQuestion, useActivePlayer, useEliminatedIds, useGameActions } from '@/core/store/selectors';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 const AUTO_ADVANCE_MS = 2500; // Time to watch tiles flip
 

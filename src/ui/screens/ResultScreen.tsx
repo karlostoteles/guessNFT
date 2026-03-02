@@ -3,9 +3,9 @@ import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useWinner, useGuessedCharacterId, useGameActions, usePlayerState, useGameCharacters, useGameMode, useGameSessionId } from '@/core/store/selectors';
-import { useCharacterPreviews } from '@/hooks/useCharacterPreviews';
+import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { COLORS } from '@/core/rules/constants';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 import { getCommitment, verifyReveal } from '@/services/starknet/commitReveal';
 
 export function ResultScreen() {

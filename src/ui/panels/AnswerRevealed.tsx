@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useCurrentQuestion, useGameActions } from '@/core/store/selectors';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 export function AnswerRevealed() {
   const question = useCurrentQuestion();

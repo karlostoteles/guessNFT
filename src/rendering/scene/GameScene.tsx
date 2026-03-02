@@ -6,11 +6,11 @@ import { Board } from './Board';
 import { CharacterGrid } from './CharacterGrid';
 import { MysteryCard } from './MysteryCard';
 import { CameraController } from './CameraController';
-import { useCharacterTextures, useCardBackTexture } from '@/hooks/useCharacterTextures';
-import { useAdaptiveGrid } from '@/hooks/useAdaptiveGrid';
+import { useCharacterTextures, useCardBackTexture } from '@/shared/hooks/useCharacterTextures';
+import { useAdaptiveGrid } from '@/shared/hooks/useAdaptiveGrid';
 import { useBoardRotation } from '@/core/store/selectors';
 import { BOARD } from '@/core/rules/constants';
-import { useCPUPlayer } from '@/hooks/useCPUPlayer';
+import { useCPUPlayer } from '@/shared/hooks/useCPUPlayer';
 
 export function GameScene() {
   useCPUPlayer(); // Drive CPU opponent in free mode

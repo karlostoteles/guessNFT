@@ -18,7 +18,7 @@ import { TurnIndicator } from './widgets/TurnIndicator';
 import { RiskItButton } from './widgets/RiskItButton';
 import { WalletButton } from './widgets/WalletButton';
 import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
-import { useOnlineGameSync } from '@/hooks/useOnlineGameSync';
+import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
 
 export function UIOverlay() {
   const phase = usePhase();

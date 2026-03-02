@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { useCharacterPreviews } from '@/hooks/useCharacterPreviews';
+import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { useActivePlayer, useEliminatedIds, useCurrentQuestion, useGameActions, useGameCharacters } from '@/core/store/selectors';
 
 export function GuessPanel() {

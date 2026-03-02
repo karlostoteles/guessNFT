@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../common/Card';
 import { QUESTIONS, Question } from '@/core/data/questions';
 import { useGameActions, useQuestionHistory, useActivePlayer, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 const CATEGORIES = [
   { key: 'hair',        label: 'Hair',        icon: '💇' },

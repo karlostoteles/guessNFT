@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useWalletAddress } from '@/services/starknet/walletStore';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 interface NoNFTScreenProps {
   onBack: () => void;

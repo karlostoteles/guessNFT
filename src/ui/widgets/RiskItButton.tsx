@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePhase, useGameActions } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
-import { sfx } from '@/audio/sfx';
+import { sfx } from '@/shared/audio/sfx';
 
 const VISIBLE_PHASES = new Set([
   GamePhase.QUESTION_SELECT,
