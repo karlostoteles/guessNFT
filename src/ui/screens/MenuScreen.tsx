@@ -16,6 +16,11 @@ export function MenuScreen() {
     startSetup();
   };
 
+  const handleNFTPlay = () => {
+    setGameMode('nft');
+    startSetup();
+  };
+
   const handlePlayOnline = () => {
     setView('online');
   };
@@ -32,6 +37,7 @@ export function MenuScreen() {
           <MenuMain
             key="menu"
             onFreePlay={handleFreePlay}
+            onNFTPlay={handleNFTPlay}
             onPlayOnline={handlePlayOnline}
           />
         )}
@@ -51,10 +57,11 @@ export function MenuScreen() {
 
 interface MenuMainProps {
   onFreePlay: () => void;
+  onNFTPlay: () => void;
   onPlayOnline: () => void;
 }
 
-function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
+function MenuMain({ onFreePlay, onNFTPlay, onPlayOnline }: MenuMainProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -154,6 +161,36 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
             <span style={{ opacity: 0.6, fontSize: 13, fontWeight: 500 }}>1v1</span>
           </motion.button>
 
+          {/* Play for Real — NFT local 2P */}
+          <motion.button
+            onClick={onNFTPlay}
+            whileHover={{ scale: 1.03, filter: 'brightness(1.12)' }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              fontSize: 16,
+              padding: '14px 40px',
+              minWidth: 'min(280px, calc(100vw - 64px))',
+              background: 'linear-gradient(135deg, rgba(232,164,68,0.18), rgba(200,130,30,0.28))',
+              border: '1px solid rgba(232,164,68,0.45)',
+              borderRadius: 14,
+              color: '#E8A444',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)',
+              letterSpacing: '0.01em',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              boxShadow: '0 0 24px rgba(232,164,68,0.12)',
+            }}
+          >
+            🎴 Play for Real
+            <span style={{ opacity: 0.55, fontSize: 12, fontWeight: 500 }}>SCHIZODIO NFTs</span>
+          </motion.button>
+
           {/* Play Free vs CPU — secondary */}
           <Button
             variant="accent"
@@ -168,4 +205,3 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
     </motion.div>
   );
 }
-

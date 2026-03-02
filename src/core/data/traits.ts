@@ -14,6 +14,19 @@ export interface CharacterTraits {
   has_hat: boolean;
   has_beard: boolean;
   has_earrings: boolean;
+  // SCHIZODIO NFT-specific traits (optional — only present on NFT characters)
+  nft_hair?: string;
+  nft_eyes?: string;
+  nft_mouth?: string;
+  nft_eyebrows?: string;
+  nft_body?: string;
+  nft_clothing?: string;
+  nft_has_mask?: boolean;
+  nft_has_weapons?: boolean;
+  nft_has_eyewear?: boolean;
+  nft_has_headwear?: boolean;
+  nft_has_accessories?: boolean;
+  nft_has_overlay?: boolean;
 }
 
 export const SKIN_COLORS: Record<SkinTone, string> = {
