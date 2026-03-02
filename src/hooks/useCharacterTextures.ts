@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameCharacters } from '@/core/store/selectors';
-import { renderPortrait, renderCardBack } from '@/canvas/PortraitRenderer';
+import { renderPortrait, renderCardBack } from '@/rendering/canvas/PortraitRenderer';
 import { getTileLOD } from '@/core/rules/constants';
 
 /**
