@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../common/Button';
-import { usePhase, useActivePlayer, useGameActions, useGameMode } from '@/core/store/selectors';
+import { usePhase, useActivePlayer, useGameActions, useGameMode, useTurnNumber } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 
@@ -9,21 +9,24 @@ export function PhaseTransition() {
   const phase = usePhase();
   const activePlayer = useActivePlayer();
   const mode = useGameMode();
+  const turnNumber = useTurnNumber();
   const { advancePhase } = useGameActions();
 
-  // In free mode, auto-advance through CPU transitions without requiring a tap
-  const isCPUTransition = mode === 'free' && activePlayer === 'player2' && phase === GamePhase.TURN_TRANSITION;
+  // In free mode, all TURN_TRANSITION rounds auto-advance — no manual tap needed.
+  // (P1 is always active in free mode; there is no separate CPU turn.)
+  const isAutoTransition = mode === 'free' && phase === GamePhase.TURN_TRANSITION;
 
   useEffect(() => {
-    if (!isCPUTransition) return;
+    if (!isAutoTransition) return;
     const timer = setTimeout(advancePhase, 800);
     return () => clearTimeout(timer);
-  }, [isCPUTransition, advancePhase]);
+  }, [isAutoTransition, advancePhase]);
+
+  const isCPU = mode === 'free' && activePlayer === 'player2';
+  const nextLabel = isCPU ? 'CPU' : activePlayer === 'player1' ? 'Player 1' : 'Player 2';
 
   let title = '';
   let subtitle = '';
-  const isCPU = mode === 'free' && activePlayer === 'player2';
-  const nextLabel = isCPU ? 'CPU' : activePlayer === 'player1' ? 'Player 1' : 'Player 2';
 
   switch (phase) {
     case GamePhase.HANDOFF_P1_TO_P2:
@@ -41,8 +44,13 @@ export function PhaseTransition() {
       break;
     }
     case GamePhase.TURN_TRANSITION:
-      title = `${nextLabel}'s Turn`;
-      subtitle = isCPU ? 'CPU is thinking…' : 'Tap to continue';
+      if (mode === 'free') {
+        title = `Round ${turnNumber}`;
+        subtitle = 'Both players ask simultaneously';
+      } else {
+        title = `${nextLabel}'s Turn`;
+        subtitle = isCPU ? 'CPU is thinking…' : 'Tap to continue';
+      }
       break;
     default:
       return null;
@@ -56,7 +64,7 @@ export function PhaseTransition() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      onClick={isCPUTransition ? undefined : advancePhase}
+      onClick={isAutoTransition ? undefined : advancePhase}
       style={{
         position: 'fixed',
         inset: 0,
@@ -66,7 +74,7 @@ export function PhaseTransition() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: isCPUTransition ? 'default' : 'pointer',
+        cursor: isAutoTransition ? 'default' : 'pointer',
         pointerEvents: 'auto',
         zIndex: 20,
       }}
@@ -95,15 +103,15 @@ export function PhaseTransition() {
           {subtitle}
         </div>
 
-        {/* Only show button for human turns */}
-        {!isCPUTransition && (
+        {/* Button for manual turns (non-free or non-transition) */}
+        {!isAutoTransition && (
           <Button variant="primary" size="lg">
             Tap to Continue
           </Button>
         )}
 
-        {/* Pulsing indicator for CPU */}
-        {isCPUTransition && (
+        {/* Pulsing dots for auto-advancing transitions */}
+        {isAutoTransition && (
           <motion.div
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ repeat: Infinity, duration: 1.2 }}

@@ -49,6 +49,8 @@ export interface GameState {
   boardRotation: number; // Y-axis rotation in radians, 0 or PI
   players: Record<PlayerId, PlayerState>;
   currentQuestion: QuestionRecord | null;
+  /** CPU's question for the current simultaneous round (free mode only). */
+  cpuQuestion: QuestionRecord | null;
   questionHistory: QuestionRecord[];
   winner: PlayerId | null;
   guessedCharacterId: string | null;

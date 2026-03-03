@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { GamePhase, GameState, GameActions, PlayerId } from './types';
 import { QUESTIONS } from '@/core/data/questions';
 import { CHARACTERS } from '@/core/data/characters';
+import type { Character } from '@/core/data/characters';
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { createCommitment, generateGameSessionId, clearCommitments } from '@/services/starknet/commitReveal';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
@@ -10,6 +11,27 @@ import { enrichCharacters } from '@/core/data/nftCharacterAdapter';
 
 function getOpponent(player: PlayerId): PlayerId {
   return player === 'player1' ? 'player2' : 'player1';
+}
+
+/**
+ * Pick the question that splits CPU's remaining characters closest to 50/50.
+ * Used internally to drive simultaneous CPU questions in free mode.
+ */
+function pickBestQuestionForCPU(
+  remaining: Character[],
+  askedIds: Set<string>,
+) {
+  const available = QUESTIONS.filter((q) => !askedIds.has(q.id));
+  if (available.length === 0) return null;
+  let best = available[0];
+  let bestScore = Infinity;
+  for (const q of available) {
+    const yesCount = remaining.filter((c) => evaluateQuestion(q, c)).length;
+    const noCount = remaining.length - yesCount;
+    const score = Math.abs(yesCount - noCount);
+    if (score < bestScore) { bestScore = score; best = q; }
+  }
+  return best;
 }
 
 const initialState: GameState = {
@@ -24,6 +46,7 @@ const initialState: GameState = {
     player2: { secretCharacterId: null, eliminatedCharacterIds: [] },
   },
   currentQuestion: null,
+  cpuQuestion: null,
   questionHistory: [],
   winner: null,
   guessedCharacterId: null,
@@ -104,6 +127,7 @@ export const useGameStore = create<GameState & GameActions>()(
             state.phase = GamePhase.ANSWER_PENDING;
             break;
           case GamePhase.ANSWER_REVEALED: {
+            // Apply P1's elimination based on their question
             const q = state.currentQuestion;
             if (q) {
               const eliminated = state.players[state.activePlayer].eliminatedCharacterIds;
@@ -119,29 +143,62 @@ export const useGameStore = create<GameState & GameActions>()(
                 }
               }
             }
+            // In free mode: simultaneously apply CPU's elimination
+            if (state.mode === 'free' && state.cpuQuestion) {
+              const cpuQ = state.cpuQuestion;
+              const cpuEliminated = state.players.player2.eliminatedCharacterIds;
+              const fullCpuQ = QUESTIONS.find((qn) => qn.id === cpuQ.questionId);
+              if (fullCpuQ) {
+                for (const char of state.characters) {
+                  if (cpuEliminated.includes(char.id)) continue;
+                  const matchesQuestion = evaluateQuestion(fullCpuQ, char);
+                  const shouldEliminate = cpuQ.answer ? !matchesQuestion : matchesQuestion;
+                  if (shouldEliminate) {
+                    cpuEliminated.push(char.id);
+                  }
+                }
+              }
+            }
             state.phase = GamePhase.AUTO_ELIMINATING;
             break;
           }
           case GamePhase.AUTO_ELIMINATING: {
-            const next = getOpponent(state.activePlayer);
-            state.activePlayer = next;
-            state.boardRotation = next === 'player1' ? 0 : Math.PI;
-            state.turnNumber += 1;
-            state.currentQuestion = null;
-            state.phase = GamePhase.TURN_TRANSITION;
+            if (state.mode === 'free') {
+              // Simultaneous mode: P1 always stays active, no player switching
+              state.turnNumber += 1;
+              state.currentQuestion = null;
+              state.cpuQuestion = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+            } else {
+              const next = getOpponent(state.activePlayer);
+              state.activePlayer = next;
+              state.boardRotation = next === 'player1' ? 0 : Math.PI;
+              state.turnNumber += 1;
+              state.currentQuestion = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+            }
             break;
           }
           case GamePhase.TURN_TRANSITION:
             state.phase = GamePhase.QUESTION_SELECT;
             break;
           case GamePhase.GUESS_WRONG: {
-            const next = getOpponent(state.activePlayer);
-            state.activePlayer = next;
-            state.boardRotation = next === 'player1' ? 0 : Math.PI;
-            state.turnNumber += 1;
-            state.currentQuestion = null;
-            state.guessedCharacterId = null;
-            state.phase = GamePhase.TURN_TRANSITION;
+            if (state.mode === 'free') {
+              // Simultaneous mode: P1 stays active, no player switching
+              state.turnNumber += 1;
+              state.currentQuestion = null;
+              state.cpuQuestion = null;
+              state.guessedCharacterId = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+            } else {
+              const next = getOpponent(state.activePlayer);
+              state.activePlayer = next;
+              state.boardRotation = next === 'player1' ? 0 : Math.PI;
+              state.turnNumber += 1;
+              state.currentQuestion = null;
+              state.guessedCharacterId = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+            }
             break;
           }
           case GamePhase.GUESS_RESULT:
@@ -172,7 +229,7 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Local/free mode: auto-evaluate immediately
+        // Local mode: auto-evaluate P1's question immediately
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
         const secretChar = state.characters.find((c) => c.id === secretId);
@@ -190,6 +247,37 @@ export const useGameStore = create<GameState & GameActions>()(
 
         state.currentQuestion = record;
         state.questionHistory.push(record);
+
+        // Free mode: CPU simultaneously picks and answers its own question
+        if (state.mode === 'free') {
+          const cpuEliminated = state.players.player2.eliminatedCharacterIds;
+          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          const cpuAskedIds = new Set(
+            state.questionHistory
+              .filter((r) => r.askedBy === 'player2')
+              .map((r) => r.questionId),
+          );
+
+          const cpuBestQ = pickBestQuestionForCPU(cpuRemaining, cpuAskedIds);
+          if (cpuBestQ) {
+            const p1SecretId = state.players.player1.secretCharacterId;
+            const p1SecretChar = state.characters.find((c) => c.id === p1SecretId);
+            const cpuAnswer = p1SecretChar ? evaluateQuestion(cpuBestQ, p1SecretChar) : false;
+
+            const cpuRecord = {
+              questionId: cpuBestQ.id,
+              questionText: cpuBestQ.text,
+              traitKey: cpuBestQ.traitKey,
+              traitValue: cpuBestQ.traitValue,
+              answer: cpuAnswer,
+              askedBy: 'player2' as PlayerId,
+              turnNumber: state.turnNumber,
+            };
+            state.cpuQuestion = cpuRecord;
+            state.questionHistory.push(cpuRecord);
+          }
+        }
+
         state.phase = GamePhase.ANSWER_REVEALED;
       }),
 
@@ -228,7 +316,8 @@ export const useGameStore = create<GameState & GameActions>()(
 
     cancelGuess: () =>
       set((state) => {
-        if (state.currentQuestion) {
+        if (state.currentQuestion && state.mode !== 'free') {
+          // Non-free modes: cancelling after asking ends the turn
           const next = getOpponent(state.activePlayer);
           state.activePlayer = next;
           state.boardRotation = next === 'player1' ? 0 : Math.PI;
@@ -236,6 +325,9 @@ export const useGameStore = create<GameState & GameActions>()(
           state.currentQuestion = null;
           state.phase = GamePhase.TURN_TRANSITION;
         } else {
+          // Free mode or no question yet: return to question select
+          state.currentQuestion = null;
+          state.cpuQuestion = null;
           state.phase = GamePhase.QUESTION_SELECT;
         }
       }),
@@ -250,10 +342,54 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Local/free: evaluate immediately
+        // Evaluate the active player's guess
         const opponent = getOpponent(state.activePlayer);
-        const secretId = state.players[opponent].secretCharacterId;
-        if (characterId === secretId) {
+        const opponentSecretId = state.players[opponent].secretCharacterId;
+        const p1IsCorrect = characterId === opponentSecretId;
+
+        if (state.mode === 'free') {
+          // Check if CPU simultaneously wants to risk it this round
+          const cpuEliminated = state.players.player2.eliminatedCharacterIds;
+          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          let cpuRiskTarget: string | null = null;
+          if (cpuRemaining.length === 1) {
+            cpuRiskTarget = cpuRemaining[0].id;
+          } else if (cpuRemaining.length === 2 && Math.random() < 0.35) {
+            cpuRiskTarget = cpuRemaining[Math.floor(Math.random() * 2)].id;
+          }
+
+          if (cpuRiskTarget) {
+            const p1SecretId = state.players.player1.secretCharacterId;
+            const cpuIsCorrect = cpuRiskTarget === p1SecretId;
+
+            if (p1IsCorrect && cpuIsCorrect) {
+              // Both correct simultaneously → DRAW
+              state.winner = null;
+              state.phase = GamePhase.GUESS_RESULT;
+            } else if (p1IsCorrect) {
+              state.winner = state.activePlayer;
+              state.phase = GamePhase.GUESS_RESULT;
+            } else if (cpuIsCorrect) {
+              state.winner = 'player2';
+              state.phase = GamePhase.GUESS_RESULT;
+            } else {
+              // Both wrong — game continues
+              state.phase = GamePhase.GUESS_WRONG;
+            }
+          } else {
+            // CPU doesn't risk this round
+            if (p1IsCorrect) {
+              state.winner = state.activePlayer;
+              state.phase = GamePhase.GUESS_RESULT;
+            } else {
+              state.phase = GamePhase.GUESS_WRONG;
+            }
+          }
+          return;
+        }
+
+        // NFT local pass-and-play mode: non-simultaneous evaluation
+        if (p1IsCorrect) {
           state.winner = state.activePlayer;
           state.phase = GamePhase.GUESS_RESULT;
         } else {

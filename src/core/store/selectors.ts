@@ -8,6 +8,7 @@ export const useActivePlayer = () => useGameStore((s) => s.activePlayer);
 export const useTurnNumber = () => useGameStore((s) => s.turnNumber);
 export const useBoardRotation = () => useGameStore((s) => s.boardRotation);
 export const useCurrentQuestion = () => useGameStore((s) => s.currentQuestion);
+export const useCpuQuestion = () => useGameStore((s) => s.cpuQuestion);
 export const useQuestionHistory = () => useGameStore((s) => s.questionHistory);
 export const useWinner = () => useGameStore((s) => s.winner);
 export const useGuessedCharacterId = () => useGameStore((s) => s.guessedCharacterId);

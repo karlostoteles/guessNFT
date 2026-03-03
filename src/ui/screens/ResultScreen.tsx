@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { useWinner, useGuessedCharacterId, useGameActions, usePlayerState, useGameCharacters, useGameMode, useGameSessionId } from '@/core/store/selectors';
+import { useWinner, useGuessedCharacterId, useGameActions, usePlayerState, useGameCharacters, useGameMode, useGameSessionId, usePhase } from '@/core/store/selectors';
 import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
+import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 import { sfx } from '@/shared/audio/sfx';
 import { getCommitment, verifyReveal } from '@/services/starknet/commitReveal';
 
 export function ResultScreen() {
   const winner = useWinner();
+  const phase = usePhase();
   const guessedId = useGuessedCharacterId();
   const mode = useGameMode();
   const gameSessionId = useGameSessionId();
@@ -38,10 +40,17 @@ export function ResultScreen() {
     }
   }, [mode, gameSessionId, p1State.secretCharacterId, p2State.secretCharacterId]);
 
-  if (!winner) return null;
+  // Only render in final phases
+  const isFinalPhase = phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER;
+  if (!isFinalPhase) return null;
 
-  const winnerLabel = winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
-  const winnerColor = winner === 'player1' ? COLORS.player1.primary : COLORS.player2.primary;
+  // winner === null in a final phase means DRAW
+  const isDraw = winner === null;
+
+  const winnerLabel = isDraw ? null : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
+  const winnerColor = isDraw
+    ? '#E8A444'
+    : winner === 'player1' ? COLORS.player1.primary : COLORS.player2.primary;
 
   const p1Secret = characters.find((c) => c.id === p1State.secretCharacterId);
   const p2Secret = characters.find((c) => c.id === p2State.secretCharacterId);
@@ -89,8 +98,10 @@ export function ResultScreen() {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.15 }}
         >
-          {/* Trophy */}
-          <div style={{ fontSize: 56, marginBottom: 8 }}>🏆</div>
+          {/* Trophy / handshake icon */}
+          <div style={{ fontSize: 56, marginBottom: 8 }}>
+            {isDraw ? '🤝' : '🏆'}
+          </div>
 
           <div style={{
             fontFamily: "'Space Grotesk', sans-serif",
@@ -100,10 +111,16 @@ export function ResultScreen() {
             textShadow: `0 0 60px ${winnerColor}60`,
             marginBottom: 6,
           }}>
-            {winnerLabel} Wins!
+            {isDraw ? 'DRAW!' : `${winnerLabel} Wins!`}
           </div>
 
-          {guessedChar && (
+          {isDraw && (
+            <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.45)', marginBottom: 24 }}>
+              Both guessed correctly at the same time
+            </div>
+          )}
+
+          {!isDraw && guessedChar && (
             <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.45)', marginBottom: 24 }}>
               Correctly guessed <strong style={{ color: '#FFFFFE' }}>{guessedChar.name}</strong>
             </div>
