@@ -109,6 +109,8 @@ export function MenuScreen() {
           />
         )}
       </AnimatePresence>
+
+      <LoadingOverlay loading={loading} status={nftStatus} />
     </motion.div>
   );
 }
@@ -342,7 +344,7 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
           </g>
 
           <text x="60" y="112" textAnchor="middle" fill="#E8A444" fontSize="14" fontWeight="900"
-            fontFamily="Space Grotesk, sans-serif" opacity="0.9" letterSpacing="0.1em">PENGU vs APE</text>
+            fontFamily="Space Grotesk, sans-serif" opacity="0.9" letterSpacing="0.1em">1Vs1</text>
         </svg>
       </div>
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(232,164,68,0.45), transparent)', flexShrink: 0 }} />
@@ -351,7 +353,7 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
           Play for Real
         </div>
         <div style={{ fontSize: 10, color: 'rgba(232,164,68,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
-          SCHIZODIO NFTs
+          online mode
         </div>
       </div>
       <div style={{
@@ -396,8 +398,8 @@ function PlayFreeTile({ onClick }: { onClick: () => void }) {
           {/* Inner circle */}
           <circle cx="60" cy="60" r="28" fill="rgba(124,58,237,0.12)" stroke="rgba(124,58,237,0.5)" strokeWidth="1.5" />
           {/* AI text */}
-          <text x="60" y="67" textAnchor="middle" fill="#A78BFA" fontSize="22" fontWeight="800"
-            fontFamily="Space Grotesk, sans-serif">AI</text>
+          <text x="60" y="72" textAnchor="middle" fill="#A78BFA" fontSize="40" fontWeight="800"
+            fontFamily="Space Grotesk, sans-serif">🧠</text>
           {/* Node dots on ring */}
           {[0, 60, 120, 180, 240, 300].map((deg, i) => {
             const rad = (deg * Math.PI) / 180;
@@ -491,7 +493,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
             accent="#06B6D4"
             accentRgb="6,182,212"
             icon="💀"
-            title={nftStatus || "Schizodio vs AI"}
+            title={nftStatus || "1Vs1"}
             subtitle="Connect wallet & play with your NFTs"
             tag="NFT"
             disabled={loading}
@@ -691,23 +693,86 @@ function LoginButtonSection() {
           boxShadow: '0 0 20px rgba(124,58,237,0.25)',
         }}
       >
-        {isConnecting ? <><Spinner /> Authenticating...</> : '🔐 Connect Wallet to Play'}
+        {isConnecting ? <><Spinner /> Authenticating...</> : '🔐 Login'}
       </motion.button>
     </motion.div>
   );
 }
 
-function Spinner() {
+function Spinner({ large }: { large?: boolean }) {
+  const size = large ? 32 : 14;
   return (
     <motion.div
       animate={{ rotate: 360 }}
       transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
       style={{
-        width: 14, height: 14,
-        border: '2px solid rgba(255,255,254,0.2)',
+        width: size, height: size,
+        border: `${large ? 3 : 2}px solid rgba(255,255,254,0.2)`,
         borderTopColor: '#FFFFFE',
         borderRadius: '50%',
       }}
     />
+  );
+}
+
+function LoadingOverlay({ loading, status }: { loading: boolean; status: string }) {
+  return (
+    <AnimatePresence>
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 14, 23, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            pointerEvents: 'auto',
+          }}
+        >
+          <Card style={{ padding: '40px 60px', textAlign: 'center', minWidth: 280 }}>
+            <Spinner large />
+            <div style={{
+              marginTop: 24,
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: 18,
+              color: '#FFFFFE',
+              letterSpacing: '-0.01em',
+            }}>
+              {status || 'Loading...'}
+            </div>
+            <div style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: 'rgba(255,255,254,0.4)',
+            }}>
+              Please wait while we sync with the blockchain
+            </div>
+          </Card>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: 16,
+      padding: 24,
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+      ...style,
+    }}>
+      {children}
+    </div>
   );
 }
