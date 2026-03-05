@@ -1,7 +1,7 @@
 /**
  * NFTModeBody — the body content of QuestionPanel in NFT / Online mode.
  *
- * Layout: [Silhouette column] | [Zone tabs + question list]
+ * Layout: [Zone tabs] → [Question bubbles or Top recommendations]
  */
 
 import { useMemo } from 'react';
@@ -47,7 +47,7 @@ export function NFTModeBody({
     return NFT_QUESTIONS.filter((q) => q.zone === activeZone && usefulIds.has(q.id));
   }, [activeZone, usefulIds]);
 
-  // Compute match% per question: what % of remaining chars match this trait?
+  // Compute match% per question
   const matchPctMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const q of NFT_QUESTIONS) {
@@ -69,6 +69,24 @@ export function NFTModeBody({
     });
   }, [zoneQuestions, matchPctMap, askedIds]);
 
+  // TOP QUESTIONS across all zones (for the no-zone-selected main view)
+  const topQuestions = useMemo(() => {
+    const available = NFT_QUESTIONS.filter(
+      (q) => usefulIds.has(q.id) && !askedIds.has(q.id)
+    );
+    // Sort by how close to 50/50 split (best information gain first)
+    return available
+      .map((q) => {
+        const yesCount = remaining.filter((c) => evaluateQuestion(q, c)).length;
+        const pct = remaining.length > 0 ? Math.round((yesCount / remaining.length) * 100) : 0;
+        // Score: distance from 50%. Lower = more discriminating
+        const score = Math.abs(50 - pct);
+        return { q, pct, score };
+      })
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 12); // Show top 12 most discriminating
+  }, [remaining, askedIds, usefulIds]);
+
   const isMobile = useIsMobile();
 
   return (
@@ -80,7 +98,6 @@ export function NFTModeBody({
     }}>
       {/* ── Main content area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
 
         {/* Zone selector tabs */}
         <div style={{
@@ -128,7 +145,7 @@ export function NFTModeBody({
           })}
         </div>
 
-        {/* Question list */}
+        {/* Question area */}
         <div style={{
           overflowY: 'auto', flex: 1,
           padding: '12px 14px 16px',
@@ -136,82 +153,87 @@ export function NFTModeBody({
         }}>
           <AnimatePresence mode="wait">
             {!activeZone ? (
-              /* ── No zone selected: prompt + quick zone pills ── */
+              /* ── No zone selected: show TOP RECOMMENDED questions ── */
               <motion.div
-                key="no-zone"
+                key="top-picks"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 style={{
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center',
-                  height: '100%', minHeight: 160,
-                  color: 'rgba(255,255,254,0.3)',
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: 13, textAlign: 'center', gap: 16,
+                  gap: 12,
                 }}
               >
-                {/* Rarity legend */}
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,254,0.5)', letterSpacing: '0.06em' }}>
-                  TRAIT RARITY
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span style={{ fontSize: 14 }}>⚡</span>
+                  <span style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 700, fontSize: 12,
+                    color: '#E8A444',
+                    letterSpacing: '0.06em',
+                  }}>
+                    TOP PICKS
+                  </span>
+                  <span style={{
+                    fontSize: 10, color: 'rgba(255,255,254,0.25)',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}>
+                    Questions that eliminate the most
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 220 }}>
-                  {[
-                    { label: '★ LEGENDARY', color: '#E8A444', bg: 'rgba(232,164,68,0.12)', desc: '< 5% match' },
-                    { label: '◆ RARE', color: '#A78BFA', bg: 'rgba(124,58,237,0.12)', desc: '< 15% match' },
-                    { label: '● UNCOMMON', color: '#22D3EE', bg: 'rgba(6,182,212,0.1)', desc: '< 30% match' },
-                    { label: 'COMMON', color: 'rgba(255,255,254,0.3)', bg: 'rgba(255,255,255,0.05)', desc: '≥ 30% match' },
-                  ].map(({ label, color, bg, desc }) => (
-                    <div key={label} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '5px 10px', borderRadius: 8, background: bg,
-                    }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '0.06em' }}>{label}</span>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,254,0.25)' }}>{desc}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,254,0.15)', maxWidth: 260 }}>
-                  Rarer traits eliminate more characters but are riskier. Choose wisely!
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
-                  {ZONES.map((zone) => {
-                    const cfg = ZONE_CONFIG[zone];
-                    return (
-                      <motion.button
-                        key={zone}
-                        onClick={() => setActiveZone(zone)}
-                        whileHover={{ scale: 1.06 }}
-                        whileTap={{ scale: 0.96 }}
-                        style={{
-                          background: `${cfg.color}18`,
-                          border: `1px solid ${cfg.color}40`,
-                          borderRadius: 20, padding: '6px 14px',
-                          cursor: 'pointer', outline: 'none',
-                          color: cfg.color,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          fontWeight: 700, fontSize: 11,
-                          display: 'flex', alignItems: 'center', gap: 5,
-                        }}
-                      >
-                        {cfg.icon} {cfg.label}
-                      </motion.button>
-                    );
-                  })}
+
+                {topQuestions.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center', fontSize: 12,
+                    color: 'rgba(255,255,254,0.22)', marginTop: 20, fontStyle: 'italic',
+                  }}>
+                    No more questions available
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex', flexWrap: 'wrap', gap: 8,
+                    padding: '4px 0',
+                  }}>
+                    {topQuestions.map(({ q, pct }) => (
+                      <NFTQuestionButton
+                        key={q.id}
+                        question={q}
+                        asked={false}
+                        onClick={() => onAsk(q)}
+                        matchPct={pct}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Visual separator */}
+                <div style={{
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  paddingTop: 10,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <span style={{
+                    fontSize: 10, color: 'rgba(255,255,254,0.18)',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}>
+                    Or pick a category above for all traits
+                  </span>
                 </div>
               </motion.div>
             ) : (
-              /* ── Zone selected: question list ── */
+              /* ── Zone selected: bubble question grid ── */
               <motion.div
                 key={activeZone}
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.14 }}
-                style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
               >
                 {/* Zone header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 14 }}>{ZONE_CONFIG[activeZone].icon}</span>
                   <span style={{
                     fontFamily: "'Space Grotesk', sans-serif",
@@ -219,7 +241,7 @@ export function NFTModeBody({
                     color: ZONE_CONFIG[activeZone].color,
                     letterSpacing: '0.08em',
                   }}>
-                    {ZONE_CONFIG[activeZone].label} TRAITS
+                    {ZONE_CONFIG[activeZone].label}
                   </span>
                   {zoneBadges[activeZone].yes > 0 && (
                     <span style={{
@@ -234,7 +256,7 @@ export function NFTModeBody({
                   )}
                 </div>
 
-                {zoneQuestions.length === 0 ? (
+                {sortedZoneQuestions.length === 0 ? (
                   <div style={{
                     textAlign: 'center', fontSize: 12,
                     color: 'rgba(255,255,254,0.22)', marginTop: 20, fontStyle: 'italic',
@@ -242,15 +264,20 @@ export function NFTModeBody({
                     All {ZONE_CONFIG[activeZone].label.toLowerCase()} questions answered
                   </div>
                 ) : (
-                  sortedZoneQuestions.map((q) => (
-                    <NFTQuestionButton
-                      key={q.id}
-                      question={q}
-                      asked={askedIds.has(q.id)}
-                      onClick={() => onAsk(q)}
-                      matchPct={matchPctMap.get(q.id)}
-                    />
-                  ))
+                  <div style={{
+                    display: 'flex', flexWrap: 'wrap', gap: 8,
+                    padding: '4px 0',
+                  }}>
+                    {sortedZoneQuestions.map((q) => (
+                      <NFTQuestionButton
+                        key={q.id}
+                        question={q}
+                        asked={askedIds.has(q.id)}
+                        onClick={() => onAsk(q)}
+                        matchPct={matchPctMap.get(q.id)}
+                      />
+                    ))}
+                  </div>
                 )}
               </motion.div>
             )}

@@ -19,6 +19,7 @@ import {
 } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 import { WaitingPill, RiskItPill, AskPill } from './question/Pills';
+import { RarityInfoButton } from './question/QuestionButtons';
 import { NFTModeBody } from './question/NFTModeBody';
 import { FreeModeBody } from './question/FreeModeBody';
 import { useIsMobile } from '@/shared/hooks/useMediaQuery';
@@ -199,6 +200,7 @@ export function QuestionPanel() {
                 >
                   🎯 RISK IT!
                 </motion.button>
+                {isNFTMode && <RarityInfoButton />}
                 <motion.button
                   onClick={() => setMinimised(true)}
                   whileHover={{ scale: 1.08, background: 'rgba(255,255,255,0.12)' }}

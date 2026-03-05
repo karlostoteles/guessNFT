@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Button } from '../common/Button';
 import { usePhase, useActivePlayer, useGameActions, useGameMode, useTurnNumber } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
@@ -12,13 +11,17 @@ export function PhaseTransition() {
   const turnNumber = useTurnNumber();
   const { advancePhase } = useGameActions();
 
-  // In free mode, all TURN_TRANSITION rounds auto-advance — no manual tap needed.
-  // (P1 is always active in free mode; there is no separate CPU turn.)
-  const isAutoTransition = mode === 'free' && phase === GamePhase.TURN_TRANSITION;
+  // Auto-advance ALL transitions so the player never needs to tap "Continue"
+  // (Online mode still needs the handoff check, but turn transitions are automatic.)
+  const isSinglePlayer = mode === 'free' || mode === 'nft-free';
+  const isAutoTransition =
+    phase === GamePhase.TURN_TRANSITION ||
+    (isSinglePlayer && (phase === GamePhase.HANDOFF_START ||
+      phase === GamePhase.HANDOFF_TO_OPPONENT));
 
   useEffect(() => {
     if (!isAutoTransition) return;
-    const timer = setTimeout(advancePhase, 800);
+    const timer = setTimeout(advancePhase, 1200);
     return () => clearTimeout(timer);
   }, [isAutoTransition, advancePhase]);
 
@@ -103,41 +106,32 @@ export function PhaseTransition() {
           {subtitle}
         </div>
 
-        {/* Button for manual turns (non-free or non-transition) */}
-        {!isAutoTransition && (
-          <Button variant="primary" size="lg">
-            Tap to Continue
-          </Button>
-        )}
-
-        {/* Pulsing dots for auto-advancing transitions */}
-        {isAutoTransition && (
-          <motion.div
-            animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ repeat: Infinity, duration: 1.2 }}
-            style={{
-              display: 'flex',
-              gap: 6,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 0.7, delay: i * 0.15 }}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: colors.primary,
-                  opacity: 0.7,
-                }}
-              />
-            ))}
-          </motion.div>
-        )}
+        {/* Pulsing dots — all transitions now auto-advance */}
+        <motion.div
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ repeat: Infinity, duration: 1.2 }}
+          style={{
+            display: 'flex',
+            gap: 6,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              animate={{ y: [0, -6, 0] }}
+              transition={{ repeat: Infinity, duration: 0.7, delay: i * 0.15 }}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: colors.primary,
+                opacity: 0.7,
+              }}
+            />
+          ))}
+        </motion.div>
       </motion.div>
     </motion.div>
   );
