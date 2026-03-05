@@ -176,6 +176,7 @@ function drawPonytail(ctx: CanvasRenderingContext2D, color: string, dark: string
 }
 
 function darken(hex: string, amount: number): string {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return 'rgba(0,0,0,0)';
   const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - amount);
   const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - amount);
   const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - amount);

@@ -13,7 +13,7 @@ import { getTileLOD } from '@/core/rules/constants';
  *  full    (tileW ≥ 1.0)  → high-res procedural portrait → async real NFT image upgrade
  */
 export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Texture> {
-  const characters = useGameCharacters();
+  const characters = useGameCharacters() || [];
   const lod = getTileLOD(tileW);
   const isMinimal = lod === 'minimal';
   const isLargeBoard = characters.length > 100;
@@ -31,7 +31,17 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
       // Create ONE shared low-res placeholder to avoid 1000 canvas creations
       const placeholder = renderPortrait({
         id: 'placeholder', name: 'Loading...',
-        traits: { gender: 'male' } as any
+        traits: {
+          hair_color: 'black',
+          hair_style: 'short',
+          skin_tone: 'medium',
+          eye_color: 'brown',
+          gender: 'male',
+          has_glasses: false,
+          has_hat: false,
+          has_beard: false,
+          has_earrings: false
+        } as any
       }, undefined, true);
 
       const map = new Map<string, THREE.Texture>();
@@ -61,7 +71,7 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
 
   // 2. Async: Upgrade to real NFT images with THROTTLING
   useEffect(() => {
-    if (lod === 'minimal') return;
+    if (lod === 'minimal' || !characters || characters.length === 0) return;
 
     let cancelled = false;
     const BATCH_SIZE = 12;
@@ -87,11 +97,6 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
 
               const texture = renderPortrait(char, img, isLargeBoard);
               setTextures((prev) => {
-                const old = prev.get(char.id);
-                // Only dispose if it's NOT the shared placeholder
-                if (old && (old as any).isPlaceholder !== true) {
-                  // old.dispose(); // risky with shared textures, let's just swap
-                }
                 const next = new Map(prev);
                 next.set(char.id, texture);
                 return next;
