@@ -488,6 +488,14 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       }),
 
+    goBackToSetupP1: () =>
+      set((state) => {
+        if (state.phase === GamePhase.SETUP_P2) {
+          state.phase = GamePhase.SETUP_P1;
+          state.players.player2.secretCharacterId = null;
+        }
+      }),
+
     enrichNFTCharacters: (traitMap) =>
       set((state) => {
         enrichCharacters(state.characters, traitMap);

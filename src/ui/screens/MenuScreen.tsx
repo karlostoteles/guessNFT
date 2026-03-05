@@ -4,8 +4,9 @@ import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '@/core/store/selectors';
 import { MEME_CHARACTERS } from '@/core/data/memeCharacters';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
-import { useWalletStore } from '@/services/starknet/walletStore';
+import { useWalletStore, useWalletStatus, useWalletAddress } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet/hooks';
+import { WalletButton } from '../widgets/WalletButton';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online';
 
@@ -247,15 +248,19 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.95, duration: 0.8 }}
-        style={{ fontSize: 15, color: 'rgba(255,255,254,0.38)', fontWeight: 500, marginBottom: 48, textAlign: 'center' }}
+        style={{ fontSize: 15, color: 'rgba(255,255,254,0.38)', fontWeight: 500, marginBottom: 24, textAlign: 'center' }}
       >
         The classic family game, made schizo
       </motion.div>
+
+      {/* Login Button (if not connected) */}
+      <LoginButtonSection />
 
       {/* ─── Two main tiles: slide in from sides ─── */}
       <div style={{
         display: 'flex', gap: 'clamp(16px, 4vw, 28px)',
         alignItems: 'stretch', justifyContent: 'center',
+        marginTop: 24,
       }}>
         <motion.div
           initial={{ x: -100, opacity: 0, rotate: -5 }}
@@ -300,30 +305,44 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
           position: 'absolute', inset: 0,
           background: 'radial-gradient(ellipse at 50% 55%, rgba(232,164,68,0.13) 0%, transparent 68%)',
         }} />
-        <svg viewBox="0 0 120 140" width="100%" height="100%"
+        <svg viewBox="0 0 120 120" width="100%" height="100%"
           style={{ position: 'absolute', inset: 0 }} preserveAspectRatio="xMidYMid meet">
-          <g opacity="0.82">
-            <circle cx="28" cy="30" r="11" fill="#E8A444" opacity="0.65" />
-            <rect x="21" y="41" width="14" height="28" rx="4" fill="#E8A444" opacity="0.45" />
-            <line x1="35" y1="50" x2="58" y2="64" stroke="#E8A444" strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
-            <line x1="21" y1="50" x2="10" y2="62" stroke="#E8A444" strokeWidth="3" strokeLinecap="round" opacity="0.45" />
-            <line x1="24" y1="69" x2="18" y2="94" stroke="#E8A444" strokeWidth="3.5" strokeLinecap="round" opacity="0.45" />
-            <line x1="34" y1="69" x2="38" y2="94" stroke="#E8A444" strokeWidth="3.5" strokeLinecap="round" opacity="0.45" />
+
+          {/* Penguin Mascot (Left) */}
+          <g transform="translate(15, 35) scale(0.8)">
+            {/* Body */}
+            <ellipse cx="25" cy="45" rx="20" ry="25" fill="#FFFFFE" />
+            <ellipse cx="25" cy="45" rx="16" ry="22" fill="#0F0E17" />
+            <ellipse cx="25" cy="50" rx="10" ry="14" fill="#FFFFFE" />
+            {/* Eyes */}
+            <circle cx="18" cy="38" r="3" fill="#FFFFFE" />
+            <circle cx="18" cy="38" r="1.5" fill="#000" />
+            <circle cx="32" cy="38" r="3" fill="#FFFFFE" />
+            <circle cx="32" cy="38" r="1.5" fill="#000" />
+            {/* Beak */}
+            <path d="M22 42 L28 42 L25 48 Z" fill="#E8A444" />
           </g>
-          <g opacity="0.82">
-            <circle cx="92" cy="30" r="11" fill="#60CDFF" opacity="0.65" />
-            <rect x="85" y="41" width="14" height="28" rx="4" fill="#60CDFF" opacity="0.45" />
-            <line x1="85" y1="50" x2="62" y2="64" stroke="#60CDFF" strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
-            <line x1="99" y1="50" x2="110" y2="62" stroke="#60CDFF" strokeWidth="3" strokeLinecap="round" opacity="0.45" />
-            <line x1="88" y1="69" x2="82" y2="94" stroke="#60CDFF" strokeWidth="3.5" strokeLinecap="round" opacity="0.45" />
-            <line x1="98" y1="69" x2="102" y2="94" stroke="#60CDFF" strokeWidth="3.5" strokeLinecap="round" opacity="0.45" />
+
+          {/* VS Circle */}
+          <circle cx="60" cy="65" r="15" fill="rgba(15, 14, 23, 0.8)" stroke="rgba(232, 164, 68, 0.3)" strokeWidth="1" />
+          <text x="60" y="70" textAnchor="middle" fill="#E8A444" fontSize="12" fontWeight="900" fontFamily="Space Grotesk">VS</text>
+
+          {/* Ape Mascot (Right) */}
+          <g transform="translate(65, 35) scale(0.8)">
+            {/* Head */}
+            <rect x="5" y="25" width="40" height="35" rx="12" fill="#E8A444" opacity="0.9" />
+            {/* Mouth/Muzzle */}
+            <rect x="10" y="45" width="30" height="15" rx="8" fill="#F0C060" />
+            {/* Eyes */}
+            <rect x="12" y="32" width="8" height="8" rx="2" fill="#0F0E17" />
+            <rect x="30" y="32" width="8" height="8" rx="2" fill="#0F0E17" />
+            {/* Ears */}
+            <circle cx="5" cy="40" r="6" fill="#E8A444" />
+            <circle cx="45" cy="40" r="6" fill="#E8A444" />
           </g>
-          <line x1="56" y1="58" x2="64" y2="70" stroke="#E8A444" strokeWidth="2.5" opacity="0.5" />
-          <line x1="64" y1="58" x2="56" y2="70" stroke="#60CDFF" strokeWidth="2.5" opacity="0.5" />
-          <circle cx="60" cy="64" r="5" fill="none" stroke="#FFFFA0" strokeWidth="1.2" opacity="0.55" />
-          <circle cx="60" cy="64" r="2" fill="#FFFFA0" opacity="0.6" />
-          <text x="60" y="118" textAnchor="middle" fill="#E8A444" fontSize="20" fontWeight="900"
-            fontFamily="Space Grotesk, sans-serif" opacity="0.9">1v1</text>
+
+          <text x="60" y="112" textAnchor="middle" fill="#E8A444" fontSize="14" fontWeight="900"
+            fontFamily="Space Grotesk, sans-serif" opacity="0.9" letterSpacing="0.1em">PENGU vs APE</text>
         </svg>
       </div>
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(232,164,68,0.45), transparent)', flexShrink: 0 }} />
@@ -628,5 +647,67 @@ function OptionCard({ onClick, accent, accentRgb, icon, title, subtitle, tag, di
         {tag}
       </div>
     </motion.button>
+  );
+}
+
+// ─── Login Button Section ──────────────────────────────────────────────────
+
+function LoginButtonSection() {
+  const status = useWalletStatus();
+  const address = useWalletAddress();
+  const { connectWallet } = useWalletConnection();
+  const isConnected = status === 'connected' || status === 'ready' || status === 'loading_nfts';
+  const isConnecting = status === 'connecting' || status === 'loading_nfts';
+
+  if (isConnected && address) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1.0 }}
+      style={{ marginBottom: 8 }}
+    >
+      <motion.button
+        onClick={connectWallet}
+        disabled={isConnecting}
+        whileHover={isConnecting ? {} : { scale: 1.04, filter: 'brightness(1.1)', boxShadow: '0 0 40px rgba(124,58,237,0.45)' }}
+        whileTap={isConnecting ? {} : { scale: 0.97 }}
+        style={{
+          background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+          border: '1px solid rgba(124,58,237,0.5)',
+          borderRadius: 12,
+          padding: '12px 32px',
+          color: '#FFFFFE',
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: 15,
+          cursor: isConnecting ? 'wait' : 'pointer',
+          opacity: isConnecting ? 0.7 : 1,
+          outline: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          boxShadow: '0 0 20px rgba(124,58,237,0.25)',
+        }}
+      >
+        {isConnecting ? <><Spinner /> Authenticating...</> : '🔐 Connect Wallet to Play'}
+      </motion.button>
+    </motion.div>
+  );
+}
+
+function Spinner() {
+  return (
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+      style={{
+        width: 14, height: 14,
+        border: '2px solid rgba(255,255,254,0.2)',
+        borderTopColor: '#FFFFFE',
+        borderRadius: '50%',
+      }}
+    />
   );
 }

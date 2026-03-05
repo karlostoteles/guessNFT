@@ -11,23 +11,80 @@ import type { SchizodioNFT } from '@/services/starknet/types';
  * No full-screen modal; click outside (transparent backdrop) to close.
  */
 export function WalletButton() {
-  const status   = useWalletStatus();
+  const status = useWalletStatus();
   const username = useWalletUsername();
-  const address  = useWalletAddress();
-  const nfts     = useOwnedNFTs();
+  const address = useWalletAddress();
+  const nfts = useOwnedNFTs();
   const { disconnectWallet, refreshNFTs } = useWalletConnection();
-  const [open, setOpen]         = useState(false);
-  const [copied, setCopied]     = useState(false);
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const isConnected = status === 'connected' || status === 'ready' || status === 'loading_nfts';
   const displayName = username || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '');
 
-  if (!isConnected) return null;
+  if (!isConnected) {
+    const isConnecting = status === 'connecting';
+    const { connectWallet } = useWalletConnection();
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 16,
+        left: 16,
+        zIndex: 100,
+        pointerEvents: 'auto',
+      }}>
+        <motion.button
+          onClick={connectWallet}
+          disabled={isConnecting}
+          whileHover={isConnecting ? {} : { scale: 1.05, borderColor: 'rgba(124, 58, 237, 0.6)' }}
+          whileTap={isConnecting ? {} : { scale: 0.95 }}
+          style={{
+            background: 'rgba(15, 14, 23, 0.88)',
+            border: '1px solid rgba(124, 58, 237, 0.4)',
+            borderRadius: 12,
+            padding: '8px 14px',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            cursor: isConnecting ? 'wait' : 'pointer',
+            color: '#FFFFFE',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 600,
+            fontSize: 12,
+            outline: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
+          {isConnecting ? (
+            <>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                style={{
+                  width: 12, height: 12,
+                  border: '2px solid rgba(255,255,254,0.2)',
+                  borderTopColor: '#FFFFFE',
+                  borderRadius: '50%',
+                }}
+              />
+              Authenticating...
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 14 }}>🔐</span>
+              Login
+            </>
+          )}
+        </motion.button>
+      </div>
+    );
+  }
 
   const handleCopy = () => {
     if (!address) return;
-    navigator.clipboard.writeText(address).catch(() => {});
+    navigator.clipboard.writeText(address).catch(() => { });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

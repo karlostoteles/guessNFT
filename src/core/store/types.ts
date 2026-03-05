@@ -77,6 +77,7 @@ export interface GameActions {
   makeGuess: (characterId: string) => void;
   cancelGuess: () => void;
   resetGame: () => void;
+  goBackToSetupP1: () => void;
   // Online-specific actions (called by useOnlineGameSync hook)
   setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2) => void;
   advanceToGameStart: () => void;

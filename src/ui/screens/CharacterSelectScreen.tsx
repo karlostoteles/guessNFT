@@ -23,7 +23,7 @@ export function CharacterSelectScreen() {
   const phase = usePhase();
   const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
-  const { selectSecretCharacter } = useGameActions();
+  const { selectSecretCharacter, resetGame, goBackToSetupP1 } = useGameActions();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
 
   // All game characters (full 999-stub board for nft/online, meme chars for free)
@@ -231,7 +231,31 @@ export function CharacterSelectScreen() {
         overflow: 'hidden',
       }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>
+        <div style={{ position: 'relative', textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>
+          {/* Back button */}
+          <motion.button
+            onClick={() => {
+              if (phase === GamePhase.SETUP_P2) goBackToSetupP1();
+              else resetGame();
+            }}
+            whileHover={{ scale: 1.06, background: 'rgba(255,255,255,0.1)' }}
+            whileTap={{ scale: 0.94 }}
+            style={{
+              position: 'absolute',
+              left: 4, top: 4,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10, padding: '6px 14px',
+              cursor: 'pointer', outline: 'none',
+              color: 'rgba(255,255,254,0.55)',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            ← Back
+          </motion.button>
+
           <div style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: 'clamp(20px, 4vw, 26px)',

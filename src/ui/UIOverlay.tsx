@@ -17,6 +17,7 @@ import { GuessWrongOverlay } from './overlays/GuessWrongOverlay';
 import { TurnIndicator } from './widgets/TurnIndicator';
 import { RiskItButton } from './widgets/RiskItButton';
 import { WalletButton } from './widgets/WalletButton';
+import { HomeButton } from './widgets/HomeButton';
 import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
 import { OpponentCounter } from './widgets/OpponentCounter';
 import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
@@ -41,6 +42,7 @@ export function UIOverlay() {
 
       {/* Wallet connection status — always visible */}
       <WalletButton />
+      <HomeButton />
 
       {/* Always-visible Risk It button during gameplay */}
       <RiskItButton />
