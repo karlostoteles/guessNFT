@@ -43,7 +43,7 @@ const GENDERS: Gender[] = ['male', 'female'];
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Deterministic hash from a string → positive integer */
-function hashString(s: string): number {
+export function hashString(s: string): number {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
     hash = ((hash << 5) - hash) + s.charCodeAt(i);
@@ -98,9 +98,83 @@ function deriveBool(attrValue: string | undefined, seed: number, offset: number)
 // ─── NFT trait mapping ────────────────────────────────────────────────────────
 
 /**
- * Build the nft_* fields from a real attribute array.
- * All string values are lowercased so matchFn keyword comparisons work directly.
- * Boolean fields: true when the trait has a real value (not "No X" / "None").
+ * SCHIZODIO trait bitmask parser.
+ * Schema maps index -> trait name (e.g. 104 -> "body_snowflake")
+ */
+export function buildTraitsFromBitmap(
+  bitmap: string[],
+  schema: Record<string, string>
+): Partial<CharacterTraits> {
+  const traits: Partial<CharacterTraits> = {};
+
+  // Helper to check if a specific bit is set in the bitmap
+  const hasBit = (idx: number) => {
+    const chunkIdx = Math.floor(idx / 128);
+    const bitOffset = idx % 128;
+    const chunk = bitmap[chunkIdx];
+    if (!chunk) return false;
+    try {
+      const val = BigInt(chunk);
+      return (val & (1n << BigInt(bitOffset))) !== 0n;
+    } catch { return false; }
+  };
+
+  // Iterate over all schema entries (indices 0 to 417 confirmed in schizodio.json)
+  for (const [key, traitName] of Object.entries(schema)) {
+    const idx = parseInt(key, 10);
+    if (isNaN(idx)) continue;
+    if (!hasBit(idx)) continue;
+
+    const lowerName = traitName.toLowerCase();
+
+    // Categorize and map to nft_* fields
+    if (lowerName.startsWith('hair_')) traits.nft_hair = lowerName.replace('hair_', '');
+    else if (lowerName.startsWith('eyes_')) traits.nft_eyes = lowerName.replace('eyes_', '');
+    else if (lowerName.startsWith('mouth_')) traits.nft_mouth = lowerName.replace('mouth_', '');
+    else if (lowerName.startsWith('eyebrows_')) traits.nft_eyebrows = lowerName.replace('eyebrows_', '');
+    else if (lowerName.startsWith('body_')) traits.nft_body = lowerName.replace('body_', '');
+    else if (lowerName.startsWith('clothing_')) traits.nft_clothing = lowerName.replace('clothing_', '');
+    else if (lowerName.startsWith('sidekick_')) {
+      traits.nft_sidekick = lowerName.replace('sidekick_', '');
+      traits.nft_has_sidekick = true;
+    }
+    else if (lowerName.startsWith('background_')) traits.nft_background = lowerName.replace('background_', '');
+    else if (lowerName.startsWith('mask_')) traits.nft_has_mask = true;
+    else if (lowerName.startsWith('weapons_')) traits.nft_has_weapons = true;
+    else if (lowerName.startsWith('eyewear_')) traits.nft_has_eyewear = true;
+    else if (lowerName.startsWith('headwear_')) traits.nft_has_headwear = true;
+    else if (lowerName.startsWith('accessories_')) traits.nft_has_accessories = true;
+    else if (lowerName.startsWith('overlays_')) traits.nft_has_overlay = true;
+  }
+
+  return traits;
+}
+
+/**
+ * Build web2 fallbacks (hair_color, etc.) from real NFT traits.
+ * This ensures the "Free Mode" questions also work correctly on NFT characters.
+ */
+export function deriveFreeTraits(nftTraits: Partial<CharacterTraits>, seed: number): CharacterTraits {
+  const hair = nftTraits.nft_hair || '';
+  const eyes = nftTraits.nft_eyes || '';
+  const body = nftTraits.nft_body || '';
+
+  return {
+    hair_color: mapToEnum(hair, HAIR_COLORS, seed, 0),
+    hair_style: mapToEnum(hair, HAIR_STYLES, seed, 1),
+    skin_tone: mapToEnum(body, SKIN_TONES, seed, 2),
+    gender: mapToEnum(undefined, GENDERS, seed, 3),
+    eye_color: mapToEnum(eyes, EYE_COLORS, seed, 4),
+    has_glasses: nftTraits.nft_has_eyewear || deriveBool(undefined, seed, 5),
+    has_hat: nftTraits.nft_has_headwear || deriveBool(undefined, seed, 6),
+    has_beard: deriveBool(undefined, seed, 7),
+    has_earrings: nftTraits.nft_has_accessories || deriveBool(undefined, seed, 8),
+    ...nftTraits,
+  };
+}
+
+/**
+ * Build the nft_* fields from a real attribute array (used for user's owned NFTs).
  */
 function buildNftTraits(attrs: NFTAttribute[]): Partial<CharacterTraits> {
   if (attrs.length === 0) return {};

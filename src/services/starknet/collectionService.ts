@@ -8,8 +8,8 @@
  */
 
 import type { Character } from '@/core/data/characters';
-import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
-import type { SchizodioNFT } from './types';
+import { buildTraitsFromBitmap, deriveFreeTraits, hashString } from '@/core/data/nftCharacterAdapter';
+import schizodioData from '@/core/data/schizodio.json';
 
 export const COLLECTION_SIZE = 999;
 
@@ -18,15 +18,24 @@ let _cached: Character[] | null = null;
 export async function generateAllCollectionCharacters(): Promise<Character[]> {
   if (_cached) return _cached;
 
+  const { characters, question_schema } = schizodioData;
   const chars: Character[] = [];
-  for (let i = 0; i <= 999; i++) {
-    const stub: SchizodioNFT = {
-      tokenId: String(i),
-      name: `Schizodio #${i}`,
-      imageUrl: '', // Will be resolved via proxy in useCharacterTextures
-      attributes: [], // Will use deterministic fallback in nftToCharacter
-    };
-    chars.push(nftToCharacter(stub));
+
+  for (const raw of characters) {
+    const seed = hashString(String(raw.id));
+
+    // 1. Parse real NFT traits from bitmap
+    const nftTraits = buildTraitsFromBitmap(raw.bitmap, question_schema);
+
+    // 2. Derive free-mode traits (web2 fallbacks)
+    const traits = deriveFreeTraits(nftTraits, seed);
+
+    chars.push({
+      id: `nft_${raw.id}`,
+      name: raw.name || `Schizodio #${raw.id}`,
+      imageUrl: raw.image_url,
+      traits,
+    });
   }
 
   _cached = chars;

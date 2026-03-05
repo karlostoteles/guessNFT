@@ -75,9 +75,8 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
 
   // 2. Async: Upgrade to real NFT images with THROTTLING and BATCHED UPDATES
   useEffect(() => {
-    // LOD Gating: Only load real high-res textures when the board is narrowed down
-    // This creates the "Mystery" phase requested for massive boards.
-    if (lod === 'minimal' || !characters || characters.length === 0 || remainingCount > 24) return;
+    // LOD Gating: Only load real images in individual mode
+    if (lod === 'minimal' || !characters || characters.length === 0) return;
 
     let cancelled = false;
     const BATCH_SIZE = 12;
@@ -91,29 +90,17 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
 
         await Promise.all(
           batch.map(async (char) => {
-            let imageUrl = (char as any).imageUrl as string | undefined;
-            const tokenId = char.id.replace('nft_', '');
-
-            // Use the proxy to resolve metadata/image firmly (bypasses CORS + 404)
-            if (!imageUrl || imageUrl.includes('v1assets.schizod.io')) {
-              try {
-                const proxyResp = await fetch(`/api/schizodio-meta?id=${tokenId}`);
-                if (proxyResp.ok) {
-                  const meta = await proxyResp.json();
-                  imageUrl = meta.imageUrl;
-                }
-              } catch { /* fallback to direct if proxy fails */ }
-            }
-
-            if (!imageUrl) {
-              // If no URL available, stick with procedural render
-              return;
-            }
+            // Use character imageUrl directly (populated from schizodio.json in collectionService)
+            const imageUrl = char.imageUrl;
+            if (!imageUrl) return;
 
             try {
               const img = await loadImage(imageUrl);
               if (cancelled) return;
 
+              // Force isLargeBoard false for Schizodio mode to avoid low-res resizing
+              // if the board is massive, unless we want to keep it.
+              // Actually, renderPortrait uses isLargeBoard to decide canvas size.
               const texture = renderPortrait(char, img, isLargeBoard);
               newTextures.set(char.id, texture);
             } catch (err) {
@@ -144,7 +131,7 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     return () => {
       cancelled = true;
     };
-  }, [characters, lod, isLargeBoard, remainingCount]);
+  }, [characters, lod, isLargeBoard]);
 
   return textures;
 }
