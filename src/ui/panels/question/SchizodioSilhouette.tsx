@@ -1,23 +1,14 @@
 /**
  * SchizodioSilhouette — interactive SVG body with 4 clickable trait zones.
- *
- * Design language: PFP avatar proportions — large square head, boxy torso,
- * bold geometric features. Inspired by the SCHIZODIO collection aesthetic.
- *
- * Progressive reveal: as YES answers accumulate in each zone, that zone
- * "fills in" with colour highlights and detail overlays — giving a sense
- * that you are uncovering who the hidden character is.
- *
- *  Zone → trait categories
- *  ─────────────────────────────────────────────────
- *  HAIR  → Hair, Headwear, Overlays
- *  FACE  → Eyes, Eyebrows, Mouth, Mask, Eyewear
- *  BODY  → Body, Clothing, Background (chest)
- *  GEAR  → Weapons, Accessories, Sidekick (arms)
+ * 
+ * Identity Construction:
+ * As questions are answered "YES", the silhouette "populates" its 
+ * appearance with confirmed traits (Skin, Hair, Eyes, accessories).
  */
 
 import { motion } from 'framer-motion';
 import type { QuestionZone } from '@/core/data/questions';
+import { SKIN_COLORS, HAIR_COLORS, EYE_COLORS, type SkinTone, type HairColor, type EyeColor } from '@/core/data/traits';
 import { ZONE_CONFIG, ZONES } from './zoneConfig';
 
 export interface SilhouetteProps {
@@ -25,21 +16,30 @@ export interface SilhouetteProps {
   hoveredZone: QuestionZone | null;
   /** Confirmed yes/no counts per zone (from question history) */
   zoneBadges: Record<QuestionZone, { yes: number; no: number }>;
+  /** Confirmed trait values (e.g., { hair_color: 'red' }) */
+  revealedTraits: Record<string, any>;
   onZoneClick: (z: QuestionZone) => void;
   onZoneEnter: (z: QuestionZone) => void;
   onZoneLeave: () => void;
 }
 
-// How strongly a zone is "revealed" — 0 = dark silhouette, 1 = fully revealed
-function revealAlpha(yesCount: number): number {
-  if (yesCount === 0) return 0;
-  return Math.min(0.92, yesCount * 0.38);
-}
-
 export function SchizodioSilhouette({
-  activeZone, hoveredZone, zoneBadges,
+  activeZone, hoveredZone, zoneBadges, revealedTraits,
   onZoneClick, onZoneEnter, onZoneLeave,
 }: SilhouetteProps) {
+
+  // Dynamic colors based on revealed traits
+  const skinColor = revealedTraits.skin_tone
+    ? SKIN_COLORS[revealedTraits.skin_tone as SkinTone]
+    : 'url(#sg-head)';
+
+  const hairColor = revealedTraits.hair_color
+    ? HAIR_COLORS[revealedTraits.hair_color as HairColor]
+    : 'url(#sg-hair)';
+
+  const eyeColor = revealedTraits.eye_color
+    ? EYE_COLORS[revealedTraits.eye_color as EyeColor]
+    : '#0E0D1C';
 
   const highlight = (zone: QuestionZone) => ({
     fill: ZONE_CONFIG[zone].color,
@@ -55,11 +55,6 @@ export function SchizodioSilhouette({
     onMouseLeave: () => onZoneLeave(),
     style: { cursor: 'pointer' as const, fill: 'transparent', stroke: 'none' },
   });
-
-  const hairReveal = revealAlpha(zoneBadges.hair.yes);
-  const faceReveal = revealAlpha(zoneBadges.face.yes);
-  const bodyReveal = revealAlpha(zoneBadges.body.yes);
-  const gearReveal = revealAlpha(zoneBadges.gear.yes);
 
   return (
     <div style={{ position: 'relative', width: 130, flexShrink: 0 }}>
@@ -86,196 +81,95 @@ export function SchizodioSilhouette({
           </linearGradient>
         </defs>
 
-        {/* Ambient glow removed for performance */}
-
-        {/* ══════════════════════════════════════════
-            LEGS  (bottom anchor, always visible)
-        ════════════════════════════════════════════ */}
+        {/* LEGS */}
         <rect x="30" y="192" width="30" height="38" rx="7" fill="url(#sg-body)" />
         <rect x="70" y="192" width="30" height="38" rx="7" fill="url(#sg-body)" />
 
-        {/* ══════════════════════════════════════════
-            GEAR ZONE — arms
-        ════════════════════════════════════════════ */}
-        {/* Left arm */}
-        <rect x="1" y="122" width="24" height="68" rx="9"
-          fill="url(#sg-body)" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-        {/* Right arm */}
-        <rect x="105" y="122" width="24" height="68" rx="9"
-          fill="url(#sg-body)" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-        {/* Hands */}
-        <ellipse cx="13" cy="193" rx="10" ry="8" fill="url(#sg-head)" />
-        <ellipse cx="117" cy="193" rx="10" ry="8" fill="url(#sg-head)" />
+        {/* GEAR ZONE — arms */}
+        <rect x="1" y="122" width="24" height="68" rx="9" fill="url(#sg-body)" stroke="rgba(255,255,255,0.09)" />
+        <rect x="105" y="122" width="24" height="68" rx="9" fill="url(#sg-body)" stroke="rgba(255,255,255,0.09)" />
 
-        {/* GEAR reveal — glowing cuff + arm tint */}
-        {gearReveal > 0 && (
-          <g opacity={gearReveal}>
-            <rect x="1" y="122" width="24" height="68" rx="9"
-              fill="#EF4444" fillOpacity={0.14} />
-            <rect x="105" y="122" width="24" height="68" rx="9"
-              fill="#EF4444" fillOpacity={0.14} />
-            {/* Cuff / bracelet details */}
-            <rect x="2" y="154" width="22" height="7" rx="3"
-              fill="#EF4444" fillOpacity={0.28} stroke="#EF4444" strokeWidth="0.6" strokeOpacity={0.55} />
-            <rect x="106" y="154" width="22" height="7" rx="3"
-              fill="#EF4444" fillOpacity={0.28} stroke="#EF4444" strokeWidth="0.6" strokeOpacity={0.55} />
-            {/* Item stub on dominant hand */}
-            {zoneBadges.gear.yes >= 2 && (
-              <path d="M106 178 L118 168 L122 172 L110 182 Z"
-                fill="#EF4444" fillOpacity={0.35} stroke="#EF4444" strokeWidth="0.8" strokeOpacity={0.6} />
-            )}
+        {/* Hands — use revealed skin color */}
+        <ellipse cx="13" cy="193" rx="10" ry="8" fill={skinColor} />
+        <ellipse cx="117" cy="193" rx="10" ry="8" fill={skinColor} />
+
+        {/* BODY ZONE — torso */}
+        <rect x="14" y="116" width="102" height="18" rx="7" fill="url(#sg-body)" stroke="rgba(255,255,255,0.10)" />
+        <rect x="26" y="128" width="78" height="66" rx="9" fill="url(#sg-body)" stroke="rgba(255,255,255,0.11)" />
+        <rect x="52" y="114" width="26" height="16" rx="6" fill={skinColor} />
+
+        {/* HAIR mass — use revealed hair color */}
+        <rect x="12" y="4" width="106" height="48" rx="18" fill={hairColor} stroke="rgba(255,255,255,0.09)" />
+
+        {/* Spiky top (Hair revealed styles) */}
+        {revealedTraits.hair_style === 'mohawk' && (
+          <path d="M60 4 L65 -15 L70 4" fill={hairColor} stroke={hairColor} strokeWidth="2" />
+        )}
+        {(revealedTraits.hair_style === 'short' || revealedTraits.hair_style === 'spiky') && (
+          <g>
+            <path d="M44 36 L48 10 L56 32" fill={hairColor} />
+            <path d="M57 26 L65  6 L73 24" fill={hairColor} />
+            <path d="M74 30 L84 10 L90 34" fill={hairColor} />
           </g>
         )}
 
-        {/* ══════════════════════════════════════════
-            BODY ZONE — torso
-        ════════════════════════════════════════════ */}
-        {/* Wide shoulders */}
-        <rect x="14" y="116" width="102" height="18" rx="7"
-          fill="url(#sg-body)" stroke="rgba(255,255,255,0.10)" strokeWidth="1" />
-        {/* Torso */}
-        <rect x="26" y="128" width="78" height="66" rx="9"
-          fill="url(#sg-body)" stroke="rgba(255,255,255,0.11)" strokeWidth="1" />
-        {/* Neck */}
-        <rect x="52" y="114" width="26" height="16" rx="6" fill="url(#sg-head)" />
-        {/* Shirt collar hint */}
-        <path d="M52 130 Q65 143 78 130"
-          stroke="rgba(255,255,255,0.10)" strokeWidth="1.5" fill="none" />
+        {/* HEAD — base shape with revealed skin color */}
+        <rect x="20" y="34" width="90" height="84" rx="13" fill={skinColor} stroke="rgba(255,255,255,0.13)" />
 
-        {/* BODY reveal — clothing colour + pocket + seam */}
-        {bodyReveal > 0 && (
-          <g opacity={bodyReveal}>
-            <rect x="26" y="128" width="78" height="66" rx="9"
-              fill="#A855F7" fillOpacity={0.14} />
-            <path d="M52 130 Q65 143 78 130"
-              stroke="#A855F7" strokeWidth="2" fill="none" strokeOpacity={0.65} />
-            {/* Center seam */}
-            <line x1="65" y1="144" x2="65" y2="194"
-              stroke="#A855F7" strokeWidth="1" strokeOpacity={0.35} />
-            {/* Chest pocket */}
-            {zoneBadges.body.yes >= 2 && (
-              <rect x="38" y="148" width="16" height="14" rx="3"
-                fill="#A855F7" fillOpacity={0.22}
-                stroke="#A855F7" strokeWidth="0.7" strokeOpacity={0.5} />
-            )}
+        {/* Eyes with revealed eye color */}
+        <rect x="30" y="55" width="28" height="22" rx="6" fill={eyeColor} />
+        <rect x="72" y="55" width="28" height="22" rx="6" fill={eyeColor} />
+        <circle cx="35" cy="62" r="3" fill="white" opacity="0.5" />
+        <circle cx="77" cy="62" r="3" fill="white" opacity="0.5" />
+
+        {/* ACCESSORIES (Construction layer) */}
+        {revealedTraits.has_glasses && (
+          <g stroke="#FFFFFE" strokeWidth="2" fill="none">
+            <rect x="25" y="52" width="38" height="28" rx="4" />
+            <rect x="67" y="52" width="38" height="28" rx="4" />
+            <line x1="63" y1="66" x2="67" y2="66" />
           </g>
         )}
 
-        {/* ══════════════════════════════════════════
-            HAIR / HEADWEAR ZONE
-        ════════════════════════════════════════════ */}
-        {/* Hair mass — flat-top PFP style */}
-        <rect x="12" y="4" width="106" height="48" rx="18"
-          fill="url(#sg-hair)" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-        {/* Spiky silhouette top — three spikes */}
-        <path d="M44 36 L48 10 L56 32" fill="#26244C" strokeLinejoin="round" />
-        <path d="M57 26 L65  6 L73 24" fill="#26244C" strokeLinejoin="round" />
-        <path d="M74 30 L84 10 L90 34" fill="#26244C" strokeLinejoin="round" />
-        {/* Side hair hang */}
-        <rect x="12" y="32" width="14" height="32" rx="6"
-          fill="url(#sg-hair)" stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
-        <rect x="104" y="32" width="14" height="32" rx="6"
-          fill="url(#sg-hair)" stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
-
-        {/* HAIR reveal — simplified */}
-        {hairReveal > 0 && (
-          <rect x="12" y="4" width="106" height="48" rx="18"
-            fill="#E8A444" fillOpacity={0.16} opacity={hairReveal} />
+        {revealedTraits.has_beard && (
+          <path d="M30 90 Q65 125 100 90 L100 80 L30 80 Z" fill={hairColor} opacity="0.8" />
         )}
 
-        {/* ══════════════════════════════════════════
-            HEAD — base shape
-        ════════════════════════════════════════════ */}
-        <rect x="20" y="34" width="90" height="84" rx="13"
-          fill="url(#sg-head)" stroke="rgba(255,255,255,0.13)" strokeWidth="1" />
+        {/* ZONE HOVER / ACTIVE HIGHLIGHTS */}
+        <rect x="12" y="4" width="106" height="48" rx="18" {...highlight('hair')} />
+        <rect x="20" y="34" width="90" height="84" rx="13" {...highlight('face')} />
+        <rect x="14" y="116" width="102" height="18" rx="7" {...highlight('body')} />
+        <rect x="26" y="128" width="78" height="66" rx="9" {...highlight('body')} />
+        <rect x="0" y="118" width="130" height="80" rx="10" {...highlight('gear')} />
 
-        {/* Simplified Eyes */}
-        <rect x="30" y="55" width="28" height="22" rx="6" fill="#0E0D1C" />
-        <rect x="72" y="55" width="28" height="22" rx="6" fill="#0E0D1C" />
-        <circle cx="35" cy="60" r="3" fill="white" opacity="0.4" />
-        <circle cx="77" cy="60" r="3" fill="white" opacity="0.4" />
-
-        {/* FACE reveal — simplified */}
-        {faceReveal > 0 && (
-          <g opacity={faceReveal}>
-            <rect x="30" y="55" width="28" height="22" rx="6" stroke="#60CDFF" fill="none" />
-            <rect x="72" y="55" width="28" height="22" rx="6" stroke="#60CDFF" fill="none" />
-          </g>
-        )}
-
-        {/* ══════════════════════════════════════════
-            ZONE HOVER / ACTIVE HIGHLIGHT OVERLAYS
-        ════════════════════════════════════════════ */}
-
-        {/* HAIR zone overlay */}
-        {(activeZone === 'hair' || hoveredZone === 'hair') && (
-          <>
-            <rect x="12" y="4" width="106" height="48" rx="18" {...highlight('hair')} />
-            <rect x="12" y="32" width="14" height="32" rx="6" {...highlight('hair')} />
-            <rect x="104" y="32" width="14" height="32" rx="6" {...highlight('hair')} />
-          </>
-        )}
-
-        {/* FACE zone overlay */}
-        {(activeZone === 'face' || hoveredZone === 'face') && (
-          <rect x="20" y="34" width="90" height="84" rx="13" {...highlight('face')} />
-        )}
-
-        {/* BODY zone overlay */}
-        {(activeZone === 'body' || hoveredZone === 'body') && (
-          <>
-            <rect x="14" y="116" width="102" height="18" rx="7" {...highlight('body')} />
-            <rect x="26" y="128" width="78" height="66" rx="9" {...highlight('body')} />
-          </>
-        )}
-
-        {/* GEAR zone overlay */}
-        {(activeZone === 'gear' || hoveredZone === 'gear') && (
-          <rect x="0" y="118" width="130" height="80" rx="10" {...highlight('gear')} />
-        )}
-
-        {/* ══════════════════════════════════════════
-            ZONE BADGE DOTS  (confirmed YES count)
-        ════════════════════════════════════════════ */}
+        {/* ZONE BADGES */}
         {ZONES.map((zone) => {
           const yes = zoneBadges[zone].yes;
           if (yes === 0) return null;
           const pos: Record<QuestionZone, { x: number; y: number }> = {
-            hair: { x: 114, y: 18 },
-            face: { x: 110, y: 60 },
-            body: { x: 116, y: 134 },
-            gear: { x: 116, y: 168 },
+            hair: { x: 114, y: 18 }, face: { x: 110, y: 60 },
+            body: { x: 116, y: 134 }, gear: { x: 116, y: 168 },
           };
           const { x, y } = pos[zone];
           return (
             <g key={zone}>
-              <circle cx={x} cy={y} r={9.5}
-                fill={ZONE_CONFIG[zone].color} opacity={0.92} />
-              <text x={x} y={y + 4}
-                textAnchor="middle" fontSize="9" fontWeight="800"
-                fill="#0F0E17" fontFamily="Space Grotesk, sans-serif">
+              <circle cx={x} cy={y} r={9.5} fill={ZONE_CONFIG[zone].color} />
+              <text x={x} y={y + 4} textAnchor="middle" fontSize="9" fontWeight="800" fill="#0F0E17">
                 {yes}
               </text>
             </g>
           );
         })}
 
-        {/* ══════════════════════════════════════════
-            INTERACTIVE HIT AREAS  (transparent, on top)
-        ════════════════════════════════════════════ */}
-        {/* HAIR */}
+        {/* INTERACTIVE HIT AREAS */}
         <rect x="10" y="2" width="110" height="54" rx="18" {...zoneBtn('hair')} />
-        {/* FACE */}
         <rect x="18" y="32" width="94" height="88" rx="13" {...zoneBtn('face')} />
-        {/* BODY */}
         <rect x="12" y="112" width="106" height="84" rx="8"  {...zoneBtn('body')} />
-        {/* GEAR — left arm */}
         <rect x="0" y="118" width="28" height="78" rx="9"  {...zoneBtn('gear')} />
-        {/* GEAR — right arm */}
         <rect x="102" y="118" width="28" height="78" rx="9"  {...zoneBtn('gear')} />
       </svg>
 
-      {/* Zone label pills — positioned to the left of the figure */}
+      {/* Zone labels */}
       {ZONES.map((zone) => {
         const cfg = ZONE_CONFIG[zone];
         const isActive = activeZone === zone;
@@ -299,25 +193,14 @@ export function SchizodioSilhouette({
               gap: 4,
               cursor: 'pointer',
               userSelect: 'none',
-              background: isActive
-                ? `linear-gradient(135deg, ${cfg.color}26, ${cfg.color}12)`
-                : 'transparent',
-              border: isActive
-                ? `1px solid ${cfg.color}55`
-                : '1px solid transparent',
               borderRadius: 20,
               padding: '3px 8px',
-              transition: 'all 0.18s',
+              border: isActive ? `1px solid ${cfg.color}55` : '1px solid transparent',
+              background: isActive ? `linear-gradient(135deg, ${cfg.color}26, ${cfg.color}12)` : 'transparent',
             }}
           >
             <span style={{ fontSize: 10 }}>{cfg.icon}</span>
-            <span style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: isActive ? cfg.color : 'rgba(255,255,255,0.4)',
-              fontFamily: "'Space Grotesk', sans-serif",
-              letterSpacing: '0.06em',
-            }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? cfg.color : 'rgba(255,255,255,0.4)' }}>
               {cfg.label}
             </span>
           </motion.div>

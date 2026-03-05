@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { useGameCharacters } from '@/core/store/selectors';
+import { useGameCharacters, useActivePlayer, useEliminatedIds } from '@/core/store/selectors';
 import { renderPortrait, renderCardBack } from '@/rendering/canvas/PortraitRenderer';
 import { getTileLOD } from '@/core/rules/constants';
 
@@ -69,9 +69,15 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     };
   }, [isMinimal, characters, isLargeBoard]);
 
+  const activePlayer = useActivePlayer();
+  const eliminatedIds = useEliminatedIds(activePlayer);
+  const remainingCount = characters.length - (eliminatedIds?.length || 0);
+
   // 2. Async: Upgrade to real NFT images with THROTTLING and BATCHED UPDATES
   useEffect(() => {
-    if (lod === 'minimal' || !characters || characters.length === 0) return;
+    // LOD Gating: Only load real high-res textures when the board is narrowed down
+    // This creates the "Mystery" phase requested for massive boards.
+    if (lod === 'minimal' || !characters || characters.length === 0 || remainingCount > 24) return;
 
     let cancelled = false;
     const BATCH_SIZE = 12;
@@ -138,7 +144,7 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     return () => {
       cancelled = true;
     };
-  }, [characters, lod, isLargeBoard]);
+  }, [characters, lod, isLargeBoard, remainingCount]);
 
   return textures;
 }

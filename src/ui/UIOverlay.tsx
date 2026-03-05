@@ -18,6 +18,7 @@ import { TurnIndicator } from './widgets/TurnIndicator';
 import { RiskItButton } from './widgets/RiskItButton';
 import { WalletButton } from './widgets/WalletButton';
 import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
+import { OpponentCounter } from './widgets/OpponentCounter';
 import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
 import { useNFTTraitLoader } from '@/shared/hooks/useNFTTraitLoader';
 
@@ -46,6 +47,7 @@ export function UIOverlay() {
 
       {/* CPU thinking indicator — free mode only */}
       <CPUThinkingIndicator />
+      <OpponentCounter />
       <SecretCardPanel />
 
       <AnimatePresence mode="wait">
@@ -62,8 +64,8 @@ export function UIOverlay() {
           phase === GamePhase.HANDOFF_START ||
           phase === GamePhase.HANDOFF_TO_OPPONENT ||
           phase === GamePhase.TURN_TRANSITION) && (
-          <PhaseTransition key={`transition-${phase}`} />
-        )}
+            <PhaseTransition key={`transition-${phase}`} />
+          )}
 
         {phase === GamePhase.QUESTION_SELECT && <QuestionPanel key="question" />}
 

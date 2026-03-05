@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import { BOARD, getTileLOD, computeAdaptiveGrid } from '@/core/rules/constants';
 import { useGameCharacters, useActivePlayer, useEliminatedIds } from '@/core/store/selectors';
 import { CharacterTile } from './CharacterTile';
+import { sfx } from '@/shared/audio/sfx';
 
 interface CharacterGridProps {
   textures: Map<string, THREE.Texture>;
@@ -128,6 +129,9 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
       } else {
         const st = existing.get(char.id)!;
         if (target) { st.tx = target[0]; st.tz = target[1]; }
+        if (isEliminated && st.targetScale === 1) {
+          sfx.tileFlip();
+        }
         st.targetScale = isEliminated ? 0 : 1;
       }
     }
@@ -241,6 +245,7 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
         // Trigger flip+shrink for newly eliminated tiles
         if (isEliminated && st.phase === 'alive') {
           st.phase = 'flipping';
+          sfx.tileFlip();
         }
         // When the active player switches and this character is not eliminated in
         // the new player's view, revive it so it appears on their board.

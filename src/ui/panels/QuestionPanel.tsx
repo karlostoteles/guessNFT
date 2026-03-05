@@ -76,6 +76,18 @@ export function QuestionPanel() {
     return map;
   }, [history, activePlayer]);
 
+  // Extract confirmed trait values for Identity Construction
+  const revealedTraits = useMemo(() => {
+    const traits: Record<string, any> = {};
+    for (const record of history) {
+      if (record.askedBy !== activePlayer || record.answer !== true) continue;
+      const q = QUESTIONS.find((q) => q.id === record.questionId);
+      if (!q?.traitKey) continue;
+      traits[q.traitKey] = q.traitValue;
+    }
+    return traits;
+  }, [history, activePlayer]);
+
   const handleRiskIt = () => { sfx.riskIt(); startGuess(); };
 
   const handleAsk = (q: Question) => {
@@ -230,6 +242,7 @@ export function QuestionPanel() {
                 zoneBadges={zoneBadges}
                 askedIds={askedIds}
                 remaining={remaining}
+                revealedTraits={revealedTraits}
                 onAsk={handleAsk}
               />
             ) : (

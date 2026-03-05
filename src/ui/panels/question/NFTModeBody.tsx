@@ -22,13 +22,14 @@ interface NFTModeBodyProps {
   zoneBadges: Record<QuestionZone, { yes: number; no: number }>;
   askedIds: Set<string>;
   remaining: Character[];
+  revealedTraits: Record<string, any>;
   onAsk: (q: Question) => void;
 }
 
 export function NFTModeBody({
   activeZone, hoveredZone,
   setActiveZone, setHoveredZone,
-  zoneBadges, askedIds, remaining, onAsk,
+  zoneBadges, askedIds, remaining, revealedTraits, onAsk,
 }: NFTModeBodyProps) {
 
   // Info-gain filtered question IDs
@@ -84,6 +85,7 @@ export function NFTModeBody({
                 activeZone={activeZone}
                 hoveredZone={hoveredZone}
                 zoneBadges={zoneBadges}
+                revealedTraits={revealedTraits}
                 onZoneClick={(z) => setActiveZone(activeZone === z ? null : z)}
                 onZoneEnter={(z) => setHoveredZone(z)}
                 onZoneLeave={() => setHoveredZone(null)}

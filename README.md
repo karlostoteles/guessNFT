@@ -130,20 +130,26 @@ export const GAME_CONTRACT = '0x0'; // TODO: deploy guessNFT Cairo contract and 
 
 ---
 
-## 🤖 Contributing with AI Agents
+## 🤖 Collaborating with AI Agents
 
-This project is optimized for collaboration with AI coding assistants (like Antigravity, Claude Engineer, or Cursor). To maintain development velocity, we use a structured workflow:
+This project follows an **Agent-First Workflow**. If you are an AI assistant (Antigravity, Claude, etc.) working on this codebase, follow these rules to ensure high-quality, verifiable progress:
 
-### AI Assets
-- **`task.md`**: The source of truth for current progress. Always keep this updated with `[ ]`, `[/]`, and `[x]`.
-- **`implementation_plan.md`**: Before making major changes, agents should propose a plan here for human review.
-- **`walkthrough.md`**: After a milestone, a summary of changes and verification results is recorded in `docs/walkthrough.md`.
+### 1. The "Brain" Artifacts
+All strategic work is recorded in the `brain/` directory:
+- **`task.md`**: Your live checklist. Mark items as `[/]` (in-progress) or `[x]` (complete).
+- **`implementation_plan.md`**: Propose your technical design here **before** writing code. Seek human approval for breaking changes.
+- **`walkthrough.md`**: Document your results, performance gains, and provide proof-of-work (screenshots/recordings).
 
-### Best Practices for Agents
-1. **Plan First**: Never skip the `implementation_plan.md` step for architectural changes.
-2. **Verify Build**: Always run `npm run build` after changes to catch type regressions.
-3. **Atomic Commits**: Group related optimizations and fixes into single, descriptive commits.
-4. **Performance First**: When dealing with 3D or large datasets (like the 999 board), always prioritize memory efficiency and main-thread responsiveness.
+### 2. Standard Workflow
+1. **Research**: Use `grep` and `find` to understand the data flow.
+2. **Plan**: Update the `implementation_plan.md`.
+3. **Build**: Keep changes atomic. Wrap components in `React.memo` where appropriate.
+4. **Verify**: Run `npm run build` and `npm run lint` before notifying the human.
+
+### 3. Performance Standards
+- Minimize `useFrame` calls on large boards.
+- Use **LOD Gating** (InstancedMesh vs. Individual Tiles).
+- Batch state updates to prevent UI churn.
 
 ---
 
