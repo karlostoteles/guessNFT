@@ -22,19 +22,8 @@ export function MenuScreen() {
     startSetup();
   };
 
-  const handleNFTFreePlay = async () => {
-    setLoading(true);
-    try {
-      const chars = await generateAllCollectionCharacters();
-      setGameMode('nft-free', chars);
-      startSetup();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   /** Connect wallet → read owned Schizodios → start free game with those NFTs */
-  const handleMySchizodios = async () => {
+  const handleNFTFreePlay = async () => {
     setLoading(true);
     setNftStatus('Connecting wallet...');
     try {
@@ -145,7 +134,6 @@ export function MenuScreen() {
             onBack={() => setView('menu')}
             onCTVersion={handleFreePlay}
             onSchizodio={handleNFTFreePlay}
-            onMySchizodios={handleMySchizodios}
             loading={loading}
             nftStatus={nftStatus}
           />
@@ -489,12 +477,11 @@ interface FreePickProps {
   onBack: () => void;
   onCTVersion: () => void;
   onSchizodio: () => void;
-  onMySchizodios: () => void;
   loading?: boolean;
   nftStatus?: string;
 }
 
-function FreePickView({ onBack, onCTVersion, onSchizodio, onMySchizodios, loading, nftStatus }: FreePickProps) {
+function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: FreePickProps) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -523,26 +510,15 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, onMySchizodios, loadin
             subtitle="Crypto Twitter meme characters"
             tag="24 CHARACTERS"
           />
-          {/* My Schizodios (wallet-connected) */}
-          <OptionCard
-            onClick={loading ? () => { } : onMySchizodios}
-            accent="#E8A444"
-            accentRgb="232,164,68"
-            icon="🔗"
-            title={nftStatus || "My Schizodios"}
-            subtitle="Connect Controller & play with your own NFTs"
-            tag="WALLET"
-            disabled={loading}
-          />
-          {/* Schizodio vs AI (full collection, no wallet) */}
+          {/* Schizodio vs AI — connects wallet & checks NFT ownership */}
           <OptionCard
             onClick={loading ? () => { } : onSchizodio}
             accent="#06B6D4"
             accentRgb="6,182,212"
             icon="💀"
-            title={loading && !nftStatus ? "Loading..." : "Schizodio Collection"}
-            subtitle="Full 999 NFT collection (no wallet needed)"
-            tag="999 NFTS"
+            title={nftStatus || "Schizodio vs AI"}
+            subtitle="Connect wallet & play with your NFTs"
+            tag="NFT"
             disabled={loading}
           />
         </div>
