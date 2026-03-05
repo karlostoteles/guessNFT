@@ -45,6 +45,8 @@ const actions = {
   get applyOpponentAnswer() { return useGameStore.getState().applyOpponentAnswer; },
   get receiveOpponentGuess() { return useGameStore.getState().receiveOpponentGuess; },
   get applyGuessResult() { return useGameStore.getState().applyGuessResult; },
+  get goBackToSetupP1() { return useGameStore.getState().goBackToSetupP1; },
+  get enrichNFTCharacters() { return useGameStore.getState().enrichNFTCharacters; },
 };
 
 export const useGameActions = () => actions;
