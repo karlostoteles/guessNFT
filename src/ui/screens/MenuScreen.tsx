@@ -125,20 +125,31 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
         background: 'radial-gradient(ellipse at center, rgba(15,14,23,0.6) 0%, rgba(15,14,23,0.95) 70%)',
       }}
     >
-      {/* Title */}
+      {/* Logo & Title */}
       <motion.div
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2, type: 'spring', stiffness: 150 }}
         style={{ textAlign: 'center', marginBottom: 48 }}
       >
+        <img
+          src="/logo.png"
+          alt="guessNFT"
+          style={{
+            width: 'clamp(120px, 30vw, 200px)',
+            height: 'auto',
+            borderRadius: '50%',
+            filter: 'drop-shadow(0 0 40px rgba(124,58,237,0.4))',
+            marginBottom: 12,
+          }}
+        />
         <div style={{
           fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: 'clamp(38px, 10vw, 64px)',
+          fontSize: 'clamp(28px, 8vw, 48px)',
           fontWeight: 800, letterSpacing: '-0.02em',
           background: 'linear-gradient(135deg, #E8A444 0%, #F0C060 50%, #E8A444 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          marginBottom: 4, filter: 'drop-shadow(0 0 40px rgba(232,164,68,0.3))',
+          marginBottom: 4, filter: 'drop-shadow(0 0 30px rgba(232,164,68,0.3))',
         }}>
           guessNFT
         </div>

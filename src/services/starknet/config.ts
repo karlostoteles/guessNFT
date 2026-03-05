@@ -3,10 +3,10 @@
 export const SCHIZODIO_CONTRACT =
   '0x077485a949c130cf0d98819d2b0749f5860b0734ea28cb678dd3f39379131bfa';
 
-export const RPC_URL = 'https://api.cartridge.gg/x/starknet/sepolia';
+export const RPC_URL = 'https://api.cartridge.gg/x/starknet/mainnet';
 
-// "SN_SEPOLIA" in ASCII hex
-export const SN_MAIN_CHAIN_ID = '0x534e5f5345504f4c4941';
+// Starknet Mainnet chain ID
+export const SN_MAIN_CHAIN_ID = '0x534e5f4d41494e';
 
 // Game contract address — deployed when Phase 2 is ready
 // Replace with actual address after deploying the Cairo/Dojo contract (Phase 2)
