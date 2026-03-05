@@ -86,7 +86,7 @@ export function computeAdaptiveCamera(activeCount: number): {
 export type TileLOD = 'minimal' | 'flat' | 'full';
 
 export function getTileLOD(tileW: number): TileLOD {
-  if (tileW < 0.38) return 'minimal';
+  if (tileW < 0.1) return 'minimal';
   if (tileW < 1.0) return 'flat';
   return 'full';
 }
