@@ -66,9 +66,6 @@ export const useGameStore = create<GameState & GameActions>()(
         state.mode = mode;
         if (characters) {
           state.characters = characters;
-        } else if (mode === 'nft' || mode === 'online' || mode === 'nft-free') {
-          // Full 999-token SCHIZODIO collection — adaptive board uses all tokens
-          state.characters = generateAllCollectionCharacters();
         } else {
           state.characters = CHARACTERS;
         }

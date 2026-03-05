@@ -15,25 +15,36 @@ export const COLLECTION_SIZE = 999;
 
 let _cached: Character[] | null = null;
 
-/**
- * Generate all 999 SCHIZODIO stub characters.
- * Result is memoized — subsequent calls return the same array instance.
- */
-export function generateAllCollectionCharacters(): Character[] {
+export async function generateAllCollectionCharacters(): Promise<Character[]> {
   if (_cached) return _cached;
 
-  const chars: Character[] = [];
-  for (let i = 1; i <= COLLECTION_SIZE; i++) {
-    const stub: SchizodioNFT = {
-      tokenId: String(i),
-      name: `#${i}`,
-      // imageUrl starts empty — will be populated lazily by useCharacterTextures
-      // when tiles are large enough to warrant loading real art
-      imageUrl: '',
-      attributes: [],
-    };
-    chars.push(nftToCharacter(stub));
+  const BASE = 'https://v1assets.schizod.io/json/revealed/';
+  const promises = [];
+
+  for (let i = 0; i <= 999; i++) {
+    const url = `${BASE}${i}.json`;
+    promises.push(
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) return null;
+          return res.json();
+        })
+        .then((data) => {
+          if (!data) return null;
+          const stub: SchizodioNFT = {
+            tokenId: String(i),
+            name: data.name || `#${i}`,
+            imageUrl: data.image || '',
+            attributes: data.attributes || [],
+          };
+          return nftToCharacter(stub);
+        })
+        .catch(() => null)
+    );
   }
+
+  const results = await Promise.all(promises);
+  const chars = results.filter((c) => c !== null) as Character[];
 
   _cached = chars;
   return chars;

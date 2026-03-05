@@ -23,50 +23,52 @@ export interface Question {
 }
 
 // ─── Helper accessors ─────────────────────────────────────────────────────────
-const nftHair     = (c: Character) => c.traits.nft_hair      ?? '';
-const nftEyes     = (c: Character) => c.traits.nft_eyes      ?? '';
-const nftMouth    = (c: Character) => c.traits.nft_mouth     ?? '';
-const nftBrows    = (c: Character) => c.traits.nft_eyebrows  ?? '';
-const nftBody     = (c: Character) => c.traits.nft_body      ?? '';
-const nftClothing = (c: Character) => c.traits.nft_clothing  ?? '';
+const nftHair = (c: Character) => c.traits.nft_hair ?? '';
+const nftEyes = (c: Character) => c.traits.nft_eyes ?? '';
+const nftMouth = (c: Character) => c.traits.nft_mouth ?? '';
+const nftBrows = (c: Character) => c.traits.nft_eyebrows ?? '';
+const nftBody = (c: Character) => c.traits.nft_body ?? '';
+const nftClothing = (c: Character) => c.traits.nft_clothing ?? '';
+const nftSidekick = (c: Character) => c.traits.nft_sidekick ?? '';
+const nftBg = (c: Character) => c.traits.nft_background ?? '';
 
 // ─── Free / classic-mode questions ───────────────────────────────────────────
 export const FREE_QUESTIONS: Question[] = [
   // Hair color
-  { id: 'q_hc_black',  text: 'Does your character have black hair?',    category: 'hair', traitKey: 'hair_color', traitValue: 'black'  },
-  { id: 'q_hc_brown',  text: 'Does your character have brown hair?',    category: 'hair', traitKey: 'hair_color', traitValue: 'brown'  },
-  { id: 'q_hc_blonde', text: 'Does your character have blonde hair?',   category: 'hair', traitKey: 'hair_color', traitValue: 'blonde' },
-  { id: 'q_hc_red',    text: 'Does your character have red hair?',      category: 'hair', traitKey: 'hair_color', traitValue: 'red'    },
-  { id: 'q_hc_white',  text: 'Does your character have white hair?',    category: 'hair', traitKey: 'hair_color', traitValue: 'white'  },
-  { id: 'q_hc_blue',   text: 'Does your character have blue hair?',     category: 'hair', traitKey: 'hair_color', traitValue: 'blue'   },
+  { id: 'q_hc_black', text: 'Does your character have black hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'black' },
+  { id: 'q_hc_brown', text: 'Does your character have brown hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'brown' },
+  { id: 'q_hc_blonde', text: 'Does your character have blonde hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'blonde' },
+  { id: 'q_hc_red', text: 'Does your character have red hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'red' },
+  { id: 'q_hc_white', text: 'Does your character have white hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'white' },
+  { id: 'q_hc_blue', text: 'Does your character have blue hair?', category: 'hair', traitKey: 'hair_color', traitValue: 'blue' },
 
   // Hair style
-  { id: 'q_hs_short',    text: 'Does your character have short hair?',    category: 'hair', traitKey: 'hair_style', traitValue: 'short'    },
-  { id: 'q_hs_long',     text: 'Does your character have long hair?',     category: 'hair', traitKey: 'hair_style', traitValue: 'long'     },
-  { id: 'q_hs_curly',    text: 'Does your character have curly hair?',    category: 'hair', traitKey: 'hair_style', traitValue: 'curly'    },
-  { id: 'q_hs_bald',     text: 'Is your character bald?',                 category: 'hair', traitKey: 'hair_style', traitValue: 'bald'     },
-  { id: 'q_hs_mohawk',   text: 'Does your character have a mohawk?',      category: 'hair', traitKey: 'hair_style', traitValue: 'mohawk'   },
-  { id: 'q_hs_ponytail', text: 'Does your character have a ponytail?',    category: 'hair', traitKey: 'hair_style', traitValue: 'ponytail' },
+  { id: 'q_hs_short', text: 'Does your character have short hair?', category: 'hair', traitKey: 'hair_style', traitValue: 'short' },
+  { id: 'q_hs_long', text: 'Does your character have long hair?', category: 'hair', traitKey: 'hair_style', traitValue: 'long' },
+  { id: 'q_hs_curly', text: 'Does your character have curly hair?', category: 'hair', traitKey: 'hair_style', traitValue: 'curly' },
+  { id: 'q_hs_bald', text: 'Is your character bald?', category: 'hair', traitKey: 'hair_style', traitValue: 'bald' },
+  { id: 'q_hs_mohawk', text: 'Does your character have a mohawk?', category: 'hair', traitKey: 'hair_style', traitValue: 'mohawk' },
+  { id: 'q_hs_ponytail', text: 'Does your character have a ponytail?', category: 'hair', traitKey: 'hair_style', traitValue: 'ponytail' },
 
   // Face — eyes
-  { id: 'q_eye_brown', text: 'Does your character have brown eyes?',  category: 'face', traitKey: 'eye_color', traitValue: 'brown' },
-  { id: 'q_eye_blue',  text: 'Does your character have blue eyes?',   category: 'face', traitKey: 'eye_color', traitValue: 'blue'  },
-  { id: 'q_eye_green', text: 'Does your character have green eyes?',  category: 'face', traitKey: 'eye_color', traitValue: 'green' },
-  { id: 'q_eye_hazel', text: 'Does your character have hazel eyes?',  category: 'face', traitKey: 'eye_color', traitValue: 'hazel' },
+  { id: 'q_eye_brown', text: 'Does your character have brown eyes?', category: 'face', traitKey: 'eye_color', traitValue: 'brown' },
+  { id: 'q_eye_blue', text: 'Does your character have blue eyes?', category: 'face', traitKey: 'eye_color', traitValue: 'blue' },
+  { id: 'q_eye_green', text: 'Does your character have green eyes?', category: 'face', traitKey: 'eye_color', traitValue: 'green' },
+  { id: 'q_eye_hazel', text: 'Does your character have hazel eyes?', category: 'face', traitKey: 'eye_color', traitValue: 'hazel' },
   // Face — gender
-  { id: 'q_gender_m', text: 'Is your character male?',   category: 'face', traitKey: 'gender', traitValue: 'male'   },
+  { id: 'q_gender_m', text: 'Is your character male?', category: 'face', traitKey: 'gender', traitValue: 'male' },
   { id: 'q_gender_f', text: 'Is your character female?', category: 'face', traitKey: 'gender', traitValue: 'female' },
   // Face — skin tone
-  { id: 'q_skin_light',     text: 'Does your character have light skin?',       category: 'face', traitKey: 'skin_tone', traitValue: 'light'     },
-  { id: 'q_skin_medium',    text: 'Does your character have medium skin tone?', category: 'face', traitKey: 'skin_tone', traitValue: 'medium'    },
-  { id: 'q_skin_tan',       text: 'Does your character have tan skin?',         category: 'face', traitKey: 'skin_tone', traitValue: 'tan'       },
-  { id: 'q_skin_dark',      text: 'Does your character have dark skin?',        category: 'face', traitKey: 'skin_tone', traitValue: 'dark'      },
-  { id: 'q_skin_very_dark', text: 'Does your character have very dark skin?',   category: 'face', traitKey: 'skin_tone', traitValue: 'very_dark' },
-  { id: 'q_beard',          text: 'Does your character have a beard?',          category: 'face', traitKey: 'has_beard', traitValue: true        },
+  { id: 'q_skin_light', text: 'Does your character have light skin?', category: 'face', traitKey: 'skin_tone', traitValue: 'light' },
+  { id: 'q_skin_medium', text: 'Does your character have medium skin tone?', category: 'face', traitKey: 'skin_tone', traitValue: 'medium' },
+  { id: 'q_skin_tan', text: 'Does your character have tan skin?', category: 'face', traitKey: 'skin_tone', traitValue: 'tan' },
+  { id: 'q_skin_dark', text: 'Does your character have dark skin?', category: 'face', traitKey: 'skin_tone', traitValue: 'dark' },
+  { id: 'q_skin_very_dark', text: 'Does your character have very dark skin?', category: 'face', traitKey: 'skin_tone', traitValue: 'very_dark' },
+  { id: 'q_beard', text: 'Does your character have a beard?', category: 'face', traitKey: 'has_beard', traitValue: true },
 
   // Accessories
-  { id: 'q_glasses',  text: 'Does your character wear glasses?',  category: 'accessories', traitKey: 'has_glasses',  traitValue: true },
-  { id: 'q_hat',      text: 'Does your character wear a hat?',    category: 'accessories', traitKey: 'has_hat',      traitValue: true },
+  { id: 'q_glasses', text: 'Does your character wear glasses?', category: 'accessories', traitKey: 'has_glasses', traitValue: true },
+  { id: 'q_hat', text: 'Does your character wear a hat?', category: 'accessories', traitKey: 'has_hat', traitValue: true },
   { id: 'q_earrings', text: 'Does your character have earrings?', category: 'accessories', traitKey: 'has_earrings', traitValue: true },
 ];
 
@@ -118,7 +120,7 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => {
       const h = nftHair(c);
       return h.includes('red') || h.includes('green') || h.includes('pink')
-          || h.includes('orange') || h.includes('blue') || h.includes('purple');
+        || h.includes('orange') || h.includes('blue') || h.includes('purple');
     },
   },
   {
@@ -155,8 +157,8 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => {
       const e = nftEyes(c);
       return e.includes('fire') || e.includes('devil') || e.includes('stoned')
-          || e.includes('bionic') || e.includes('ekubo')
-          || e.includes('whirlpool') || e.includes('hazelnut');
+        || e.includes('bionic') || e.includes('ekubo')
+        || e.includes('whirlpool') || e.includes('hazelnut');
     },
   },
   {
@@ -306,6 +308,24 @@ export const NFT_QUESTIONS: Question[] = [
     text: 'Does your character have an Overlay effect?',
     traitKey: 'nft_has_overlay', traitValue: true,
     matchFn: (c) => c.traits.nft_has_overlay === true,
+  },
+  {
+    id: 'nq_sidekick', zone: 'gear', category: 'gear', icon: '🐾',
+    text: 'Does your character have a Sidekick?',
+    traitKey: 'nft_has_sidekick', traitValue: true,
+    matchFn: (c) => c.traits.nft_has_sidekick === true,
+  },
+  {
+    id: 'nq_sidekick_randall', zone: 'gear', category: 'gear', icon: '🦎',
+    text: 'Is your character\'s sidekick Randall?',
+    traitKey: 'nft_sidekick', traitValue: 'randall',
+    matchFn: (c) => nftSidekick(c).includes('randall'),
+  },
+  {
+    id: 'nq_background_boardwalk', zone: 'body', category: 'body', icon: '🏖️',
+    text: 'Is your character at the Richard Haynes Boardwalk?',
+    traitKey: 'nft_background', traitValue: 'boardwalk',
+    matchFn: (c) => nftBg(c).includes('boardwalk'),
   },
 ];
 

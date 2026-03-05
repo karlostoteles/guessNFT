@@ -12,16 +12,17 @@ import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { SchizodioSilhouette } from './SchizodioSilhouette';
 import { NFTQuestionButton } from './QuestionButtons';
 import { ZONE_CONFIG, ZONES } from './zoneConfig';
+import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 interface NFTModeBodyProps {
-  activeZone:   QuestionZone | null;
-  hoveredZone:  QuestionZone | null;
+  activeZone: QuestionZone | null;
+  hoveredZone: QuestionZone | null;
   setActiveZone: (z: QuestionZone | null) => void;
   setHoveredZone: (z: QuestionZone | null) => void;
-  zoneBadges:   Record<QuestionZone, { yes: number; no: number }>;
-  askedIds:     Set<string>;
-  remaining:    Character[];
-  onAsk:        (q: Question) => void;
+  zoneBadges: Record<QuestionZone, { yes: number; no: number }>;
+  askedIds: Set<string>;
+  remaining: Character[];
+  onAsk: (q: Question) => void;
 }
 
 export function NFTModeBody({
@@ -47,40 +48,73 @@ export function NFTModeBody({
     return NFT_QUESTIONS.filter((q) => q.zone === activeZone && usefulIds.has(q.id));
   }, [activeZone, usefulIds]);
 
+  const isMobile = useIsMobile();
+
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+    <div style={{
+      display: 'flex',
+      flex: 1,
+      overflow: 'hidden',
+      flexDirection: isMobile ? 'column' : 'row'
+    }}>
 
-      {/* ── Left: silhouette ─────────────────────────────────────────── */}
-      <div style={{
-        width: 200, flexShrink: 0,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '12px 8px 12px 28px',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        background: 'linear-gradient(180deg, rgba(40,36,80,0.35) 0%, rgba(20,18,40,0.15) 100%)',
-      }}>
-        <SchizodioSilhouette
-          activeZone={activeZone}
-          hoveredZone={hoveredZone}
-          zoneBadges={zoneBadges}
-          onZoneClick={(z) => setActiveZone(activeZone === z ? null : z)}
-          onZoneEnter={(z) => setHoveredZone(z)}
-          onZoneLeave={() => setHoveredZone(null)}
-        />
-        <p style={{
-          margin: '10px 0 0',
-          fontSize: 10,
-          color: 'rgba(255,255,255,0.22)',
-          textAlign: 'center',
-          fontFamily: "'Space Grotesk', sans-serif",
-          lineHeight: 1.45,
-        }}>
-          Click a zone · traits reveal<br/>as you confirm answers
-        </p>
-      </div>
+      {/* ── Silhouette column (Left on desktop, Top on mobile) ── */}
+      <AnimatePresence>
+        {(!isMobile || !activeZone) && (
+          <motion.div
+            initial={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+            animate={isMobile ? { height: 'auto', opacity: 1 } : { width: 200, opacity: 1 }}
+            exit={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+            style={{
+              width: isMobile ? '100%' : 200,
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: isMobile ? 'row' : 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: isMobile ? '10px 20px' : '12px 8px 12px 28px',
+              borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.05)',
+              borderBottom: isMobile ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              background: 'linear-gradient(180deg, rgba(40,36,80,0.35) 0%, rgba(20,18,40,0.15) 100%)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ transform: isMobile ? 'scale(0.7)' : 'none', flexShrink: 0 }}>
+              <SchizodioSilhouette
+                activeZone={activeZone}
+                hoveredZone={hoveredZone}
+                zoneBadges={zoneBadges}
+                onZoneClick={(z) => setActiveZone(activeZone === z ? null : z)}
+                onZoneEnter={(z) => setHoveredZone(z)}
+                onZoneLeave={() => setHoveredZone(null)}
+              />
+            </div>
 
-      {/* ── Right: zone tabs + questions ─────────────────────────────── */}
+            {!isMobile && (
+              <p style={{
+                margin: '10px 0 0',
+                fontSize: 10,
+                color: 'rgba(255,255,255,0.22)',
+                textAlign: 'center',
+                fontFamily: "'Space Grotesk', sans-serif",
+                lineHeight: 1.45,
+              }}>
+                Click a zone · traits reveal<br />as you confirm answers
+              </p>
+            )}
+
+            {isMobile && (
+              <div style={{ marginLeft: 16, fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                Tap sections to<br />filter questions
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Main content area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
 
         {/* Zone selector tabs */}
         <div style={{
@@ -88,10 +122,10 @@ export function NFTModeBody({
           background: 'rgba(255,255,255,0.02)', flexShrink: 0,
         }}>
           {ZONES.map((zone) => {
-            const cfg      = ZONE_CONFIG[zone];
+            const cfg = ZONE_CONFIG[zone];
             const isActive = activeZone === zone;
             const badgeYes = zoneBadges[zone].yes;
-            const qCount   = NFT_QUESTIONS.filter(
+            const qCount = NFT_QUESTIONS.filter(
               (q) => q.zone === zone && usefulIds.has(q.id) && !askedIds.has(q.id)
             ).length;
             return (
@@ -152,7 +186,7 @@ export function NFTModeBody({
                 }}
               >
                 <div style={{ fontSize: 36 }}>👈</div>
-                <div>Click a body zone on the silhouette<br/>to explore its trait questions</div>
+                <div>Click a body zone on the silhouette<br />to explore its trait questions</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
                   {ZONES.map((zone) => {
                     const cfg = ZONE_CONFIG[zone];

@@ -19,21 +19,23 @@ import {
 } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 import { WaitingPill, RiskItPill, AskPill } from './question/Pills';
-import { NFTModeBody }  from './question/NFTModeBody';
+import { NFTModeBody } from './question/NFTModeBody';
 import { FreeModeBody } from './question/FreeModeBody';
+import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 export function QuestionPanel() {
-  const [minimised,   setMinimised]   = useState(false);
-  const [activeZone,  setActiveZone]  = useState<QuestionZone | null>(null);
+  const [minimised, setMinimised] = useState(false);
+  const [activeZone, setActiveZone] = useState<QuestionZone | null>(null);
   const [hoveredZone, setHoveredZone] = useState<QuestionZone | null>(null);
 
-  const mode            = useGameMode();
+  const mode = useGameMode();
   const { askQuestion, startGuess } = useGameActions();
-  const history         = useQuestionHistory();
-  const activePlayer    = useActivePlayer();
-  const characters      = useGameCharacters();
-  const playerState     = usePlayerState(activePlayer);
+  const history = useQuestionHistory();
+  const activePlayer = useActivePlayer();
+  const characters = useGameCharacters();
+  const playerState = usePlayerState(activePlayer);
   const onlinePlayerNum = useOnlinePlayerNum();
+  const isMobile = useIsMobile();
 
   const isNFTMode = mode === 'nft' || mode === 'online' || mode === 'nft-free';
 
@@ -69,7 +71,7 @@ export function QuestionPanel() {
       const q = QUESTIONS.find((q) => q.id === record.questionId);
       if (!q?.zone) continue;
       if (record.answer) map[q.zone].yes++;
-      else               map[q.zone].no++;
+      else map[q.zone].no++;
     }
     return map;
   }, [history, activePlayer]);
@@ -134,41 +136,52 @@ export function QuestionPanel() {
           >
             {/* ── Header ── */}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 18px 10px',
-              borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              padding: isMobile ? '10px 14px' : '14px 18px 10px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+              gap: isMobile ? 12 : 0,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18 }}>❓</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: isMobile ? 16 : 18 }}>❓</span>
                 <h3 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontWeight: 700, fontSize: 17, margin: 0, color: '#FFFFFE',
+                  fontWeight: 700, fontSize: isMobile ? 15 : 17, margin: 0, color: '#FFFFFE',
                 }}>
                   Ask a Question
                 </h3>
                 {askedIds.size > 0 && (
                   <span style={{
-                    fontSize: 11, fontWeight: 600, color: 'rgba(255,255,254,0.3)',
+                    fontSize: 9, fontWeight: 600, color: 'rgba(255,255,254,0.3)',
                     background: 'rgba(255,255,255,0.06)',
                     border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 20, padding: '2px 10px',
+                    borderRadius: 20, padding: '1px 8px',
                   }}>
                     {askedIds.size} asked
                   </span>
                 )}
                 {isNFTMode && (
                   <span style={{
-                    fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                    fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
                     color: 'rgba(232,164,68,0.55)',
                     background: 'rgba(232,164,68,0.08)',
                     border: '1px solid rgba(232,164,68,0.18)',
-                    borderRadius: 20, padding: '2px 10px',
+                    borderRadius: 20, padding: '1px 8px',
                   }}>
                     SCHIZODIO TRAITS
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: isMobile ? '100%' : 'auto',
+                justifyContent: isMobile ? 'space-between' : 'flex-end'
+              }}>
                 <motion.button
                   onClick={handleRiskIt}
                   whileHover={{ scale: 1.05 }}
@@ -176,10 +189,12 @@ export function QuestionPanel() {
                   style={{
                     background: 'linear-gradient(135deg, rgba(224,85,85,0.18), rgba(180,50,50,0.28))',
                     border: '1px solid rgba(224,85,85,0.5)',
-                    borderRadius: 8, padding: '5px 14px',
+                    borderRadius: 8, padding: '5px 12px',
                     cursor: 'pointer', outline: 'none', color: '#FF6B6B',
-                    fontSize: 13, fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
+                    flex: isMobile ? 1 : 'none',
+                    justifyContent: 'center',
                   }}
                 >
                   🎯 RISK IT!
@@ -194,11 +209,13 @@ export function QuestionPanel() {
                     borderRadius: 8, padding: '5px 12px',
                     cursor: 'pointer', outline: 'none',
                     color: 'rgba(255,255,254,0.45)',
-                    fontSize: 13, fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
+                    flex: isMobile ? 1 : 'none',
+                    justifyContent: 'center',
                   }}
                 >
-                  <span style={{ fontSize: 11 }}>▼</span> Hide
+                  <span style={{ fontSize: 10 }}>▼</span> Hide
                 </motion.button>
               </div>
             </div>

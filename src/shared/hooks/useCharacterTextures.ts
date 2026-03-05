@@ -20,24 +20,29 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
   const lod = getTileLOD(tileW);
   const isMinimal = lod === 'minimal';
 
-  // Build initial procedural textures — only when NOT minimal LOD
-  const initialTextures = useMemo(() => {
-    if (isMinimal) return new Map<string, THREE.Texture>();
+  const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
+
+  // Build initial procedural textures and handle cleanup
+  useEffect(() => {
+    if (isMinimal) {
+      setTextures(new Map());
+      return;
+    }
+
     const map = new Map<string, THREE.Texture>();
     for (const char of characters) {
       map.set(char.id, renderPortrait(char));
     }
-    return map;
-    // We intentionally include isMinimal as a dep to reset textures when LOD changes
+    setTextures(map);
+
+    return () => {
+      // Dispose of procedural canvas textures when dependencies change or unmounting
+      for (const texture of map.values()) {
+        texture.dispose();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMinimal, characters]);
-
-  const [textures, setTextures] = useState<Map<string, THREE.Texture>>(initialTextures);
-
-  // Sync procedural textures when characters change or LOD crosses the minimal threshold
-  useEffect(() => {
-    setTextures(initialTextures);
-  }, [initialTextures]);
 
   // Async: upgrade to real NFT images — flat + full LOD (tiles big enough to see detail)
   useEffect(() => {
@@ -54,27 +59,24 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         // Use smaller thumbnail for flat LOD tiles; full image for large tiles
         imageUrl = lod === 'full'
           ? `/api/nft-art/${tokenId}`
-          : `/api/nft-art-thumb/${tokenId}`;
+          : `/api/nft-art/${tokenId}`; // both use same redirect for now
       }
       if (!imageUrl) continue;
 
-      loader.load(
-        imageUrl,
-        (texture) => {
-          if (cancelled) return;
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.needsUpdate = true;
-          setTextures((prev) => {
-            const next = new Map(prev);
-            next.set(char.id, texture);
-            return next;
-          });
-        },
-        undefined,
-        () => {
-          // Load failed — keep procedural canvas texture
-        },
-      );
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = imageUrl;
+      img.onload = () => {
+        if (cancelled) return;
+        const texture = renderPortrait(char, img);
+        setTextures((prev) => {
+          const old = prev.get(char.id);
+          if (old) old.dispose();
+          const next = new Map(prev);
+          next.set(char.id, texture);
+          return next;
+        });
+      };
     }
 
     return () => {

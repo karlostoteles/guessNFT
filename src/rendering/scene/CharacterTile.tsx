@@ -11,20 +11,20 @@
  * CharacterGrid store and control the flip group directly.
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GamePhase } from '@/core/store/types';
 import { usePhase, useActivePlayer, useEliminatedIds, useGameActions } from '@/core/store/selectors';
 
 interface CharacterTileProps {
-  characterId:   string;
+  characterId: string;
   characterName: string;
-  texture:       THREE.Texture | undefined;
-  tileW:         number;
-  tileH:         number;
+  texture: THREE.Texture | undefined;
+  tileW: number;
+  tileH: number;
   /** Callback so CharacterGrid can control the flip rotation */
-  pivotRef:      (el: THREE.Group | null) => void;
+  pivotRef: (el: THREE.Group | null) => void;
 }
 
 function lerp(a: number, b: number, t: number) {
@@ -71,8 +71,8 @@ function CardBorder({ tileW, tileH, isFlat, depth }: {
 export function CharacterTile({
   characterId, characterName, texture, tileW, tileH, pivotRef,
 }: CharacterTileProps) {
-  const phase         = usePhase();
-  const activePlayer  = useActivePlayer();
+  const phase = usePhase();
+  const activePlayer = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
   const { toggleElimination } = useGameActions();
   const [hovered, setHovered] = useState(false);
@@ -80,8 +80,8 @@ export function CharacterTile({
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
 
   const isInteractive = phase === GamePhase.ELIMINATION;
-  const isFlat        = tileW < 1.0;
-  const DEPTH         = Math.min(0.06, tileW * 0.04);
+  const isFlat = tileW < 1.0;
+  const DEPTH = Math.min(0.06, tileW * 0.04);
 
   // Hover glow — idle baseline 0.07, jumps to 0.45 on hover during elimination
   useFrame((_, delta) => {
@@ -177,8 +177,8 @@ function NameLabel({ name, tileW, tileH, depth }: {
   const texture = useRef<THREE.CanvasTexture | null>(null);
 
   if (!texture.current) {
-    const canvas  = document.createElement('canvas');
-    canvas.width  = 320;
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
     canvas.height = 72;
     const ctx = canvas.getContext('2d')!;
 
@@ -194,7 +194,7 @@ function NameLabel({ name, tileW, tileH, depth }: {
     ctx.fillRect(24, 58, 272, 3);
 
     ctx.font = 'bold 28px Inter, Arial, sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // Shadow
@@ -208,6 +208,15 @@ function NameLabel({ name, tileW, tileH, depth }: {
     texture.current = new THREE.CanvasTexture(canvas);
     texture.current.colorSpace = THREE.SRGBColorSpace;
   }
+
+  useEffect(() => {
+    const currentTexture = texture.current;
+    return () => {
+      if (currentTexture) {
+        currentTexture.dispose();
+      }
+    };
+  }, []);
 
   return (
     <mesh position={[0, -tileH * 0.42, depth / 2 + 0.06]}>

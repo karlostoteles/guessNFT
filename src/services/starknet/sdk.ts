@@ -11,8 +11,9 @@ export interface ConnectedWallet {
 }
 
 let ctrl: InstanceType<typeof Controller> | null = null;
+let currentAccount: any = null;
 
-function getController() {
+export function getController() {
   if (!ctrl) {
     ctrl = new Controller({
       defaultChainId: SN_MAIN_CHAIN_ID,
@@ -21,6 +22,13 @@ function getController() {
     console.log('[cartridge] Controller created');
   }
   return ctrl;
+}
+
+export function getAccount() {
+  if (!currentAccount) {
+    throw new Error('Wallet not connected. Call connectCartridgeWallet first.');
+  }
+  return currentAccount;
 }
 
 /**
@@ -37,6 +45,7 @@ export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
     throw new Error('Login cancelled or failed — no account returned');
   }
 
+  currentAccount = account;
   console.log('[cartridge] connected:', account.address);
 
   return {
@@ -55,4 +64,5 @@ export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
 export function resetSDK() {
   try { ctrl?.disconnect?.(); } catch { /* ignore */ }
   ctrl = null;
+  currentAccount = null;
 }

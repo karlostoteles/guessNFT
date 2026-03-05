@@ -1,8 +1,8 @@
-# WhoisWho — AI Agent Guide
+# guessNFT — AI Agent Guide
 
 ## What Is This?
 
-WhoisWho is a browser-based 1v1 deduction game — "Guess Who?" for Starknet NFT collections. Each player secretly picks a character from a shared board of NFT portraits. On your turn you ask a yes/no question about a trait (e.g. "Does your character have a hat?"); the answer lets you eliminate characters who don't match. First player to correctly guess their opponent's secret character wins.
+guessNFT is a browser-based 1v1 deduction game — "Guess Who?" for Starknet NFT collections. Each player secretly picks a character from a shared board of NFT portraits. On your turn you ask a yes/no question about a trait (e.g. "Does your character have a hat?"); the answer lets you eliminate characters who don't match. First player to correctly guess their opponent's secret character wins.
 
 Supports three modes: **local pass-and-play**, **vs CPU**, and **online multiplayer** via Supabase Realtime. Starknet wallet + commit-reveal provides a tamper-evident hidden choice (on-chain enforcement is Phase 2).
 
@@ -231,7 +231,7 @@ These rules apply to every task, no exceptions:
 
 ---
 
-## Never Do This (WhoisWho-specific)
+## Never Do This (guessNFT-specific)
 
 | Never | Why |
 |---|---|

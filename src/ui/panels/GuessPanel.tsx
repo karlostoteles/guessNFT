@@ -12,6 +12,7 @@ export function GuessPanel() {
   const previews = useCharacterPreviews();
   const characters = useGameCharacters();
   const midTurn = currentQuestion !== null;
+  const elimSet = new Set(eliminatedIds);
 
   return (
     <motion.div
@@ -65,7 +66,7 @@ export function GuessPanel() {
           gap: 10,
         }}>
           {characters.map((char) => {
-            const isEliminated = eliminatedIds.includes(char.id);
+            const isEliminated = elimSet.has(char.id);
             return (
               <motion.button
                 key={char.id}

@@ -1,5 +1,5 @@
 /**
- * Commit-Reveal scheme for WhoisWho on Starknet.
+ * Commit-Reveal scheme for guessNFT on Starknet.
  *
  * How it works:
  *   1. COMMIT:  player picks a character, generates random salt.
@@ -22,8 +22,10 @@
  *   so commitments are compatible with what the future Cairo contract will verify.
  */
 import { hash } from 'starknet';
+import { getAccount } from './sdk';
+import { GAME_CONTRACT } from './config';
 
-const STORAGE_KEY = 'whoiswho_commitments';
+const STORAGE_KEY = 'guessnft_commitments';
 
 export interface Commitment {
   playerId: 'player1' | 'player2';
@@ -179,42 +181,74 @@ export function generateGameSessionId(): string {
 // ─── Phase 2 stubs (on-chain) ─────────────────────────────────────────────────
 // When the Cairo contract is deployed, replace the Phase 1 localStorage calls above
 // with these Starknet transaction calls. The commitment value stays identical.
-
-/**
- * [Phase 2 stub] Submit commitment on-chain.
- * Replace localStorage with a contract call:
- *
- *   const account = cartridgeController.getAccount();
- *   await account.execute([{
- *     contractAddress: GAME_CONTRACT,
- *     entrypoint: 'commit_character',
- *     calldata: [gameId, commitment],
- *   }]);
- */
 export async function submitCommitmentOnChain(
-  _commitment: string,
-  _gameId: string
+  commitment: string,
+  gameId: string
 ): Promise<string> {
-  throw new Error(
-    '[Phase 2] Contract not deployed yet. Set GAME_CONTRACT in config.ts and implement this function.'
-  );
+  const account = getAccount();
+  const tx = await account.execute([{
+    contractAddress: GAME_CONTRACT,
+    entrypoint: 'commit_character',
+    calldata: [gameId, commitment],
+  }]);
+
+  // controller.execute returns an object with transaction_hash or directly the string depending on version.
+  // Cast to any and return the hash.
+  return (tx as any).transaction_hash || String(tx);
 }
 
 /**
  * [Phase 2 stub] Reveal character on-chain.
- *
- *   await account.execute([{
- *     contractAddress: GAME_CONTRACT,
- *     entrypoint: 'reveal_character',
- *     calldata: [gameId, characterIdFelt, salt],
- *   }]);
  */
 export async function revealCharacterOnChain(
-  _characterId: string,
-  _salt: string,
-  _gameId: string
+  characterId: string,
+  salt: string,
+  gameId: string
 ): Promise<string> {
-  throw new Error(
-    '[Phase 2] Contract not deployed yet. Set GAME_CONTRACT in config.ts and implement this function.'
-  );
+  const account = getAccount();
+  const characterIdFelt = characterIdToFelt(characterId);
+
+  const tx = await account.execute([{
+    contractAddress: GAME_CONTRACT,
+    entrypoint: 'reveal_character',
+    calldata: [gameId, characterIdFelt, salt],
+  }]);
+
+  return (tx as any).transaction_hash || String(tx);
+}
+
+/**
+ * [Phase 2 stub] Deposit wager on-chain.
+ */
+export async function depositWagerOnChain(
+  gameId: string,
+  tokenId: string
+): Promise<string> {
+  const account = getAccount();
+
+  const tx = await account.execute([{
+    contractAddress: GAME_CONTRACT,
+    entrypoint: 'deposit_wager',
+    // Uint256 is split into low and high segments (tokenId, 0)
+    calldata: [gameId, tokenId, '0'],
+  }]);
+
+  return (tx as any).transaction_hash || String(tx);
+}
+
+/**
+ * [Phase 2 stub] Concede game on-chain (sends both wagers to opponent).
+ */
+export async function opponentWonOnChain(
+  gameId: string
+): Promise<string> {
+  const account = getAccount();
+
+  const tx = await account.execute([{
+    contractAddress: GAME_CONTRACT,
+    entrypoint: 'opponent_won',
+    calldata: [gameId],
+  }]);
+
+  return (tx as any).transaction_hash || String(tx);
 }

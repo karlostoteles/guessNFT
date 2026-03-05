@@ -3,11 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '@/core/store/selectors';
 import { MEME_CHARACTERS } from '@/core/data/memeCharacters';
+import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online';
 
 export function MenuScreen() {
   const [view, setView] = useState<View>('menu');
+  const [loading, setLoading] = useState(false);
   const { startSetup, setGameMode } = useGameActions();
 
   const handleFreePlay = () => {
@@ -15,9 +17,15 @@ export function MenuScreen() {
     startSetup();
   };
 
-  const handleNFTFreePlay = () => {
-    setGameMode('nft-free');
-    startSetup();
+  const handleNFTFreePlay = async () => {
+    setLoading(true);
+    try {
+      const chars = await generateAllCollectionCharacters();
+      setGameMode('nft-free', chars);
+      startSetup();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,6 +49,7 @@ export function MenuScreen() {
             onBack={() => setView('menu')}
             onCTVersion={handleFreePlay}
             onSchizodio={handleNFTFreePlay}
+            loading={loading}
           />
         )}
         {view === 'real-pick' && (
@@ -131,7 +140,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           marginBottom: 4, filter: 'drop-shadow(0 0 40px rgba(232,164,68,0.3))',
         }}>
-          WhoisWho
+          guessNFT
         </div>
         <div style={{
           display: 'inline-block',
@@ -322,9 +331,10 @@ interface FreePickProps {
   onBack: () => void;
   onCTVersion: () => void;
   onSchizodio: () => void;
+  loading?: boolean;
 }
 
-function FreePickView({ onBack, onCTVersion, onSchizodio }: FreePickProps) {
+function FreePickView({ onBack, onCTVersion, onSchizodio, loading }: FreePickProps) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -355,13 +365,14 @@ function FreePickView({ onBack, onCTVersion, onSchizodio }: FreePickProps) {
           />
           {/* Schizodio vs AI */}
           <OptionCard
-            onClick={onSchizodio}
+            onClick={loading ? () => { } : onSchizodio}
             accent="#06B6D4"
             accentRgb="6,182,212"
             icon="💀"
-            title="Schizodio vs AI"
+            title={loading ? "Loading..." : "Schizodio vs AI"}
             subtitle="Full SCHIZODIO NFT collection"
             tag="999 NFTS"
+            disabled={loading}
           />
         </div>
       </div>
@@ -425,7 +436,7 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
           />
           {/* SCHIZO Mode — soon */}
           <OptionCard
-            onClick={() => {}}
+            onClick={() => { }}
             accent="#E05555"
             accentRgb="224,85,85"
             icon="🔥"

@@ -1,8 +1,8 @@
-# WhoisWho — Architecture
+# guessNFT — Architecture
 
 ## System Overview
 
-WhoisWho is a single-page application with a 3D game board rendered via Three.js and a 2D UI overlay for menus, panels, and HUD elements. Game state lives in a single Zustand store. Online multiplayer uses Supabase Realtime for event sync and Starknet for cryptographic commit-reveal of secret characters.
+guessNFT is a single-page application with a 3D game board rendered via Three.js and a 2D UI overlay for menus, panels, and HUD elements. Game state lives in a single Zustand store. Online multiplayer uses Supabase Realtime for event sync and Starknet for cryptographic commit-reveal of secret characters.
 
 ```
 ┌─────────────────────────────────────────────────┐

@@ -21,12 +21,15 @@ export interface CharacterTraits {
   nft_eyebrows?: string;
   nft_body?: string;
   nft_clothing?: string;
+  nft_sidekick?: string;
+  nft_background?: string;
   nft_has_mask?: boolean;
   nft_has_weapons?: boolean;
   nft_has_eyewear?: boolean;
   nft_has_headwear?: boolean;
   nft_has_accessories?: boolean;
   nft_has_overlay?: boolean;
+  nft_has_sidekick?: boolean;
 }
 
 export const SKIN_COLORS: Record<SkinTone, string> = {

@@ -1,14 +1,14 @@
-# WhoisWho — SCHIZODIO Premiere
+# guessNFT — SCHIZODIO Premiere
 
 > The classic family guessing game, rebuilt for crypto. Play with your SCHIZODIO NFTs on Starknet.
 
-![WhoisWho](https://img.shields.io/badge/Starknet-Mainnet-7C3AED?style=flat-square) ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square) ![Three.js](https://img.shields.io/badge/Three.js-3D-black?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![guessNFT](https://img.shields.io/badge/Starknet-Mainnet-7C3AED?style=flat-square) ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square) ![Three.js](https://img.shields.io/badge/Three.js-3D-black?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 ---
 
 ## What is this?
 
-WhoisWho is a **1v1 deduction game** where players secretly pick a character, then take turns asking yes/no questions about the opponent's pick. First to correctly guess wins.
+guessNFT is a **1v1 deduction game** where players secretly pick a character, then take turns asking yes/no questions about the opponent's pick. First to correctly guess wins.
 
 This version is built for the **SCHIZODIO NFT collection** on Starknet — holders can play using their actual NFTs as characters, with cryptographic commit-reveal ensuring neither player can cheat by changing their character mid-game.
 
@@ -123,7 +123,7 @@ npm run build
 export const SCHIZODIO_CONTRACT = '0x077485a949c130...'; // ERC-721 contract
 export const RPC_URL = 'https://api.cartridge.gg/x/starknet/mainnet';
 export const SN_MAIN_CHAIN_ID = '0x534e5f4d41494e'; // Cartridge uses SN_MAIN not SN_MAINNET
-export const GAME_CONTRACT = '0x0'; // TODO: deploy WhoisWho Cairo contract and set here
+export const GAME_CONTRACT = '0x0'; // TODO: deploy guessNFT Cairo contract and set here
 ```
 
 ---
@@ -234,7 +234,7 @@ Once the Cairo contract is written:
 
 ```bash
 # 1. Deploy to Starknet mainnet
-starkli deploy WhoisWho.contract_class.json --account myaccount
+starkli deploy guessNFT.contract_class.json --account myaccount
 
 # 2. Update config.ts
 # GAME_CONTRACT = '0x<deployed_address>'

@@ -1,4 +1,4 @@
-# WhoisWho — Vibe-Coder Guide
+# guessNFT — Vibe-Coder Guide
 
 > **This file is for you** — the human writing prompts to build features. Copy-paste the recipes, adapt the examples, and follow the rules at the bottom to keep the game fast and clean.
 >
@@ -8,7 +8,7 @@
 
 ## What Is This Game?
 
-WhoisWho is a browser-based **1v1 deduction game** — "Guess Who?" for NFT collections. Each player secretly picks a character from a shared board of NFT portraits. On your turn, you ask a yes/no question about a trait ("Does your character wear a hat?"). The answer lets you eliminate characters who don't match. First to correctly guess the opponent's character wins.
+guessNFT is a browser-based **1v1 deduction game** — "Guess Who?" for NFT collections. Each player secretly picks a character from a shared board of NFT portraits. On your turn, you ask a yes/no question about a trait ("Does your character wear a hat?"). The answer lets you eliminate characters who don't match. First to correctly guess the opponent's character wins.
 
 The board is a **live 3D grid** that shrinks as characters get eliminated. It works with real Starknet NFTs — each NFT's metadata (traits, accessories, colors) drives what questions are available.
 

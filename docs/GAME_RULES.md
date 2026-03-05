@@ -1,8 +1,8 @@
-# WhoisWho — Game Rules
+# guessNFT — Game Rules
 
 ## Overview
 
-WhoisWho is a digital adaptation of "Guess Who?" built for NFT collections. Two players each secretly pick a character from a shared pool, then take turns asking yes/no questions about character traits to narrow down the opponent's secret pick.
+guessNFT is a digital adaptation of "Guess Who?" built for NFT collections. Two players each secretly pick a character from a shared pool, then take turns asking yes/no questions about character traits to narrow down the opponent's secret pick.
 
 ## Game Modes
 

@@ -84,22 +84,22 @@ interface MinimalAnimState {
 }
 
 function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
-  const characters    = useGameCharacters();
-  const activePlayer  = useActivePlayer();
+  const characters = useGameCharacters();
+  const activePlayer = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
 
-  const meshRef  = useRef<THREE.InstancedMesh>(null);
-  const animRef  = useRef<Map<string, MinimalAnimState>>(new Map());
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const animRef = useRef<Map<string, MinimalAnimState>>(new Map());
   const colorBuf = useRef(new THREE.Color());
-  const matBuf   = useRef(new THREE.Matrix4());
-  const posBuf   = useRef(new THREE.Vector3());
-  const sclBuf   = useRef(new THREE.Vector3());
-  const quatBuf  = useRef(new THREE.Quaternion());
+  const matBuf = useRef(new THREE.Matrix4());
+  const posBuf = useRef(new THREE.Vector3());
+  const sclBuf = useRef(new THREE.Vector3());
+  const quatBuf = useRef(new THREE.Quaternion());
 
-  const activeChars = useMemo(
-    () => characters.filter((c) => !eliminatedIds.includes(c.id)),
-    [characters, eliminatedIds],
-  );
+  const activeChars = useMemo(() => {
+    const elimSet = new Set(eliminatedIds);
+    return characters.filter((c) => !elimSet.has(c.id));
+  }, [characters, eliminatedIds]);
   const layout = useMemo(() => computeAdaptiveGrid(activeChars.length), [activeChars.length]);
   const targets = useMemo(
     () => computeTargetPositions(activeChars, layout.cols, layout.tileW, layout.tileH, layout.gap),
@@ -114,8 +114,9 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
   // Sync animation states — runs after render, populates animRef
   useEffect(() => {
     const existing = animRef.current;
+    const elimSet = new Set(eliminatedIds);
     for (const char of characters) {
-      const isEliminated = eliminatedIds.includes(char.id);
+      const isEliminated = elimSet.has(char.id);
       const target = targets.get(char.id);
       if (!existing.has(char.id)) {
         const [tx, tz] = target ?? [0, 0];
@@ -137,7 +138,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     const mesh = meshRef.current;
     if (!mesh || animRef.current.size === 0) return;
 
-    const t    = 1 - Math.pow(0.003, delta);
+    const t = 1 - Math.pow(0.003, delta);
     const tScl = 1 - Math.pow(0.0001, delta);
 
     let idx = 0;
@@ -194,18 +195,18 @@ interface TileAnim {
 }
 
 function IndividualGrid({ textures, tileW }: CharacterGridProps) {
-  const characters    = useGameCharacters();
-  const activePlayer  = useActivePlayer();
+  const characters = useGameCharacters();
+  const activePlayer = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
 
   const groupRefs = useRef<Map<string, THREE.Group>>(new Map());
   const pivotRefs = useRef<Map<string, THREE.Group>>(new Map());
-  const animRef   = useRef<Map<string, TileAnim>>(new Map());
+  const animRef = useRef<Map<string, TileAnim>>(new Map());
 
-  const activeChars = useMemo(
-    () => characters.filter((c) => !eliminatedIds.includes(c.id)),
-    [characters, eliminatedIds],
-  );
+  const activeChars = useMemo(() => {
+    const elimSet = new Set(eliminatedIds);
+    return characters.filter((c) => !elimSet.has(c.id));
+  }, [characters, eliminatedIds]);
   const layout = useMemo(() => computeAdaptiveGrid(activeChars.length), [activeChars.length]);
   const targets = useMemo(
     () => computeTargetPositions(activeChars, layout.cols, layout.tileW, layout.tileH, layout.gap),
@@ -215,8 +216,9 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
   // Update animRef when eliminations or targets change
   useEffect(() => {
     const existing = animRef.current;
+    const elimSet = new Set(eliminatedIds);
     for (const char of characters) {
-      const isEliminated = eliminatedIds.includes(char.id);
+      const isEliminated = elimSet.has(char.id);
       const target = targets.get(char.id);
 
       if (!existing.has(char.id)) {
@@ -265,9 +267,9 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
 
   // Single useFrame: position lerp + flip + shrink for all tiles
   useFrame((_, delta) => {
-    const tPos  = 1 - Math.pow(0.003, delta);
+    const tPos = 1 - Math.pow(0.003, delta);
     const tFlip = 1 - Math.pow(0.0001, delta);
-    const tScl  = 1 - Math.pow(0.0001, delta);
+    const tScl = 1 - Math.pow(0.0001, delta);
 
     for (const st of animRef.current.values()) {
       if (st.phase === 'dead') continue;
@@ -322,7 +324,8 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
                 if (!animRef.current.has(char.id)) {
                   const target = targets.get(char.id);
                   const [tx, tz] = target ?? [0, 0];
-                  const isElim = eliminatedIds.includes(char.id);
+                  const elimSet = new Set(eliminatedIds);
+                  const isElim = elimSet.has(char.id);
                   animRef.current.set(char.id, {
                     id: char.id, x: tx, z: tz, tx, tz,
                     scale: isElim ? 0 : 1, targetScale: isElim ? 0 : 1,
@@ -349,7 +352,7 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
               tileH={layout.tileH}
               pivotRef={(el) => {
                 if (el) pivotRefs.current.set(char.id, el);
-                else    pivotRefs.current.delete(char.id);
+                else pivotRefs.current.delete(char.id);
               }}
             />
           </group>

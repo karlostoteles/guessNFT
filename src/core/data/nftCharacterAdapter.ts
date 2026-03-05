@@ -36,9 +36,9 @@ export type GameCharacter = NFTCharacter | MockCharacter;
 
 const HAIR_COLORS: HairColor[] = ['black', 'brown', 'blonde', 'red', 'white', 'blue'];
 const HAIR_STYLES: HairStyle[] = ['short', 'long', 'curly', 'bald', 'mohawk', 'ponytail'];
-const SKIN_TONES: SkinTone[]   = ['light', 'medium', 'tan', 'dark', 'very_dark'];
-const EYE_COLORS: EyeColor[]   = ['brown', 'blue', 'green', 'hazel'];
-const GENDERS: Gender[]        = ['male', 'female'];
+const SKIN_TONES: SkinTone[] = ['light', 'medium', 'tan', 'dark', 'very_dark'];
+const EYE_COLORS: EyeColor[] = ['brown', 'blue', 'green', 'hazel'];
+const GENDERS: Gender[] = ['male', 'female'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,18 +106,20 @@ function buildNftTraits(attrs: NFTAttribute[]): Partial<CharacterTraits> {
   if (attrs.length === 0) return {};
 
   const raw = {
-    hair:        findAttribute(attrs, 'Hair'),
-    eyes:        findAttribute(attrs, 'Eyes'),
-    mouth:       findAttribute(attrs, 'Mouth'),
-    eyebrows:    findAttribute(attrs, 'Eyebrows'),
-    body:        findAttribute(attrs, 'Body'),
-    clothing:    findAttribute(attrs, 'Clothing'),
-    mask:        findAttribute(attrs, 'Mask'),
-    weapons:     findAttribute(attrs, 'Weapons'),
-    eyewear:     findAttribute(attrs, 'Eyewear'),
-    headwear:    findAttribute(attrs, 'Headwear'),
+    hair: findAttribute(attrs, 'Hair'),
+    eyes: findAttribute(attrs, 'Eyes'),
+    mouth: findAttribute(attrs, 'Mouth'),
+    eyebrows: findAttribute(attrs, 'Eyebrows'),
+    body: findAttribute(attrs, 'Body'),
+    clothing: findAttribute(attrs, 'Clothing'),
+    mask: findAttribute(attrs, 'Mask'),
+    weapons: findAttribute(attrs, 'Weapons'),
+    eyewear: findAttribute(attrs, 'Eyewear'),
+    headwear: findAttribute(attrs, 'Headwear'),
     accessories: findAttribute(attrs, 'Accessories'),
-    overlays:    findAttribute(attrs, 'Overlays'),
+    overlays: findAttribute(attrs, 'Overlays'),
+    sidekick: findAttribute(attrs, 'Sidekick'),
+    background: findAttribute(attrs, 'Background'),
   };
 
   // Log in dev for debugging
@@ -127,20 +129,23 @@ function buildNftTraits(attrs: NFTAttribute[]): Partial<CharacterTraits> {
 
   return {
     // String traits — stored lowercase so matchFn includes() works directly
-    nft_hair:      raw.hair      ? raw.hair.toLowerCase()      : undefined,
-    nft_eyes:      raw.eyes      ? raw.eyes.toLowerCase()      : undefined,
-    nft_mouth:     raw.mouth     ? raw.mouth.toLowerCase()     : undefined,
-    nft_eyebrows:  raw.eyebrows  ? raw.eyebrows.toLowerCase()  : undefined,
-    nft_body:      raw.body      ? raw.body.toLowerCase()      : undefined,
-    nft_clothing:  raw.clothing  ? raw.clothing.toLowerCase()  : undefined,
+    nft_hair: raw.hair ? raw.hair.toLowerCase() : undefined,
+    nft_eyes: raw.eyes ? raw.eyes.toLowerCase() : undefined,
+    nft_mouth: raw.mouth ? raw.mouth.toLowerCase() : undefined,
+    nft_eyebrows: raw.eyebrows ? raw.eyebrows.toLowerCase() : undefined,
+    nft_body: raw.body ? raw.body.toLowerCase() : undefined,
+    nft_clothing: raw.clothing ? raw.clothing.toLowerCase() : undefined,
+    nft_sidekick: raw.sidekick ? raw.sidekick.toLowerCase() : undefined,
+    nft_background: raw.background ? raw.background.toLowerCase() : undefined,
 
     // Boolean traits — true only when a real (non-"No X") value exists
-    nft_has_mask:        !isAbsent(raw.mask),
-    nft_has_weapons:     !isAbsent(raw.weapons),
-    nft_has_eyewear:     !isAbsent(raw.eyewear),
-    nft_has_headwear:    !isAbsent(raw.headwear),
+    nft_has_mask: !isAbsent(raw.mask),
+    nft_has_weapons: !isAbsent(raw.weapons),
+    nft_has_eyewear: !isAbsent(raw.eyewear),
+    nft_has_headwear: !isAbsent(raw.headwear),
     nft_has_accessories: !isAbsent(raw.accessories),
-    nft_has_overlay:     !isAbsent(raw.overlays),
+    nft_has_overlay: !isAbsent(raw.overlays),
+    nft_has_sidekick: !isAbsent(raw.sidekick),
   };
 }
 
@@ -152,7 +157,7 @@ function buildNftTraits(attrs: NFTAttribute[]): Partial<CharacterTraits> {
  * NFT-specific traits (nft_*) are populated only when real attributes are present.
  */
 export function nftToCharacter(nft: SchizodioNFT): NFTCharacter {
-  const seed  = hashString(nft.tokenId);
+  const seed = hashString(nft.tokenId);
   const attrs = nft.attributes ?? [];
 
   if (import.meta.env.DEV && attrs.length > 0) {
@@ -165,21 +170,21 @@ export function nftToCharacter(nft: SchizodioNFT): NFTCharacter {
   // ── Free-mode traits (always present) ──────────────────────────────────────
   // These map to FREE_QUESTIONS and the classic game. Use the SCHIZODIO attributes
   // when available, fall back to deterministic hash when not.
-  const hair  = findAttribute(attrs, 'Hair');
-  const eyes  = findAttribute(attrs, 'Eyes');
-  const body  = findAttribute(attrs, 'Body');
-  const head  = findAttribute(attrs, 'Headwear', 'Mask');
-  const accs  = findAttribute(attrs, 'Accessories', 'Eyewear');
+  const hair = findAttribute(attrs, 'Hair');
+  const eyes = findAttribute(attrs, 'Eyes');
+  const body = findAttribute(attrs, 'Body');
+  const head = findAttribute(attrs, 'Headwear', 'Mask');
+  const accs = findAttribute(attrs, 'Accessories', 'Eyewear');
 
   const freeTraits: CharacterTraits = {
-    hair_color:  mapToEnum(hair, HAIR_COLORS, seed, 0),
-    hair_style:  mapToEnum(hair, HAIR_STYLES, seed, 1),
-    skin_tone:   mapToEnum(body, SKIN_TONES,  seed, 2),
-    gender:      mapToEnum(undefined, GENDERS, seed, 3),   // not in SCHIZODIO attrs
-    eye_color:   mapToEnum(eyes, EYE_COLORS,  seed, 4),
+    hair_color: mapToEnum(hair, HAIR_COLORS, seed, 0),
+    hair_style: mapToEnum(hair, HAIR_STYLES, seed, 1),
+    skin_tone: mapToEnum(body, SKIN_TONES, seed, 2),
+    gender: mapToEnum(undefined, GENDERS, seed, 3),   // not in SCHIZODIO attrs
+    eye_color: mapToEnum(eyes, EYE_COLORS, seed, 4),
     has_glasses: deriveBool(findAttribute(attrs, 'Eyewear'), seed, 5),
-    has_hat:     deriveBool(head, seed, 6),
-    has_beard:   deriveBool(undefined, seed, 7),            // not in SCHIZODIO attrs
+    has_hat: deriveBool(head, seed, 6),
+    has_beard: deriveBool(undefined, seed, 7),            // not in SCHIZODIO attrs
     has_earrings: deriveBool(accs, seed, 8),
 
     // ── NFT-specific traits ─────────────────────────────────────────────────
@@ -187,12 +192,12 @@ export function nftToCharacter(nft: SchizodioNFT): NFTCharacter {
   };
 
   return {
-    id:       `nft_${nft.tokenId}`,
-    name:     nft.name || `#${nft.tokenId}`,
-    traits:   freeTraits,
-    source:   'nft',
+    id: `nft_${nft.tokenId}`,
+    name: nft.name || `#${nft.tokenId}`,
+    traits: freeTraits,
+    source: 'nft',
     imageUrl: nft.imageUrl,
-    tokenId:  nft.tokenId,
+    tokenId: nft.tokenId,
   };
 }
 
@@ -248,7 +253,7 @@ export function selectGameCharacters(
     return shuffled.slice(0, 24);
   }
 
-  const needed  = 24 - nftCharacters.length;
+  const needed = 24 - nftCharacters.length;
   const padding = mockCharacters.slice(0, needed).map(toMockCharacter);
   return [...nftCharacters, ...padding];
 }

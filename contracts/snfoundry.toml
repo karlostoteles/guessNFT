@@ -1,0 +1,5 @@
+
+[sncast.whoiswho_deployer]
+account = "whoiswho_deployer"
+accounts-file = "/Users/carlosdelafiguera/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+network = "sepolia"

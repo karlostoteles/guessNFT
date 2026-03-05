@@ -3,3 +3,15 @@ dist/
 .vite/
 *.local
 .DS_Store
+
+# Secrets
+.env
+.env.local
+.env.production
+
+# Contract build artifacts
+contracts/target/
+onchain/*/target/
+
+# IDE
+.claude/

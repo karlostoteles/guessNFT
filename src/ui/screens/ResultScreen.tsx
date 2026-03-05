@@ -7,7 +7,8 @@ import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 import { sfx } from '@/shared/audio/sfx';
-import { getCommitment, verifyReveal } from '@/services/starknet/commitReveal';
+import { getCommitment, verifyReveal, opponentWonOnChain } from '@/services/starknet/commitReveal';
+import { useOnlinePlayerNum } from '@/core/store/selectors';
 
 export function ResultScreen() {
   const winner = useWinner();
@@ -27,6 +28,13 @@ export function ResultScreen() {
   // In NFT mode: verify both players honoured their commitments
   const [p1Verified, setP1Verified] = useState<boolean | null>(null);
   const [p2Verified, setP2Verified] = useState<boolean | null>(null);
+
+  const [conceding, setConceding] = useState(false);
+  const [conceded, setConceded] = useState(false);
+
+  // Identify local player
+  const playerNum = useOnlinePlayerNum();
+  const myPlayer = mode === 'online' ? (playerNum === 2 ? 'player2' : 'player1') : 'player1';
 
   useEffect(() => {
     if (mode !== 'nft') return;
@@ -208,6 +216,34 @@ export function ResultScreen() {
                   ? 'Commit-reveal verified — fair play confirmed'
                   : 'Commitment mismatch detected!'}
               </span>
+            </motion.div>
+          )}
+
+          {mode !== 'free' && !isDraw && winner !== myPlayer && !conceded && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} style={{ marginBottom: 20 }}>
+              <Button
+                variant={conceding ? 'secondary' : 'primary'}
+                size="lg"
+                disabled={conceding}
+                style={{ backgroundColor: conceding ? undefined : '#E05555', color: '#fff' }}
+                onClick={async () => {
+                  try {
+                    setConceding(true);
+                    await opponentWonOnChain(gameSessionId);
+                    setConceded(true);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Failed to surrender NFT. Check console.');
+                  } finally {
+                    setConceding(false);
+                  }
+                }}
+              >
+                {conceding ? 'Transferring NFT...' : 'I Lost (Surrender NFT)'}
+              </Button>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+                Requires Cartridge Session authorization.
+              </div>
             </motion.div>
           )}
 

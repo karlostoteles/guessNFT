@@ -7,6 +7,7 @@ import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
+import { depositWagerOnChain, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
 // Deterministic accent colour from character id
 function idToColor(id: string): string {
@@ -19,10 +20,11 @@ function idToColor(id: string): string {
 }
 
 export function CharacterSelectScreen() {
-  const phase           = usePhase();
-  const mode            = useGameMode();
+  const phase = usePhase();
+  const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
   const { selectSecretCharacter } = useGameActions();
+  const [lockingIn, setLockingIn] = useState<string | null>(null);
 
   // All game characters (full 999-stub board for nft/online, meme chars for free)
   const allCharacters = useGameCharacters();
@@ -85,11 +87,51 @@ export function CharacterSelectScreen() {
     if (!search.trim()) return displayChars;
     const s = search.trim().toLowerCase().replace(/[^0-9a-z#]/g, '');
     return displayChars.filter((c) => {
-      const id   = c.id.toLowerCase();
+      const id = c.id.toLowerCase();
       const name = c.name.toLowerCase().replace(/[^0-9a-z#]/g, '');
       return id.includes(s) || name.includes(s);
     });
   }, [displayChars, search]);
+
+  // ── Character Lock-In Flow ───────────────────────────────────────────────
+  const handleSelect = async (charId: string, tokenId?: string) => {
+    if (lockingIn) return;
+    try {
+      setLockingIn(charId);
+
+      // Update local storage commitment first so it's ready.
+      selectSecretCharacter(player, charId);
+
+      const session = useGameStore.getState().gameSessionId;
+
+      // Handle on-chain wager if needed
+      if (isNFTMode && mode !== 'nft-free') {
+        // TokenId fallback: if charId is "nft_123", it becomes "123"
+        const finalTokenId = tokenId || charId.replace('nft_', '');
+
+        const commitmentsStr = localStorage.getItem('whoiswho_commitments') || '{}';
+        const cMap = JSON.parse(commitmentsStr);
+        const myCommitment = cMap[session]?.[player]?.commitment;
+
+        if (myCommitment) {
+          console.log('[cartridge] Saving commitment on-chain:', myCommitment);
+          await submitCommitmentOnChain(myCommitment, session);
+
+          console.log('[cartridge] Depositing wager on-chain, token:', finalTokenId);
+          await depositWagerOnChain(session, finalTokenId);
+        }
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to lock in character: ' + err.message);
+      // Revert phase on failure if necessary, but MVP can just alert
+    } finally {
+      // The phase advances globally so this component unmounts,
+      // but clear anyway if it failed.
+      setLockingIn(null);
+    }
+  };
 
   // ── Bypass / no-NFT auto-pick screen ──────────────────────────────────────
   if (isBypassNoNFT) {
@@ -136,8 +178,9 @@ export function CharacterSelectScreen() {
                 </div>
               </div>
               <motion.button
-                onClick={() => selectSecretCharacter(player, bypassAssigned.id)}
-                whileHover={{ scale: 1.04, filter: 'brightness(1.1)' }}
+                onClick={() => handleSelect(bypassAssigned.id)}
+                disabled={!!lockingIn}
+                whileHover={!lockingIn ? { scale: 1.04, filter: 'brightness(1.1)' } : {}}
                 whileTap={{ scale: 0.97 }}
                 style={{
                   background: 'linear-gradient(135deg, #E8A444, #C47B1A)',
@@ -150,7 +193,7 @@ export function CharacterSelectScreen() {
                   width: '100%',
                 }}
               >
-                Lock In {bypassAssigned.name} →
+                {lockingIn ? 'Locking on-chain...' : `Lock In ${bypassAssigned.name} →`}
               </motion.button>
             </>
           ) : (
@@ -255,7 +298,9 @@ export function CharacterSelectScreen() {
                   previewSrc={imgSrc}
                   accentColor={idToColor(char.id)}
                   large={isNFTMode && ownedNFTs.length > 0}
-                  onSelect={() => selectSecretCharacter(player, char.id)}
+                  onSelect={() => handleSelect(char.id, (char as any).tokenId)}
+                  isLocking={lockingIn === char.id}
+                  isDisabled={!!lockingIn && lockingIn !== char.id}
                 />
               );
             })}
@@ -281,14 +326,16 @@ export function CharacterSelectScreen() {
 // ── Per-card component ──────────────────────────────────────────────────────────
 
 interface CharacterCardProps {
-  char:         { id: string; name: string; [key: string]: any };
-  previewSrc:   string | undefined;
-  accentColor:  string;
-  large?:       boolean;
-  onSelect:     () => void;
+  char: { id: string; name: string;[key: string]: any };
+  previewSrc: string | undefined;
+  accentColor: string;
+  large?: boolean;
+  onSelect: () => void;
+  isLocking?: boolean;
+  isDisabled?: boolean;
 }
 
-function CharacterCard({ char, previewSrc, accentColor, large, onSelect }: CharacterCardProps) {
+function CharacterCard({ char, previewSrc, accentColor, large, onSelect, isLocking, isDisabled }: CharacterCardProps) {
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
   const src = previewSrc && !imgError ? previewSrc : undefined;
@@ -296,11 +343,13 @@ function CharacterCard({ char, previewSrc, accentColor, large, onSelect }: Chara
   return (
     <motion.button
       onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
+      disabled={isDisabled || isLocking}
+      onMouseEnter={() => !isDisabled && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      whileHover={{ scale: 1.06 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={!isDisabled && !isLocking ? { scale: 1.06 } : {}}
+      whileTap={!isDisabled && !isLocking ? { scale: 0.95 } : {}}
       style={{
+        opacity: isDisabled ? 0.4 : 1,
         background: hovered
           ? 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(91,33,182,0.15))'
           : 'rgba(255,255,255,0.05)',
@@ -353,6 +402,34 @@ function CharacterCard({ char, previewSrc, accentColor, large, onSelect }: Chara
             {char.name}
           </span>
         )}
+
+        {/* Loading Spinner */}
+        <AnimatePresence>
+          {isLocking && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'absolute', inset: 0,
+                background: 'rgba(0,0,0,0.6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 2,
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                style={{
+                  width: 24, height: 24,
+                  border: '3px solid rgba(255,255,255,0.2)',
+                  borderTopColor: '#E8A444',
+                  borderRadius: '50%',
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Hover shimmer */}
         <AnimatePresence>

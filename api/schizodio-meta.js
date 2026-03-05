@@ -19,30 +19,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    const resp = await fetch(`https://schizodio.art/nft/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WhoisWhoGame/1.0)' },
+    const resp = await fetch(`https://v1assets.schizod.io/json/revealed/${id}.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; guessNFT/1.0)' },
     });
 
     if (!resp.ok) {
-      return res.status(resp.status).json({ error: `schizodio.art returned ${resp.status}` });
+      return res.status(resp.status).json({ error: `Schizodio API returned ${resp.status}` });
     }
 
-    const html = await resp.text();
-
-    const imageMatch = html.match(/\/static\/images_webp_512\/([0-9a-f]{64}\.webp)/);
-    const imageUrl = imageMatch
-      ? `https://schizodio.art/static/images_webp_512/${imageMatch[1]}`
-      : null;
-
-    const nameMatch = html.match(/<title>([^<]+?)(?:\s*[•\-|]|\s*<)/);
-    const name = nameMatch ? nameMatch[1].trim() : `SCHIZODIO #${id}`;
+    const data = await resp.json();
+    const imageUrl = data.image;
+    const name = data.name || `SCHIZODIO #${id}`;
+    const attributes = data.attributes || [];
 
     if (!imageUrl) {
-      return res.status(404).json({ error: 'Image not found in page', name });
+      return res.status(404).json({ error: 'Image not found in metadata', name });
     }
 
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=3600');
-    return res.json({ imageUrl, name, tokenId: id });
+    return res.json({ imageUrl, name, tokenId: id, attributes });
   } catch (err) {
     return res.status(500).json({ error: String(err) });
   }

@@ -43,7 +43,10 @@ const MEME_CONFIG: Record<string, { bg: string; badge: string }> = {
   m24: { bg: '#6A1B9A', badge: '🪬' },      // Murad
 };
 
-export function renderPortrait(character: Character): THREE.CanvasTexture {
+export function renderPortrait(
+  character: Character,
+  nftImage?: HTMLImageElement | HTMLCanvasElement
+): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = SIZE;
   canvas.height = SIZE;
@@ -68,15 +71,21 @@ export function renderPortrait(character: Character): THREE.CanvasTexture {
   ctx.fillRect(0, 0, SIZE, portraitH);
 
   // Draw portrait
-  const traits = character.traits;
-  if (traits.hair_style === 'long' || traits.hair_style === 'curly') {
-    drawHair(ctx, traits);
-    drawFace(ctx, traits);
+  if (nftImage) {
+    // Draw the real NFT image
+    ctx.drawImage(nftImage, 0, 0, SIZE, portraitH);
   } else {
-    drawFace(ctx, traits);
-    drawHair(ctx, traits);
+    // Draw procedural portrait
+    const traits = character.traits;
+    if (traits.hair_style === 'long' || traits.hair_style === 'curly') {
+      drawHair(ctx, traits);
+      drawFace(ctx, traits);
+    } else {
+      drawFace(ctx, traits);
+      drawHair(ctx, traits);
+    }
+    drawAccessories(ctx, traits);
   }
-  drawAccessories(ctx, traits);
 
   // ── Badge (top-right, meme characters only) ──────────────────────────────
   if (memeConf?.badge) {

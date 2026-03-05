@@ -10,23 +10,25 @@ import { FREE_QUESTIONS, type Question } from '@/core/data/questions';
 import type { Character } from '@/core/data/characters';
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { FreeQuestionButton } from './QuestionButtons';
+import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 const FREE_CATEGORIES = [
-  { key: 'hair'        as const, label: 'Hair',        icon: '💇'  },
-  { key: 'face'        as const, label: 'Face',        icon: '👁️'   },
-  { key: 'accessories' as const, label: 'Accessories', icon: '🎩'  },
+  { key: 'hair' as const, label: 'Hair', icon: '💇' },
+  { key: 'face' as const, label: 'Face', icon: '👁️' },
+  { key: 'accessories' as const, label: 'Accessories', icon: '🎩' },
 ] as const;
 
 type FreeCategory = typeof FREE_CATEGORIES[number]['key'];
 
 interface FreeModeBodyProps {
-  askedIds:  Set<string>;
+  askedIds: Set<string>;
   remaining: Character[];
-  onAsk:     (q: Question) => void;
+  onAsk: (q: Question) => void;
 }
 
 export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) {
   const [freeCategory, setFreeCategory] = useState<FreeCategory>('hair');
+  const isMobile = useIsMobile();
 
   // Info-gain filtered question IDs
   const usefulIds = useMemo(() => {
@@ -48,22 +50,22 @@ export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) 
         background: 'rgba(255,255,255,0.03)', flexShrink: 0,
       }}>
         {FREE_CATEGORIES.map((cat) => {
-          const catUseful  = FREE_QUESTIONS.filter(
+          const catUseful = FREE_QUESTIONS.filter(
             (q) => q.category === cat.key && usefulIds.has(q.id) && !askedIds.has(q.id)
           ).length;
-          const catAsked   = FREE_QUESTIONS.filter(
+          const catAsked = FREE_QUESTIONS.filter(
             (q) => q.category === cat.key && askedIds.has(q.id)
           ).length;
-          const catTotal   = catUseful + catAsked;
-          const allAsked   = catUseful === 0;
-          const isActiveCat= freeCategory === cat.key;
+          const catTotal = catUseful + catAsked;
+          const allAsked = catUseful === 0;
+          const isActiveCat = freeCategory === cat.key;
           return (
             <motion.button
               key={cat.key}
               onClick={() => setFreeCategory(cat.key)}
               whileHover={{ background: isActiveCat ? undefined : 'rgba(255,255,255,0.08)' }}
               style={{
-                flex: 1, padding: '9px 10px 12px',
+                flex: 1, padding: isMobile ? '8px 4px 10px' : '9px 10px 12px',
                 border: 'none', borderRadius: '8px 8px 0 0',
                 background: isActiveCat ? 'rgba(232,164,68,0.15)' : 'transparent',
                 borderBottom: isActiveCat
@@ -75,19 +77,19 @@ export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) 
                     ? 'rgba(255,255,254,0.2)'
                     : 'rgba(255,255,254,0.5)',
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 600, fontSize: 13,
+                fontWeight: 600, fontSize: isMobile ? 11 : 13,
                 cursor: 'pointer', outline: 'none', transition: 'all 0.18s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 4 : 6,
               }}
             >
-              <span style={{ fontSize: 15 }}>{cat.icon}</span>
-              <span>{cat.label}</span>
+              <span style={{ fontSize: isMobile ? 13 : 15 }}>{cat.icon}</span>
+              <span>{isMobile && cat.key === 'accessories' ? 'Accs' : cat.label}</span>
               <span style={{
-                fontSize: 10,
+                fontSize: 9,
                 background: catAsked > 0
                   ? 'rgba(232,164,68,0.15)'
                   : 'rgba(255,255,255,0.08)',
-                borderRadius: 8, padding: '1px 6px',
+                borderRadius: 8, padding: '1px 5px',
                 color: catAsked > 0
                   ? 'rgba(232,164,68,0.6)'
                   : 'rgba(255,255,254,0.25)',
