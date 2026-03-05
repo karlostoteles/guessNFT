@@ -29,9 +29,6 @@ export function ConfirmedTraits() {
 
     const isNFTMode = mode === 'nft' || mode === 'online' || mode === 'nft-free';
 
-    // Only show during gameplay
-    if (!GAMEPLAY_PHASES.has(phase)) return null;
-
     const confirmedTraits = useMemo(() => {
         return history
             .filter((r) => r.askedBy === activePlayer && r.answer === true)
@@ -45,6 +42,9 @@ export function ConfirmedTraits() {
                 };
             });
     }, [history, activePlayer]);
+
+    // Only show during gameplay
+    if (!GAMEPLAY_PHASES.has(phase)) return null;
 
     if (confirmedTraits.length === 0) return null;
 
