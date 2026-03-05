@@ -5,6 +5,7 @@ import { useGameActions } from '@/core/store/selectors';
 import { MEME_CHARACTERS } from '@/core/data/memeCharacters';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
 import { connectCartridgeWallet } from '@/services/starknet/sdk';
+import { useWalletStore } from '@/services/starknet/walletStore';
 import { SCHIZODIO_CONTRACT, RPC_URL } from '@/services/starknet/config';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import type { SchizodioNFT } from '@/services/starknet/types';
@@ -84,24 +85,24 @@ export function MenuScreen() {
             imageUrl: data.image || '',
             attributes: data.attributes || [],
           };
-          return nftToCharacter(stub);
+          return stub;
         } catch { return null; }
       });
 
-      const ownedChars = (await Promise.all(nftPromises)).filter(Boolean) as any[];
+      const ownedNfts = (await Promise.all(nftPromises)).filter(Boolean) as SchizodioNFT[];
 
-      if (ownedChars.length < 24) {
-        // Pad with random collection characters
-        setNftStatus(`${ownedChars.length} NFTs loaded, padding to 24...`);
-        const allChars = await generateAllCollectionCharacters();
-        const ownedIds = new Set(ownedChars.map((c: any) => c.id));
-        const padding = allChars.filter(c => !ownedIds.has(c.id));
-        const shuffled = [...padding].sort(() => Math.random() - 0.5);
-        const needed = 24 - ownedChars.length;
-        ownedChars.push(...shuffled.slice(0, needed));
-      }
+      // Store owned NFTs (SchizodioNFT type) in wallet store
+      const walletStore = useWalletStore.getState();
+      walletStore.setAddress(wallet.address);
+      walletStore.setOwnedNFTs(ownedNfts);
+      walletStore.setStatus('ready');
 
-      setGameMode('nft-free', ownedChars.slice(0, 24));
+      setNftStatus(`Ready! Loading full collection for the board...`);
+
+      // Load the FULL collection (999 chars) for the board
+      const allChars = await generateAllCollectionCharacters();
+
+      setGameMode('nft-free', allChars);
       startSetup();
     } catch (err: any) {
       console.error('[MenuScreen] NFT ownership check failed:', err);
