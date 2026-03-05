@@ -4,11 +4,8 @@ import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '@/core/store/selectors';
 import { MEME_CHARACTERS } from '@/core/data/memeCharacters';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
-import { connectCartridgeWallet } from '@/services/starknet/sdk';
 import { useWalletStore } from '@/services/starknet/walletStore';
-import { SCHIZODIO_CONTRACT, RPC_URL } from '@/services/starknet/config';
-import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
-import type { SchizodioNFT } from '@/services/starknet/types';
+import { useWalletConnection } from '@/services/starknet/hooks';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online';
 
@@ -17,6 +14,7 @@ export function MenuScreen() {
   const [loading, setLoading] = useState(false);
   const [nftStatus, setNftStatus] = useState<string>('');
   const { startSetup, setGameMode } = useGameActions();
+  const { connectWallet } = useWalletConnection();
 
   const handleFreePlay = () => {
     setGameMode('free', MEME_CHARACTERS);
@@ -28,76 +26,33 @@ export function MenuScreen() {
     setLoading(true);
     setNftStatus('Connecting wallet...');
     try {
-      const wallet = await connectCartridgeWallet();
-      setNftStatus('Reading your NFTs...');
+      // Use the robust connection hook used in Online mode
+      await connectWallet();
 
-      // Read balanceOf from the Schizodio ERC-721 contract
-      const { RpcProvider, CallData, cairo } = await import('starknet');
-      const provider = new RpcProvider({ nodeUrl: RPC_URL });
+      const state = useWalletStore.getState();
+      if (state.status === 'error') {
+        throw new Error(state.error || 'Connection failed');
+      }
 
-      // Read balanceOf(owner) — ERC-721 standard
-      const balanceCalldata = CallData.compile([wallet.address]);
-      const balanceRaw = await provider.callContract({
-        contractAddress: SCHIZODIO_CONTRACT,
-        entrypoint: 'balanceOf',
-        calldata: balanceCalldata,
-      });
-      const balance = Number(balanceRaw[0] || 0);
+      setNftStatus('Loading your collection...');
 
-      if (balance === 0) {
+      // Wait for the hook to finish loading NFTs
+      // We check every 500ms for up to 15 seconds
+      let attempts = 0;
+      while (useWalletStore.getState().status === 'loading_nfts' && attempts < 30) {
+        await new Promise(r => setTimeout(r, 500));
+        attempts++;
+      }
+
+      const finalState = useWalletStore.getState();
+      const ownedCount = finalState.ownedNFTs.length;
+
+      if (ownedCount === 0) {
         setNftStatus('No Schizodios found! Using full collection instead...');
         await new Promise(r => setTimeout(r, 1500));
-        const chars = await generateAllCollectionCharacters();
-        setGameMode('nft-free', chars);
-        startSetup();
-        return;
+      } else {
+        setNftStatus(`Found ${ownedCount} Schizodios! Loading the board...`);
       }
-
-      setNftStatus(`Found ${balance} Schizodios! Loading metadata...`);
-
-      // Enumerate owned token IDs
-      const tokenIds: string[] = [];
-      for (let i = 0; i < Math.min(balance, 50); i++) {
-        try {
-          const indexCalldata = CallData.compile([wallet.address, cairo.uint256(i)]);
-          const tokenRaw = await provider.callContract({
-            contractAddress: SCHIZODIO_CONTRACT,
-            entrypoint: 'tokenOfOwnerByIndex',
-            calldata: indexCalldata,
-          });
-          const id = Number(tokenRaw[0] || 0).toString();
-          tokenIds.push(id);
-        } catch {
-          break;
-        }
-      }
-
-      // Fetch metadata for each owned token
-      const BASE = 'https://v1assets.schizod.io/json/revealed/';
-      const nftPromises = tokenIds.map(async (id) => {
-        try {
-          const res = await fetch(`${BASE}${id}.json`);
-          if (!res.ok) return null;
-          const data = await res.json();
-          const stub: SchizodioNFT = {
-            tokenId: id,
-            name: data.name || `#${id}`,
-            imageUrl: data.image || '',
-            attributes: data.attributes || [],
-          };
-          return stub;
-        } catch { return null; }
-      });
-
-      const ownedNfts = (await Promise.all(nftPromises)).filter(Boolean) as SchizodioNFT[];
-
-      // Store owned NFTs (SchizodioNFT type) in wallet store
-      const walletStore = useWalletStore.getState();
-      walletStore.setAddress(wallet.address);
-      walletStore.setOwnedNFTs(ownedNfts);
-      walletStore.setStatus('ready');
-
-      setNftStatus(`Ready! Loading full collection for the board...`);
 
       // Load the FULL collection (999 chars) for the board
       const allChars = await generateAllCollectionCharacters();

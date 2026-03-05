@@ -18,33 +18,16 @@ let _cached: Character[] | null = null;
 export async function generateAllCollectionCharacters(): Promise<Character[]> {
   if (_cached) return _cached;
 
-  const BASE = 'https://v1assets.schizod.io/json/revealed/';
-  const promises = [];
-
+  const chars: Character[] = [];
   for (let i = 0; i <= 999; i++) {
-    const url = `${BASE}${i}.json`;
-    promises.push(
-      fetch(url)
-        .then((res) => {
-          if (!res.ok) return null;
-          return res.json();
-        })
-        .then((data) => {
-          if (!data) return null;
-          const stub: SchizodioNFT = {
-            tokenId: String(i),
-            name: data.name || `#${i}`,
-            imageUrl: data.image || '',
-            attributes: data.attributes || [],
-          };
-          return nftToCharacter(stub);
-        })
-        .catch(() => null)
-    );
+    const stub: SchizodioNFT = {
+      tokenId: String(i),
+      name: `Schizodio #${i}`,
+      imageUrl: `https://v1assets.schizod.io/images/revealed/${i}.png`,
+      attributes: [], // Will use deterministic fallback in nftToCharacter
+    };
+    chars.push(nftToCharacter(stub));
   }
-
-  const results = await Promise.all(promises);
-  const chars = results.filter((c) => c !== null) as Character[];
 
   _cached = chars;
   return chars;

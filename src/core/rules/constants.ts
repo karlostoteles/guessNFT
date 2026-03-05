@@ -39,17 +39,17 @@ export interface AdaptiveGridLayout {
  * Uses a 16:10 target aspect ratio so the grid always fits the board.
  */
 export function computeAdaptiveGrid(activeCount: number): AdaptiveGridLayout {
-  const ASPECT    = 1.7;     // cols/rows target ratio (16:10ish)
-  const USABLE    = 14.0;    // world units of usable board width
-  const GAP_FRAC  = 0.18;    // gap = GAP_FRAC × tileW
+  const ASPECT = 1.7;     // cols/rows target ratio (16:10ish)
+  const USABLE = 14.0;    // world units of usable board width
+  const GAP_FRAC = 0.18;    // gap = GAP_FRAC × tileW
 
-  const n    = Math.max(1, activeCount);
+  const n = Math.max(1, activeCount);
   const cols = Math.ceil(Math.sqrt(n * ASPECT));
   const rows = Math.ceil(n / cols);
 
   // tileW × (cols + (cols-1) × GAP_FRAC) = USABLE  →  solve for tileW
   const tileW = USABLE / (cols + (cols - 1) * GAP_FRAC);
-  const gap   = tileW * GAP_FRAC;
+  const gap = tileW * GAP_FRAC;
   const tileH = tileW * 1.35; // portrait aspect ratio
 
   const gridW = cols * tileW + (cols - 1) * gap;
@@ -73,7 +73,7 @@ export function computeAdaptiveCamera(activeCount: number): {
   const y = Math.max(6, view * 0.58 + 2.5);
   return {
     position: [0, y, z],
-    lookAt:   [0, 0, 0],
+    lookAt: [0, 0, 0],
   };
 }
 
@@ -86,8 +86,8 @@ export function computeAdaptiveCamera(activeCount: number): {
 export type TileLOD = 'minimal' | 'flat' | 'full';
 
 export function getTileLOD(tileW: number): TileLOD {
-  if (tileW < 0.38) return 'minimal';
-  if (tileW < 1.0)  return 'flat';
+  if (tileW < 0.15) return 'minimal';
+  if (tileW < 1.0) return 'flat';
   return 'full';
 }
 
