@@ -22,7 +22,7 @@ export function PhaseTransition() {
 
   useEffect(() => {
     if (!isAutoTransition) return;
-    const timer = setTimeout(advancePhase, 1400);
+    const timer = setTimeout(advancePhase, 800);
     return () => clearTimeout(timer);
   }, [isAutoTransition, advancePhase]);
 

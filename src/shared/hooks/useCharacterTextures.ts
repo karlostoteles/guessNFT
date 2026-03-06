@@ -7,12 +7,13 @@ import { getTileLOD } from '@/core/rules/constants';
 /**
  * Returns a texture map for all game characters.
  *
- * LOD-aware strategy:
- *  minimal (tileW < 0.38) → no textures; CharacterGrid renders coloured planes
- *  flat/full              → procedural portrait → async upgrade from local /nft/ images
- *
- * Local images are same-origin (no CORS), loaded from public/nft/{tokenId}.png
- * after running `node scripts/download-nft-images.mjs`.
+ * Strategy for real NFT art:
+ *   1. Start with procedural portraits (instant)
+ *   2. Async: load real images using HTMLImageElement → draw to Canvas → CanvasTexture
+ *      This bypasses Three.js TextureLoader CORS restrictions by drawing the image
+ *      to a canvas we control, then creating a texture from that canvas.
+ *   3. First tries local /nft/{id}.png (same-origin, from download pipeline)
+ *   4. Falls back to external URL from character.imageUrl
  */
 export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Texture> {
   const characters = useGameCharacters() || [];
@@ -33,15 +34,11 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
       const placeholder = renderPortrait({
         id: 'placeholder', name: 'Loading...',
         traits: {
-          hair_color: 'black',
-          hair_style: 'short',
-          skin_tone: 'medium',
-          eye_color: 'brown',
-          gender: 'male',
-          has_glasses: false,
-          has_hat: false,
-          has_beard: false,
-          has_earrings: false
+          hair_color: 'black', hair_style: 'short',
+          skin_tone: 'medium', eye_color: 'brown',
+          gender: 'male', has_glasses: false,
+          has_hat: false, has_beard: false,
+          has_earrings: false,
         } as any
       }, undefined, true);
 
@@ -50,94 +47,100 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         map.set(char.id, placeholder);
       }
       setTextures(map);
-
-      return () => {
-        placeholder.dispose();
-      };
+      return () => { placeholder.dispose(); };
     }
 
-    // Small boards: generate individual procedural textures immediately
     const map = new Map<string, THREE.Texture>();
     for (const char of characters) {
       map.set(char.id, renderPortrait(char, undefined, false));
     }
     setTextures(map);
-
     return () => {
-      for (const texture of map.values()) {
-        texture.dispose();
-      }
+      for (const texture of map.values()) texture.dispose();
     };
   }, [isMinimal, characters, isLargeBoard]);
 
-  // 2. Async upgrade: load local /nft/{tokenId}.png images (same-origin, no CORS)
+  // 2. Async upgrade: load real NFT art via Image → Canvas → CanvasTexture
   useEffect(() => {
     if (isMinimal || !characters || characters.length === 0) return;
 
     let cancelled = false;
-    const loader = new THREE.TextureLoader();
-    const BATCH_SIZE = 20;
-    const DELAY = 50; // Small delay between batches to avoid frame hitches
+    const BATCH_SIZE = 15;
+    const BATCH_DELAY = 100;
+    const IMG_SIZE = 128; // Render at 128×128 for WebGL performance
+
+    function loadImageAsTexture(url: string): Promise<THREE.CanvasTexture | null> {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = IMG_SIZE;
+            canvas.height = IMG_SIZE;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.needsUpdate = true;
+            resolve(texture);
+          } catch {
+            resolve(null); // Canvas tainted (CORS)
+          }
+        };
+        img.onerror = () => resolve(null);
+        // Timeout after 8 seconds
+        setTimeout(() => resolve(null), 8000);
+        img.src = url;
+      });
+    }
 
     const loadBatches = async () => {
       for (let i = 0; i < characters.length; i += BATCH_SIZE) {
         if (cancelled) break;
         const batch = characters.slice(i, i + BATCH_SIZE);
-        const newTextures = new Map<string, THREE.Texture>();
+        const batchTextures = new Map<string, THREE.Texture>();
 
         await Promise.all(
           batch.map(async (char) => {
-            // Extract numeric ID from "nft_123" format
+            if (cancelled) return;
+
             const numericId = char.id.replace('nft_', '');
-            const localUrl = `/nft/${numericId}.png`;
 
-            try {
-              const texture = await new Promise<THREE.Texture>((resolve, reject) => {
-                loader.load(
-                  localUrl,
-                  (tex) => {
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    tex.needsUpdate = true;
-                    resolve(tex);
-                  },
-                  undefined,
-                  reject
-                );
-              });
+            // Try local first (from download pipeline), then external URL
+            const urls = [
+              `/nft/${numericId}.png`,
+              char.imageUrl,
+            ].filter(Boolean) as string[];
 
-              if (cancelled) {
-                texture.dispose();
-                return;
+            for (const url of urls) {
+              const texture = await loadImageAsTexture(url);
+              if (texture && !cancelled) {
+                batchTextures.set(char.id, texture);
+                break; // Success — skip other URLs
               }
-
-              newTextures.set(char.id, texture);
-            } catch {
-              // Local image not available — keep procedural portrait
             }
           })
         );
 
         if (cancelled) break;
 
-        if (newTextures.size > 0) {
+        if (batchTextures.size > 0) {
           setTextures((prev) => {
             const next = new Map(prev);
-            for (const [id, tex] of newTextures) {
+            for (const [id, tex] of batchTextures) {
               next.set(id, tex);
             }
             return next;
           });
         }
 
-        await new Promise(r => setTimeout(r, DELAY));
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
       }
     };
 
     loadBatches();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [characters, isMinimal]);
 
   return textures;

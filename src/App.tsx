@@ -18,7 +18,7 @@ function LoadingFallback() {
 
 export default function App() {
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', isolation: 'isolate' }}>
       <Canvas
         shadows
         camera={{ fov: 45, near: 0.1, far: 100, position: [0, 12, 14] }}

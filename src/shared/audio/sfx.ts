@@ -118,42 +118,42 @@ class SFXEngine {
   }
 
   tileFlip() {
-    // Retro wooden clack — quick square wave thud
-    this.playTone({ frequency: 300, type: 'square', duration: 0.06, volume: 0.08, freqEnd: 120, attack: 0.003, decay: 0.05 });
+    // Ceramic tile clack — short noise burst + low thud, like a tile hitting a table
+    this.playTone({ frequency: 1200, type: 'square', duration: 0.03, volume: 0.06, freqEnd: 200, attack: 0.001, decay: 0.025 });
+    this.playTone({ frequency: 180, type: 'triangle', duration: 0.1, volume: 0.1, freqEnd: 60, attack: 0.005, decay: 0.08, delay: 0.02 });
   }
 
   /**
-   * Play a retro cascading sweep — fast descending 8-bit arpeggio.
-   * More tiles = longer and richer sweep.
+   * Rapid cascade of tile clacks — like dominoes falling in sequence.
+   * More tiles = more clacks + deeper finish.
    */
   tilesCascade(count: number) {
     if (this.muted) return;
-    // Clamp notes to keep it snappy (max 6 notes over ~0.5s)
-    const noteCount = Math.min(Math.max(2, Math.ceil(count / 10)), 6);
-    const baseFreq = 800;
-    const totalDur = Math.min(0.5, noteCount * 0.08);
+    const noteCount = Math.min(Math.max(2, Math.ceil(count / 8)), 8);
+    const totalDur = Math.min(0.6, noteCount * 0.06);
     for (let i = 0; i < noteCount; i++) {
-      const freq = baseFreq - (i * (400 / noteCount)); // descend from 800 → 400
+      const freq = 1400 - (i * (800 / noteCount));
+      // Quick clack
       this.playTone({
         frequency: freq,
         type: 'square',
-        duration: 0.08,
-        volume: 0.06 + Math.min(count * 0.002, 0.06),
-        attack: 0.003,
-        decay: 0.06,
-        freqEnd: freq * 0.6,
+        duration: 0.025,
+        volume: 0.04 + Math.min(count * 0.001, 0.04),
+        attack: 0.001,
+        decay: 0.02,
+        freqEnd: freq * 0.3,
         delay: i * (totalDur / noteCount),
       });
     }
-    // Finish with a satisfying low thud
+    // Final thud — tile pile settling
     this.playTone({
-      frequency: 150,
+      frequency: 120,
       type: 'triangle',
-      duration: 0.15,
-      volume: 0.1,
-      freqEnd: 60,
+      duration: 0.2,
+      volume: 0.12,
+      freqEnd: 40,
       attack: 0.01,
-      decay: 0.12,
+      decay: 0.15,
       delay: totalDur,
     });
   }

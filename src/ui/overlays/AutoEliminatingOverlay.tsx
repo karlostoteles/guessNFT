@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '../common/Card';
-import { useCurrentQuestion, useActivePlayer, useEliminatedIds, useGameActions } from '@/core/store/selectors';
+import { useCurrentQuestion, useActivePlayer, useEliminatedIds, useGameActions, useGameCharacters } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 
-const AUTO_ADVANCE_MS = 4000; // Time to enjoy the tile cascade animation
+const AUTO_ADVANCE_MS = 2000; // Fast → tiles fly + auto-advance
 
 export function AutoEliminatingOverlay() {
   const question = useCurrentQuestion();
   const activePlayer = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
+  const characters = useGameCharacters();
   const { advancePhase } = useGameActions();
   const [progress, setProgress] = useState(0);
 
-  // Play tile-flip sound on mount
+  const remaining = characters.length - eliminatedIds.length;
+
+  // Play cascade sound on mount
   useEffect(() => { sfx.tileFlip(); }, []);
 
   // Auto-advance after delay
@@ -34,97 +36,111 @@ export function AutoEliminatingOverlay() {
     };
   }, [advancePhase]);
 
-  return (
-    <Card style={{
-      position: 'fixed',
-      bottom: 16,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      width: 'min(460px, calc(100vw - 32px))',
-      pointerEvents: 'auto',
-      overflow: 'hidden',
-    }}>
-      {/* Q&A result */}
-      {question && (
-        <div style={{
-          marginBottom: 16,
-          padding: '12px 16px',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}>
-          <div style={{ flex: 1, fontSize: 14, color: 'rgba(255,255,254,0.7)' }}>
-            {question.questionText}
-          </div>
-          <div style={{
-            padding: '4px 12px',
-            borderRadius: 6,
-            fontWeight: 700,
-            fontSize: 14,
-            fontFamily: "'Space Grotesk', sans-serif",
-            background: question.answer ? 'rgba(76,175,80,0.2)' : 'rgba(224,85,85,0.2)',
-            color: question.answer ? '#4CAF50' : '#E05555',
-          }}>
-            {question.answer ? 'YES' : 'NO'}
-          </div>
-        </div>
-      )}
+  // Color for remaining tiles (green→red as they decrease)
+  const ratio = characters.length > 0 ? remaining / characters.length : 1;
+  const hue = Math.round(120 + ratio * 100);
+  const tileColor = `hsl(${hue}, 70%, 55%)`;
 
-      {/* Status */}
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        position: 'fixed',
+        bottom: 20,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        pointerEvents: 'none',
+        zIndex: 30,
+      }}
+    >
       <div style={{
+        background: 'rgba(12, 11, 20, 0.9)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(232,164,68,0.2)',
+        borderRadius: 14,
+        padding: '10px 20px',
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
+        gap: 14,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        minWidth: 200,
       }}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+        {/* Q&A result mini */}
+        {question && (
+          <>
+            <div style={{
+              fontSize: 12,
+              color: 'rgba(255,255,254,0.5)',
+              maxWidth: 180,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {question.questionText}
+            </div>
+            <div style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontWeight: 700,
+              fontSize: 11,
+              fontFamily: "'Space Grotesk', sans-serif",
+              background: question.answer ? 'rgba(76,175,80,0.2)' : 'rgba(224,85,85,0.2)',
+              color: question.answer ? '#4CAF50' : '#E05555',
+            }}>
+              {question.answer ? 'YES' : 'NO'}
+            </div>
+            <div style={{
+              width: 1,
+              height: 20,
+              background: 'rgba(255,255,255,0.1)',
+            }} />
+          </>
+        )}
+
+        {/* Tiles remaining counter */}
+        <motion.span
+          key={remaining}
+          initial={{ scale: 1.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
           style={{
-            width: 20,
-            height: 20,
-            border: '2px solid rgba(232, 164, 68, 0.3)',
-            borderTopColor: '#E8A444',
-            borderRadius: '50%',
-          }}
-        />
-        <div>
-          <div style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 600,
-            fontSize: 15,
-            color: '#FFFFFE',
-          }}>
-            Eliminating characters...
-          </div>
-          <div style={{
-            fontSize: 12,
-            color: 'rgba(255,255,254,0.4)',
-            marginTop: 2,
-          }}>
-            {eliminatedIds.length} eliminated total
-          </div>
+            fontWeight: 800,
+            fontSize: 18,
+            color: tileColor,
+          }}
+        >
+          {remaining}
+        </motion.span>
+        <span style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: 'rgba(255,255,254,0.35)',
+          letterSpacing: '0.08em',
+        }}>
+          left
+        </span>
+
+        {/* inline progress */}
+        <div style={{
+          width: 40,
+          height: 3,
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            style={{
+              height: '100%',
+              background: '#E8A444',
+              borderRadius: 2,
+              width: `${progress * 100}%`,
+            }}
+          />
         </div>
       </div>
-
-      {/* Progress bar */}
-      <div style={{
-        height: 3,
-        background: 'rgba(255,255,255,0.08)',
-        borderRadius: 2,
-        overflow: 'hidden',
-      }}>
-        <motion.div
-          style={{
-            height: '100%',
-            background: 'linear-gradient(90deg, #E8A444, #F0C674)',
-            borderRadius: 2,
-            width: `${progress * 100}%`,
-          }}
-        />
-      </div>
-    </Card>
+    </motion.div>
   );
 }
