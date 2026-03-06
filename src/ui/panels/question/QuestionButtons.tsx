@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import type { Question } from '@/core/data/questions';
 
@@ -37,10 +38,6 @@ const RARITY_COLORS: Record<RarityTier, { color: string; border: string; bg: str
   },
 };
 
-/**
- * Strip the "Does your character have " prefix to show only the key trait value.
- * Also strips trailing "?"
- */
 function stripPrefix(text: string): string {
   const prefixes = [
     'Does your character have a ',
@@ -59,7 +56,6 @@ function stripPrefix(text: string): string {
       break;
     }
   }
-  // Capitalize first letter, remove trailing ?
   result = result.replace(/\?$/, '').trim();
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
@@ -111,14 +107,28 @@ export function NFTQuestionButton({
   );
 }
 
-// ─── Rarity info tooltip ──────────────────────────────────────────────────────
+// ─── Rarity info tooltip (rendered as PORTAL to escape 3D canvas z-index) ─────
 
 export function RarityInfoButton() {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  // Calculate position when opened
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        x: rect.right - 240, // align right edge
+        y: rect.top - 8,     // above button
+      });
+    }
+  }, [open]);
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <motion.button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
@@ -146,27 +156,35 @@ export function RarityInfoButton() {
         Info
       </motion.button>
 
-      {open && (
+      {/* Portal: render directly to document.body to escape Canvas stacking context */}
+      {open && createPortal(
         <>
+          {/* Backdrop to close on click */}
           <div
             onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: 98 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9998,
+            }}
           />
+          {/* Info tooltip panel */}
           <motion.div
             initial={{ opacity: 0, y: 6, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             style={{
-              position: 'absolute',
-              bottom: '100%',
-              right: 0,
-              marginBottom: 8,
+              position: 'fixed',
+              left: pos.x,
+              top: pos.y,
+              transform: 'translateY(-100%)',
               width: 240,
               background: 'rgba(13, 12, 20, 0.97)',
-              border: '1px solid rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: 12,
               padding: '12px 14px',
-              zIndex: 99,
-              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+              zIndex: 9999,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+              pointerEvents: 'auto',
             }}
           >
             <div style={{
@@ -194,7 +212,8 @@ export function RarityInfoButton() {
               % of remaining characters that match
             </div>
           </motion.div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
