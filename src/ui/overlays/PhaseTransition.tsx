@@ -22,7 +22,7 @@ export function PhaseTransition() {
 
   useEffect(() => {
     if (!isAutoTransition) return;
-    const timer = setTimeout(advancePhase, 800);
+    const timer = setTimeout(advancePhase, 1500);
     return () => clearTimeout(timer);
   }, [isAutoTransition, advancePhase]);
 
@@ -116,7 +116,7 @@ export function PhaseTransition() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.15 }}
             style={{
               display: 'flex',
               alignItems: 'center',

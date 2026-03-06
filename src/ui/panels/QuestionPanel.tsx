@@ -13,7 +13,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QUESTIONS, type Question } from '@/core/data/questions';
-import type { TraitCategory } from './question/zoneConfig';
 import {
   useGameActions, useQuestionHistory, useActivePlayer,
   usePhase, useGameCharacters, usePlayerState, useGameMode, useOnlinePlayerNum,
@@ -27,8 +26,8 @@ import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 export function QuestionPanel() {
   const [minimised, setMinimised] = useState(false);
-  const [activeZone, setActiveZone] = useState<TraitCategory | null>(null);
-  const [hoveredZone, setHoveredZone] = useState<TraitCategory | null>(null);
+  const [activeZone, setActiveZone] = useState<string | null>(null);
+  const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
   const mode = useGameMode();
   const { askQuestion, startGuess } = useGameActions();
