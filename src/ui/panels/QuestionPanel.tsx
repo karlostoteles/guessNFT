@@ -12,7 +12,8 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QUESTIONS, type Question, type QuestionZone } from '@/core/data/questions';
+import { QUESTIONS, type Question } from '@/core/data/questions';
+import type { TraitCategory } from './question/zoneConfig';
 import {
   useGameActions, useQuestionHistory, useActivePlayer,
   usePhase, useGameCharacters, usePlayerState, useGameMode, useOnlinePlayerNum,
@@ -26,8 +27,8 @@ import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 export function QuestionPanel() {
   const [minimised, setMinimised] = useState(false);
-  const [activeZone, setActiveZone] = useState<QuestionZone | null>(null);
-  const [hoveredZone, setHoveredZone] = useState<QuestionZone | null>(null);
+  const [activeZone, setActiveZone] = useState<TraitCategory | null>(null);
+  const [hoveredZone, setHoveredZone] = useState<TraitCategory | null>(null);
 
   const mode = useGameMode();
   const { askQuestion, startGuess } = useGameActions();
@@ -59,23 +60,7 @@ export function QuestionPanel() {
     [characters, playerState.eliminatedCharacterIds],
   );
 
-  // Zone badge counters — YES/NO per zone from confirmed history
-  const zoneBadges = useMemo(() => {
-    const map: Record<QuestionZone, { yes: number; no: number }> = {
-      hair: { yes: 0, no: 0 },
-      face: { yes: 0, no: 0 },
-      body: { yes: 0, no: 0 },
-      gear: { yes: 0, no: 0 },
-    };
-    for (const record of history) {
-      if (record.askedBy !== activePlayer || record.answer === null) continue;
-      const q = QUESTIONS.find((q) => q.id === record.questionId);
-      if (!q?.zone) continue;
-      if (record.answer) map[q.zone].yes++;
-      else map[q.zone].no++;
-    }
-    return map;
-  }, [history, activePlayer]);
+
 
   const handleRiskIt = () => { sfx.riskIt(); startGuess(); };
 
@@ -122,7 +107,7 @@ export function QuestionPanel() {
             transition={{ type: 'spring', stiffness: 280, damping: 26 }}
             style={{
               width: 'min(820px, 100vw)',
-              maxHeight: 'min(620px, 85vh)',
+              maxHeight: 'min(620px, 65vh)',
               display: 'flex',
               flexDirection: 'column',
               borderRadius: 'clamp(0px, calc((100vw - 820px) * 999), 20px) clamp(0px, calc((100vw - 820px) * 999), 20px) 0 0',
@@ -229,7 +214,6 @@ export function QuestionPanel() {
                 hoveredZone={hoveredZone}
                 setActiveZone={setActiveZone}
                 setHoveredZone={setHoveredZone}
-                zoneBadges={zoneBadges}
                 askedIds={askedIds}
                 remaining={remaining}
                 onAsk={handleAsk}
