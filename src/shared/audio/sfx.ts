@@ -3,7 +3,7 @@
  * All sounds are procedurally generated. No files needed.
  */
 
-type SFXName = 'click' | 'question' | 'answerYes' | 'answerNo' | 'tileFlip' | 'tilesCascade' | 'riskIt' | 'win' | 'lose' | 'wrongGuess' | 'heartbeat';
+type SFXName = 'click' | 'cardClick' | 'question' | 'answerYes' | 'answerNo' | 'tileFlip' | 'tilesCascade' | 'riskIt' | 'win' | 'lose' | 'wrongGuess' | 'heartbeat';
 
 class SFXEngine {
   private ctx: AudioContext | null = null;
@@ -91,12 +91,40 @@ class SFXEngine {
     }
   }
 
-  // ── Public sounds ───────────────────────────────────────────────────────────
+  private get audioModeClick() {
+    if (!this._audioModeClick && typeof Audio !== 'undefined') {
+      this._audioModeClick = new Audio('/spinopel-ceramic-tile-411505.mp3');
+      this._audioModeClick.volume = 0.6;
+    }
+    return this._audioModeClick;
+  }
+  private _audioModeClick?: HTMLAudioElement;
+
+  private get audioCardClick() {
+    if (!this._audioCardClick && typeof Audio !== 'undefined') {
+      this._audioCardClick = new Audio('/1v1andAIcardsound.mp3');
+      this._audioCardClick.volume = 0.8;
+    }
+    return this._audioCardClick;
+  }
+  private _audioCardClick?: HTMLAudioElement;
 
   click() {
-    // Soft, pleasant tile touch/clack instead of the harsh CPU beep
-    this.playTone({ frequency: 600, type: 'triangle', duration: 0.04, volume: 0.1, attack: 0.005, decay: 0.02 });
-    this.playTone({ frequency: 900, type: 'sine', duration: 0.05, volume: 0.05, attack: 0.001, decay: 0.03, delay: 0.01 });
+    if (this.muted || !this.audioModeClick) return;
+    try {
+      // Play literal MP3 file
+      this.audioModeClick.currentTime = 0;
+      this.audioModeClick.play().catch(() => { });
+    } catch { }
+  }
+
+  cardClick() {
+    if (this.muted || !this.audioCardClick) return;
+    try {
+      // Play literal MP3 file
+      this.audioCardClick.currentTime = 0;
+      this.audioCardClick.play().catch(() => { });
+    } catch { }
   }
 
   question() {

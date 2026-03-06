@@ -307,7 +307,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
 function PlayRealTile({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
-      onClick={() => { sfx.click(); onClick(); }}
+      onClick={() => { sfx.cardClick(); onClick(); }}
       whileHover={{ scale: 1.04, y: -6, boxShadow: '0 0 56px rgba(232,164,68,0.35), 0 8px 32px rgba(0,0,0,0.5)' }}
       whileTap={{ scale: 0.97 }}
       initial={false}
@@ -359,7 +359,7 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
 function PlayFreeTile({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
-      onClick={() => { sfx.click(); onClick(); }}
+      onClick={() => { sfx.cardClick(); onClick(); }}
       whileHover={{ scale: 1.04, y: -6, boxShadow: '0 0 48px rgba(124,58,237,0.3), 0 8px 32px rgba(0,0,0,0.5)' }}
       whileTap={{ scale: 0.97 }}
       initial={false}
@@ -377,36 +377,15 @@ function PlayFreeTile({ onClick }: { onClick: () => void }) {
         flex: 1, position: 'relative', overflow: 'hidden',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
+        <img
+          src="/ai_background.jpg"
+          alt="AI Background"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'radial-gradient(ellipse at 50% 45%, rgba(124,58,237,0.15) 0%, transparent 68%)',
+          background: 'linear-gradient(to bottom, transparent 40%, rgba(8,12,30,0.95) 100%)',
         }} />
-        {/* AI brain SVG */}
-        <svg viewBox="0 0 120 120" width="72%" height="72%" style={{ position: 'relative', zIndex: 1 }}>
-          {/* Outer ring */}
-          <circle cx="60" cy="60" r="44" fill="none" stroke="rgba(124,58,237,0.3)" strokeWidth="1.5" strokeDasharray="6 4" />
-          <circle cx="60" cy="60" r="28" fill="rgba(124,58,237,0.12)" stroke="rgba(124,58,237,0.5)" strokeWidth="1.5" />
-          <path d="M60 42c-8.8 0-16 7.2-16 16s7.2 16 16 16 16-7.2 16-16-7.2-16-16-16zm-4 22c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4zm8 0c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z" fill="#A78BFA" opacity="0.8" />
-          {/* Node dots on ring */}
-          {[0, 60, 120, 180, 240, 300].map((deg, i) => {
-            const rad = (deg * Math.PI) / 180;
-            return (
-              <circle key={i}
-                cx={60 + 44 * Math.cos(rad)} cy={60 + 44 * Math.sin(rad)}
-                r="3.5" fill="#7C3AED" opacity="0.8"
-              />
-            );
-          })}
-          {/* Connection lines */}
-          {[[0, 120], [60, 240], [300, 180]].map(([a, b], i) => {
-            const r = 44;
-            const ax = 60 + r * Math.cos((a * Math.PI) / 180);
-            const ay = 60 + r * Math.sin((a * Math.PI) / 180);
-            const bx = 60 + r * Math.cos((b * Math.PI) / 180);
-            const by = 60 + r * Math.sin((b * Math.PI) / 180);
-            return <line key={i} x1={ax} y1={ay} x2={bx} y2={by} stroke="rgba(124,58,237,0.25)" strokeWidth="1" />;
-          })}
-        </svg>
         {/* Free badge */}
         <div style={{
           position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
