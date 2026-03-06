@@ -9,6 +9,32 @@ class SFXEngine {
   private ctx: AudioContext | null = null;
   private muted = false;
 
+  private clickBuffer: AudioBuffer | null = null;
+  private cardClickBuffer: AudioBuffer | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      // Eagerly load the MP3 files so they are ready when clicked.
+      // AudioContext is created in 'suspended' state if no user gesture yet, 
+      // but decoding still works fine.
+      this.loadFiles();
+    }
+  }
+
+  private async loadFiles() {
+    try {
+      const ctx = this.getCtx();
+      const [clickRes, cardRes] = await Promise.all([
+        fetch('/spinopel-ceramic-tile-411505.mp3').then((r) => r.arrayBuffer()),
+        fetch('/1v1andAIcardsound.mp3').then((r) => r.arrayBuffer()),
+      ]);
+      this.clickBuffer = await ctx.decodeAudioData(clickRes);
+      this.cardClickBuffer = await ctx.decodeAudioData(cardRes);
+    } catch (e) {
+      console.warn('SFXEngine: Failed to load MP3s', e);
+    }
+  }
+
   private getCtx(): AudioContext {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -91,40 +117,26 @@ class SFXEngine {
     }
   }
 
-  private get audioModeClick() {
-    if (!this._audioModeClick && typeof Audio !== 'undefined') {
-      this._audioModeClick = new Audio('/spinopel-ceramic-tile-411505.mp3');
-      this._audioModeClick.volume = 0.6;
-    }
-    return this._audioModeClick;
+  private playBuffer(buffer: AudioBuffer | null, volume: number) {
+    if (this.muted || !buffer) return;
+    try {
+      const ctx = this.getCtx();
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.value = volume;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(0);
+    } catch { }
   }
-  private _audioModeClick?: HTMLAudioElement;
-
-  private get audioCardClick() {
-    if (!this._audioCardClick && typeof Audio !== 'undefined') {
-      this._audioCardClick = new Audio('/1v1andAIcardsound.mp3');
-      this._audioCardClick.volume = 0.8;
-    }
-    return this._audioCardClick;
-  }
-  private _audioCardClick?: HTMLAudioElement;
 
   click() {
-    if (this.muted || !this.audioModeClick) return;
-    try {
-      // Play literal MP3 file
-      this.audioModeClick.currentTime = 0;
-      this.audioModeClick.play().catch(() => { });
-    } catch { }
+    this.playBuffer(this.clickBuffer, 0.6);
   }
 
   cardClick() {
-    if (this.muted || !this.audioCardClick) return;
-    try {
-      // Play literal MP3 file
-      this.audioCardClick.currentTime = 0;
-      this.audioCardClick.play().catch(() => { });
-    } catch { }
+    this.playBuffer(this.cardClickBuffer, 0.8);
   }
 
   question() {
