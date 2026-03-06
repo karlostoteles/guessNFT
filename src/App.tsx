@@ -22,7 +22,7 @@ export default function App() {
       <Canvas
         shadows
         camera={{ fov: 45, near: 0.1, far: 100, position: [0, 12, 14] }}
-        style={{ background: '#0f0e17' }}
+        style={{ background: '#0f0e17', position: 'relative', zIndex: 0 }}
       >
         <Suspense fallback={<LoadingFallback />}>
           <GameScene />

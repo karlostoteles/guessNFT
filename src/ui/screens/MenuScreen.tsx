@@ -205,7 +205,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
           width: 'clamp(180px, 45vw, 340px)',
           height: 'auto',
           filter: 'drop-shadow(0 0 50px rgba(124,58,237,0.5))',
-          marginBottom: 16,
+          marginBottom: 4,
         }}
       />
 
@@ -224,7 +224,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
           marginBottom: 4, textAlign: 'center',
         }}
       >
-        Guess right, win big.
+        Guess it right, win twice
       </motion.div>
 
       {/* ─── Badge: slides up with fade ─── */}

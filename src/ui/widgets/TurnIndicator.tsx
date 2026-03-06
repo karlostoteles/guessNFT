@@ -29,8 +29,10 @@ export function TurnIndicator() {
 
   if (!isGameplay) return null;
 
-  // Player's own tiles: always green (encouraging)  
-  const tileColor = '#4CAF50';
+  // Player's own tiles: blue → green (blue when many, green when narrowing to 1)
+  const ratio = total > 0 ? remaining / total : 1;
+  const hue = Math.round(120 + ratio * 100); // 220=blue → 120=green
+  const tileColor = `hsl(${hue}, 70%, 55%)`;
 
   return (
     <AnimatePresence mode="wait">
