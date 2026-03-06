@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sfx } from '@/shared/audio/sfx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '@/core/store/selectors';
@@ -289,7 +290,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
 function PlayRealTile({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
-      onClick={onClick}
+      onClick={() => { sfx.click(); onClick(); }}
       whileHover={{ scale: 1.04, y: -6, boxShadow: '0 0 56px rgba(232,164,68,0.35), 0 8px 32px rgba(0,0,0,0.5)' }}
       whileTap={{ scale: 0.97 }}
       initial={false}
@@ -370,7 +371,7 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
 function PlayFreeTile({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
-      onClick={onClick}
+      onClick={() => { sfx.click(); onClick(); }}
       whileHover={{ scale: 1.04, y: -6, boxShadow: '0 0 48px rgba(124,58,237,0.3), 0 8px 32px rgba(0,0,0,0.5)' }}
       whileTap={{ scale: 0.97 }}
       initial={false}

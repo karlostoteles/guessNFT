@@ -9,11 +9,8 @@ import { getTileLOD } from '@/core/rules/constants';
  *
  * Strategy for real NFT art:
  *   1. Start with procedural portraits (instant)
- *   2. Async: load real images using HTMLImageElement → draw to Canvas → CanvasTexture
- *      This bypasses Three.js TextureLoader CORS restrictions by drawing the image
- *      to a canvas we control, then creating a texture from that canvas.
- *   3. First tries local /nft/{id}.png (same-origin, from download pipeline)
- *   4. Falls back to external URL from character.imageUrl
+ *   2. Async upgrade: load through /api/nft-art/:id proxy (same-origin, no CORS)
+ *      Falls back to local /nft/{id}.png if available
  */
 export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Texture> {
   const characters = useGameCharacters() || [];
@@ -60,19 +57,19 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     };
   }, [isMinimal, characters, isLargeBoard]);
 
-  // 2. Async upgrade: load real NFT art via Image → Canvas → CanvasTexture
+  // 2. Async upgrade: load real art via same-origin proxy
   useEffect(() => {
     if (isMinimal || !characters || characters.length === 0) return;
 
     let cancelled = false;
-    const BATCH_SIZE = 15;
-    const BATCH_DELAY = 100;
-    const IMG_SIZE = 128; // Render at 128×128 for WebGL performance
+    const BATCH_SIZE = 10;
+    const BATCH_DELAY = 200;
+    const IMG_SIZE = 128;
 
     function loadImageAsTexture(url: string): Promise<THREE.CanvasTexture | null> {
       return new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // No crossOrigin needed — image comes from same-origin proxy
         img.onload = () => {
           try {
             const canvas = document.createElement('canvas');
@@ -85,12 +82,11 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
             texture.needsUpdate = true;
             resolve(texture);
           } catch {
-            resolve(null); // Canvas tainted (CORS)
+            resolve(null);
           }
         };
         img.onerror = () => resolve(null);
-        // Timeout after 8 seconds
-        setTimeout(() => resolve(null), 8000);
+        setTimeout(() => resolve(null), 10000);
         img.src = url;
       });
     }
@@ -104,20 +100,18 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         await Promise.all(
           batch.map(async (char) => {
             if (cancelled) return;
-
             const numericId = char.id.replace('nft_', '');
 
-            // Try local first (from download pipeline), then external URL
-            const urls = [
-              `/nft/${numericId}.png`,
-              char.imageUrl,
-            ].filter(Boolean) as string[];
+            // Same-origin proxy URL — streamed through Vercel serverless function
+            const proxyUrl = `/api/nft-art/${numericId}`;
+            // Fallback: local downloaded images
+            const localUrl = `/nft/${numericId}.png`;
 
-            for (const url of urls) {
+            for (const url of [proxyUrl, localUrl]) {
               const texture = await loadImageAsTexture(url);
               if (texture && !cancelled) {
                 batchTextures.set(char.id, texture);
-                break; // Success — skip other URLs
+                break;
               }
             }
           })

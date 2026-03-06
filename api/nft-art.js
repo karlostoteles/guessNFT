@@ -1,8 +1,10 @@
 /**
- * Vercel serverless function — Redirects to the actual NFT image.
+ * Vercel serverless function — Proxies NFT images through same-origin.
  * Usage: /api/nft-art?id=292
- * 
- * This allows the frontend to load images by ID even though the actual asset URL is a hash.
+ *
+ * Fetches the image from v1assets.schizod.io and STREAMS it back
+ * (not redirect) so the browser treats it as same-origin.
+ * This allows <canvas> and Three.js textures to use the image without CORS issues.
  */
 export default async function handler(req, res) {
     const id = req.query.id;
@@ -12,21 +14,31 @@ export default async function handler(req, res) {
     }
 
     try {
-        const resp = await fetch(`https://v1assets.schizod.io/json/revealed/${id}.json`);
-        if (!resp.ok) {
-            // Fallback or error
-            return res.status(resp.status).end();
+        // 1. Get metadata to find the image URL
+        const metaResp = await fetch(`https://v1assets.schizod.io/json/revealed/${id}.json`);
+        if (!metaResp.ok) {
+            return res.status(metaResp.status).end();
         }
-        const data = await resp.json();
+        const data = await metaResp.json();
         const imageUrl = data.image;
 
         if (!imageUrl) {
             return res.status(404).end();
         }
 
-        // Redirect to the actual image host
+        // 2. Fetch the actual image and stream it through
+        const imgResp = await fetch(imageUrl);
+        if (!imgResp.ok) {
+            return res.status(imgResp.status).end();
+        }
+
+        const contentType = imgResp.headers.get('content-type') || 'image/png';
+        const buffer = Buffer.from(await imgResp.arrayBuffer());
+
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=3600');
-        return res.redirect(307, imageUrl);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.send(buffer);
     } catch (err) {
         return res.status(500).end();
     }
