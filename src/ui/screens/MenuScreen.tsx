@@ -259,9 +259,11 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
 
       {/* ─── Two main tiles: slide in from sides ─── */}
       <div style={{
-        display: 'flex', gap: 'clamp(16px, 4vw, 28px)',
+        display: 'flex', gap: 'clamp(12px, 3vw, 28px)',
         alignItems: 'stretch', justifyContent: 'center',
-        marginTop: 24,
+        flexWrap: 'wrap',
+        marginTop: 20,
+        padding: '0 16px',
       }}>
         <motion.div
           initial={{ x: -100, opacity: 0, rotate: -5 }}

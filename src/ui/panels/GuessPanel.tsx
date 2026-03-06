@@ -167,9 +167,11 @@ export function GuessPanel() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))',
-          gap: 12,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, calc(50% - 8px)), 1fr))',
+          gap: 8,
           padding: 8,
+          maxHeight: 'min(360px, 45vh)',
+          overflowY: 'auto',
         }}>
           {sortedCharacters.map((char) => {
             const isEliminated = elimSet.has(char.id);
