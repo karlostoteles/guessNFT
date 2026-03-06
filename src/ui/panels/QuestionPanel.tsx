@@ -188,10 +188,10 @@ export function QuestionPanel() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(224,85,85,0.18), rgba(180,50,50,0.28))',
-                    border: '1px solid rgba(224,85,85,0.5)',
+                    background: 'linear-gradient(135deg, rgba(232,164,68,0.15), rgba(200,140,50,0.25))',
+                    border: '1px solid rgba(232,164,68,0.4)',
                     borderRadius: 8, padding: '5px 12px',
-                    cursor: 'pointer', outline: 'none', color: '#FF6B6B',
+                    cursor: 'pointer', outline: 'none', color: '#E8A444',
                     fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
                     flex: isMobile ? 1 : 'none',

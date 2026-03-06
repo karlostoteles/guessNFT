@@ -1,40 +1,44 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePhase, useActivePlayer, useTurnNumber, useGameMode, useEliminatedIds, useGameCharacters } from '@/core/store/selectors';
+import { usePhase, useTurnNumber, useGameMode, useEliminatedIds, useGameCharacters, useActivePlayer } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
-import { COLORS } from '@/core/rules/constants';
 
-const PHASE_LABELS: Partial<Record<GamePhase, string>> = {
-  [GamePhase.QUESTION_SELECT]: 'Ask a Question',
-  [GamePhase.HANDOFF_TO_OPPONENT]: 'Pass the Device',
-  [GamePhase.ANSWER_PENDING]: 'Answer the Question',
-  [GamePhase.ANSWER_REVEALED]: 'Answer Revealed',
-  [GamePhase.ELIMINATION]: 'Eliminate Characters',
-  [GamePhase.TURN_TRANSITION]: 'Switching Turns',
-  [GamePhase.GUESS_SELECT]: 'Make Your Guess',
-};
-
+/**
+ * TurnIndicator — shows only turn number and tiles remaining.
+ * No "Player 1" label, no phase label text.
+ */
 export function TurnIndicator() {
   const phase = usePhase();
   const activePlayer = useActivePlayer();
   const turnNumber = useTurnNumber();
-  const mode = useGameMode();
   const characters = useGameCharacters();
   const eliminatedIds = useEliminatedIds(activePlayer);
-  const label = PHASE_LABELS[phase];
-
-  if (!label) return null;
-
-  const isCPU = mode === 'free' && activePlayer === 'player2';
-  const colors = activePlayer === 'player1' ? COLORS.player1 : COLORS.player2;
-  const playerLabel = isCPU ? 'CPU' : activePlayer === 'player1' ? 'Player 1' : 'Player 2';
 
   const remaining = characters.length - eliminatedIds.length;
-  const showRemaining = phase === GamePhase.QUESTION_SELECT && remaining < characters.length;
+  const total = characters.length;
+
+  // Only show during active gameplay
+  const isGameplay =
+    phase === GamePhase.QUESTION_SELECT ||
+    phase === GamePhase.HANDOFF_TO_OPPONENT ||
+    phase === GamePhase.ANSWER_PENDING ||
+    phase === GamePhase.ANSWER_REVEALED ||
+    phase === GamePhase.AUTO_ELIMINATING ||
+    phase === GamePhase.ELIMINATION ||
+    phase === GamePhase.TURN_TRANSITION ||
+    phase === GamePhase.GUESS_SELECT;
+
+  if (!isGameplay) return null;
+
+  // Color: green when many tiles, yellow in the middle, red when few
+  const ratio = total > 0 ? remaining / total : 1;
+  const tileColor = ratio > 0.5
+    ? `hsl(${Math.round(ratio * 120)}, 70%, 55%)`    // green → yellow
+    : `hsl(${Math.round(ratio * 120)}, 80%, 50%)`;   // yellow → red
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`${phase}-${activePlayer}`}
+        key={`turn-${Math.ceil(turnNumber / 2)}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
@@ -46,82 +50,82 @@ export function TurnIndicator() {
           transform: 'translateX(-50%)',
           pointerEvents: 'none',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: 4,
+          gap: 12,
           zIndex: 10,
         }}
       >
         <div style={{
-          background: colors.bg,
+          background: 'rgba(12, 11, 20, 0.82)',
           backdropFilter: 'blur(12px)',
-          border: `1px solid ${colors.primary}40`,
+          border: '1px solid rgba(232,164,68,0.22)',
           borderRadius: 12,
           padding: '8px 20px',
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
+          gap: 14,
         }}>
-          {/* Player dot */}
-          <motion.div
-            animate={isCPU ? { scale: [1, 1.2, 1] } : {}}
-            transition={{ repeat: Infinity, duration: 1.5 }}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: colors.primary,
-              boxShadow: `0 0 8px ${colors.primary}`,
-              flexShrink: 0,
-            }}
-          />
-
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700,
-            fontSize: 14,
-            color: colors.primary,
+          {/* Turn number */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}>
-            {playerLabel}
-          </span>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              color: 'rgba(255,255,254,0.35)',
+              textTransform: 'uppercase',
+            }}>
+              Turn
+            </span>
+            <span style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 800,
+              fontSize: 16,
+              color: '#E8A444',
+            }}>
+              {Math.ceil(turnNumber / 2)}
+            </span>
+          </div>
 
-          <span style={{
-            fontSize: 12,
-            color: 'rgba(255,255,254,0.4)',
+          <div style={{
+            width: 1,
+            height: 18,
+            background: 'rgba(255,255,255,0.1)',
+          }} />
+
+          {/* Tiles remaining with green→red color */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}>
-            Turn {Math.ceil(turnNumber / 2)}
-          </span>
-
-          {/* Remaining counter */}
-          {showRemaining && (
-            <>
-              <div style={{
-                width: 1,
-                height: 14,
-                background: 'rgba(255,255,255,0.12)',
-              }} />
-              <span style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: remaining <= 4
-                  ? '#E05555'
-                  : remaining <= 8
-                    ? '#E8A444'
-                    : 'rgba(255,255,254,0.4)',
-              }}>
-                {remaining} left
-              </span>
-            </>
-          )}
+            <motion.span
+              key={remaining}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 800,
+                fontSize: 16,
+                color: tileColor,
+              }}
+            >
+              {remaining}
+            </motion.span>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              color: 'rgba(255,255,254,0.35)',
+              textTransform: 'uppercase',
+            }}>
+              tiles left
+            </span>
+          </div>
         </div>
-
-        <span style={{
-          fontSize: 13,
-          color: 'rgba(255,255,254,0.6)',
-          fontWeight: 500,
-        }}>
-          {label}
-        </span>
       </motion.div>
     </AnimatePresence>
   );

@@ -47,24 +47,23 @@ export function RiskItPill({ onClick }: { onClick: () => void }) {
       whileHover={{ scale: 1.04, filter: 'brightness(1.12)' }}
       whileTap={{ scale: 0.97 }}
       style={{
-        background: 'linear-gradient(135deg, rgba(224,85,85,0.22), rgba(180,50,50,0.32))',
-        border: '1px solid rgba(224,85,85,0.5)',
+        background: 'linear-gradient(135deg, rgba(232,164,68,0.15), rgba(200,140,50,0.25))',
+        border: '1px solid rgba(232,164,68,0.4)',
         borderRadius: 40, padding: '10px 22px',
         display: 'flex', alignItems: 'center', gap: 8,
         cursor: 'pointer', backdropFilter: 'blur(14px)',
         boxShadow: '0 4px 24px rgba(0,0,0,0.45)', outline: 'none',
-        color: '#FF6B6B', fontFamily: "'Space Grotesk', sans-serif",
+        color: '#E8A444', fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', pointerEvents: 'auto',
       }}
     >
-      <motion.span
-        animate={{ rotate: [0, -10, 10, -5, 0] }}
-        transition={{ repeat: Infinity, duration: 2, repeatDelay: 3 }}
-        style={{ fontSize: 16 }}
-      >
-        🎯
-      </motion.span>
-      📋 BOARD
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+      </svg>
+      BOARD
     </motion.button>
   );
 }
