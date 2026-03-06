@@ -219,7 +219,7 @@ export function ResultScreen() {
             </motion.div>
           )}
 
-          {mode !== 'free' && !isDraw && winner !== myPlayer && !conceded && (
+          {(mode === 'nft' || mode === 'online') && !isDraw && winner !== myPlayer && !conceded && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} style={{ marginBottom: 20 }}>
               <Button
                 variant={conceding ? 'secondary' : 'primary'}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { useGameCharacters, useActivePlayer, useEliminatedIds } from '@/core/store/selectors';
+import { useGameCharacters } from '@/core/store/selectors';
 import { renderPortrait, renderCardBack } from '@/rendering/canvas/PortraitRenderer';
 import { getTileLOD } from '@/core/rules/constants';
 
@@ -69,92 +69,10 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     };
   }, [isMinimal, characters, isLargeBoard]);
 
-  const activePlayer = useActivePlayer();
-  const eliminatedIds = useEliminatedIds(activePlayer);
-  const remainingCount = characters.length - (eliminatedIds?.length || 0);
-
-  // 2. Async: Upgrade to real NFT images with THROTTLING and BATCHED UPDATES
-  // Uses THREE.TextureLoader instead of canvas-based loading to avoid CORS taint issues.
-  // The external server (v1assets.schizod.io) does NOT return Access-Control-Allow-Origin,
-  // so loading into HTMLImageElement with crossOrigin='anonymous' fails silently.
-  // TextureLoader loads images directly into WebGL textures without canvas manipulation.
-  useEffect(() => {
-    if (lod === 'minimal' || !characters || characters.length === 0) return;
-
-    let cancelled = false;
-    const loader = new THREE.TextureLoader();
-    const BATCH_SIZE = 12;
-    const DELAY = 150;
-
-    const loadBatches = async () => {
-      for (let i = 0; i < characters.length; i += BATCH_SIZE) {
-        if (cancelled) break;
-        const batch = characters.slice(i, i + BATCH_SIZE);
-        const newTextures = new Map<string, THREE.Texture>();
-
-        await Promise.all(
-          batch.map(async (char) => {
-            let imageUrl = char.imageUrl;
-            if (!imageUrl) return;
-
-            // Handle IPFS URLs
-            if (imageUrl.startsWith('ipfs://')) {
-              imageUrl = imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
-            }
-
-            try {
-              const texture = await new Promise<THREE.Texture>((resolve, reject) => {
-                loader.crossOrigin = 'anonymous'; // CRITICAL: Required for cross-domain WebGL textures
-                loader.load(
-                  imageUrl,
-                  (tex) => {
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    tex.needsUpdate = true;
-                    resolve(tex);
-                  },
-                  undefined,
-                  (err) => {
-                    console.warn(`[char-textures] Failed to load ${char.name}:`, err);
-                    reject(err);
-                  }
-                );
-              });
-
-              if (cancelled) {
-                texture.dispose();
-                return;
-              }
-
-              newTextures.set(char.id, texture);
-            } catch (err) {
-              // Fail silently — character keeps its procedural placeholder
-            }
-          })
-        );
-
-        if (cancelled) break;
-
-        // Single atomic state update per batch
-        if (newTextures.size > 0) {
-          setTextures((prev) => {
-            const next = new Map(prev);
-            for (const [id, tex] of newTextures) {
-              next.set(id, tex);
-            }
-            return next;
-          });
-        }
-
-        await new Promise(r => setTimeout(r, DELAY));
-      }
-    };
-
-    loadBatches();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [characters, lod, isLargeBoard]);
+  // NOTE: Real NFT images cannot be loaded into WebGL textures because
+  // the external asset server (v1assets.schizod.io) does not send CORS headers.
+  // Three.js TextureLoader requires CORS to upload cross-origin images to the GPU.
+  // The Board panel (GuessPanel) shows real NFT art via standard <img> tags instead.
 
   return textures;
 }
