@@ -17,7 +17,17 @@ export function ResultScreen() {
   const mode = useGameMode();
   const gameSessionId = useGameSessionId();
 
-  useEffect(() => { sfx.win(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Identify local player (must be before isMyWin)
+  const playerNum = useOnlinePlayerNum();
+  const myPlayer = mode === 'online' ? (playerNum === 2 ? 'player2' : 'player1') : 'player1';
+
+  const isDraw = winner === null;
+  const isMyWin = !isDraw && winner === myPlayer;
+
+  useEffect(() => {
+    if (isDraw || isMyWin) sfx.win();
+    else sfx.lose();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { resetGame } = useGameActions();
   const p1State = usePlayerState('player1');
@@ -31,10 +41,6 @@ export function ResultScreen() {
 
   const [conceding, setConceding] = useState(false);
   const [conceded, setConceded] = useState(false);
-
-  // Identify local player
-  const playerNum = useOnlinePlayerNum();
-  const myPlayer = mode === 'online' ? (playerNum === 2 ? 'player2' : 'player1') : 'player1';
 
   useEffect(() => {
     if (mode !== 'nft') return;
@@ -51,9 +57,6 @@ export function ResultScreen() {
   // Only render in final phases
   const isFinalPhase = phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER;
   if (!isFinalPhase) return null;
-
-  // winner === null in a final phase means DRAW
-  const isDraw = winner === null;
 
   const winnerLabel = isDraw ? null : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
   const winnerColor = isDraw
@@ -84,17 +87,18 @@ export function ResultScreen() {
     >
       <Card style={{ textAlign: 'center', maxWidth: 480, position: 'relative', overflow: 'hidden' }}>
         {/* Floating confetti */}
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 30 }).map((_, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 0, x: (Math.random() - 0.5) * 200 }}
-            animate={{ opacity: [0, 1, 0], y: [0, -120 - Math.random() * 200], x: (Math.random() - 0.5) * 400 }}
-            transition={{ duration: 2 + Math.random(), delay: Math.random() * 0.5, repeat: Infinity, repeatDelay: Math.random() * 2 }}
+            animate={{ opacity: [0, 1, 0], y: [0, -140 - Math.random() * 250], x: (Math.random() - 0.5) * 400, rotate: Math.random() * 720 }}
+            transition={{ duration: 2.5 + Math.random(), delay: Math.random() * 0.6, repeat: Infinity, repeatDelay: Math.random() * 2 }}
             style={{
               position: 'absolute',
-              width: 6, height: 6,
-              borderRadius: '50%',
-              background: ['#E8A444', '#44A8E8', '#4CAF50', '#E05555', '#9C27B0'][i % 5],
+              width: Math.random() > 0.5 ? 8 : 5,
+              height: Math.random() > 0.5 ? 8 : 5,
+              borderRadius: Math.random() > 0.5 ? '50%' : 2,
+              background: ['#E8A444', '#44A8E8', '#4CAF50', '#E05555', '#9C27B0', '#FF6B6B', '#FACC15'][i % 7],
               left: '50%', bottom: '50%',
               pointerEvents: 'none',
             }}
@@ -155,14 +159,15 @@ export function ResultScreen() {
                 {/* Portrait thumbnail */}
                 {previews.get(secret.id) && (
                   <div style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 12,
+                    width: 120,
+                    height: 120,
+                    borderRadius: 14,
                     overflow: 'hidden',
-                    border: `2px solid ${color}60`,
-                    marginBottom: 8,
+                    border: `3px solid ${color}80`,
+                    marginBottom: 10,
                     marginLeft: 'auto',
                     marginRight: 'auto',
+                    boxShadow: `0 4px 24px ${color}30`,
                   }}>
                     <img
                       src={previews.get(secret.id)}

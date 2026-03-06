@@ -3,7 +3,7 @@
  * All sounds are procedurally generated. No files needed.
  */
 
-type SFXName = 'click' | 'question' | 'answerYes' | 'answerNo' | 'tileFlip' | 'tilesCascade' | 'riskIt' | 'win' | 'wrongGuess';
+type SFXName = 'click' | 'question' | 'answerYes' | 'answerNo' | 'tileFlip' | 'tilesCascade' | 'riskIt' | 'win' | 'lose' | 'wrongGuess' | 'heartbeat';
 
 class SFXEngine {
   private ctx: AudioContext | null = null;
@@ -177,6 +177,19 @@ class SFXEngine {
     // Womp womp descending
     this.playTone({ frequency: 400, type: 'sawtooth', duration: 0.35, volume: 0.3, freqEnd: 200 });
     this.playTone({ frequency: 300, type: 'sawtooth', duration: 0.4, volume: 0.25, freqEnd: 150, delay: 0.3 });
+  }
+
+  heartbeat() {
+    // Lub-dub — two quick low thumps like a real heartbeat
+    this.playTone({ frequency: 60, type: 'sine', duration: 0.12, volume: 0.2, freqEnd: 30, attack: 0.005, decay: 0.1 });
+    this.playTone({ frequency: 50, type: 'sine', duration: 0.1, volume: 0.15, freqEnd: 25, attack: 0.005, decay: 0.08, delay: 0.15 });
+  }
+
+  lose() {
+    // Sad descending — game over feeling
+    this.playTone({ frequency: 440, type: 'triangle', duration: 0.4, volume: 0.3, freqEnd: 220 });
+    this.playTone({ frequency: 330, type: 'triangle', duration: 0.5, volume: 0.25, freqEnd: 165, delay: 0.35 });
+    this.playTone({ frequency: 220, type: 'sine', duration: 0.6, volume: 0.2, freqEnd: 110, delay: 0.75 });
   }
 
   play(name: SFXName) {

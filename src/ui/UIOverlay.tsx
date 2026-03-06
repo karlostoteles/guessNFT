@@ -21,6 +21,7 @@ import { HomeButton } from './widgets/HomeButton';
 import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
 import { OpponentCounter } from './widgets/OpponentCounter';
 import { ConfirmedTraits } from './widgets/ConfirmedTraits';
+import { EndGameVignette } from './widgets/EndGameVignette';
 import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
 import { useNFTTraitLoader } from '@/shared/hooks/useNFTTraitLoader';
 
@@ -38,7 +39,9 @@ export function UIOverlay() {
       inset: 0,
       pointerEvents: 'none',
       zIndex: 10,
+      touchAction: 'manipulation',
     }}>
+      <EndGameVignette />
       <TurnIndicator />
 
       {/* Wallet connection status — always visible */}
