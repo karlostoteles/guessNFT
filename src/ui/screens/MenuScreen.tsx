@@ -400,7 +400,7 @@ function PlayFreeTile({ onClick }: { onClick: () => void }) {
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(124,58,237,0.38), transparent)', flexShrink: 0 }} />
       <div style={{ padding: '11px 13px 13px', textAlign: 'left', fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFE', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
-          Play for Free
+          Practice
         </div>
         <div style={{ fontSize: 10, color: 'rgba(167,139,250,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
           vs AI
@@ -440,7 +440,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
       }}
     >
       <div style={{ width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column' }}>
-        <SubHeader onBack={onBack} title="Play for Free" />
+        <SubHeader onBack={onBack} title="Practice" />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* CT Version */}
@@ -535,6 +535,39 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             tag="SOON"
             disabled
           />
+          {/* Ducks — soon */}
+          <OptionCard
+            onClick={() => { }}
+            accent="#FBBF24"
+            accentRgb="251,191,36"
+            icon="🦆"
+            title="Starknet Ducks"
+            subtitle="The quackiest collection descends on the board"
+            tag="SOON"
+            disabled
+          />
+          {/* Blobert — soon */}
+          <OptionCard
+            onClick={() => { }}
+            accent="#A78BFA"
+            accentRgb="167,139,250"
+            icon="🧙‍♂️"
+            title="Blobert"
+            subtitle="A magical assembly of highly intelligent blobs"
+            tag="SOON"
+            disabled
+          />
+          {/* SchizoSol — soon */}
+          <OptionCard
+            onClick={() => { }}
+            accent="#14F195"
+            accentRgb="20,241,149"
+            icon="☀️"
+            title="SchizoSol"
+            subtitle="The Solana integration expands the madness"
+            tag="SOON"
+            disabled
+          />
         </div>
       </div>
     </motion.div>
@@ -562,9 +595,9 @@ function OptionCard({ onClick, accent, accentRgb, icon, title, subtitle, tag, di
       whileTap={disabled ? {} : { scale: 0.98 }}
       style={{
         background: disabled
-          ? 'rgba(255,255,255,0.02)'
-          : `rgba(${accentRgb},0.07)`,
-        border: `1.5px solid ${disabled ? 'rgba(255,255,255,0.06)' : `rgba(${accentRgb},0.3)`}`,
+          ? 'rgba(255,255,255,0.04)'
+          : `rgba(${accentRgb},0.15)`,
+        border: `1.5px solid ${disabled ? 'rgba(255,255,255,0.1)' : `rgba(${accentRgb},0.4)`}`,
         borderRadius: 14, padding: '16px 18px',
         cursor: disabled ? 'not-allowed' : 'pointer',
         outline: 'none', textAlign: 'left', width: '100%',
@@ -577,8 +610,8 @@ function OptionCard({ onClick, accent, accentRgb, icon, title, subtitle, tag, di
       {/* Icon */}
       <div style={{
         width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-        background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${accentRgb},0.15)`,
-        border: `1px solid ${disabled ? 'rgba(255,255,255,0.08)' : `rgba(${accentRgb},0.25)`}`,
+        background: disabled ? 'rgba(255,255,255,0.06)' : `rgba(${accentRgb},0.2)`,
+        border: `1px solid ${disabled ? 'rgba(255,255,255,0.1)' : `rgba(${accentRgb},0.35)`}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22,
       }}>
