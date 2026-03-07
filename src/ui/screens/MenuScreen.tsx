@@ -201,6 +201,7 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
         position: 'fixed', inset: 0,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
+        paddingBottom: '10vh', // shifts the entire block slightly upwards
         background: 'radial-gradient(ellipse at center, rgba(15,14,23,0.6) 0%, rgba(15,14,23,0.95) 70%)',
         overflow: 'hidden',
       }}
@@ -271,10 +272,10 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
         animate={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
         transition={{ delay: 0.15, type: 'spring', stiffness: 120, damping: 12, mass: 0.8 }}
         style={{
-          width: 'clamp(240px, 60vw, 480px)',
+          width: 'clamp(180px, 45vw, 360px)',
           height: 'auto',
           filter: 'drop-shadow(0 0 50px rgba(124,58,237,0.5))',
-          marginBottom: -16, // Strongly reduced spacing between logo and subtitle
+          marginBottom: -32, // Aggressively reduced spacing between logo and subtitle
           position: 'relative',
           zIndex: 2,
         }}
