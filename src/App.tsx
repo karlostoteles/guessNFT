@@ -21,6 +21,8 @@ export default function App() {
     <div style={{ width: '100vw', height: '100vh', position: 'relative', isolation: 'isolate' }}>
       <Canvas
         shadows
+        gl={{ powerPreference: 'high-performance', antialias: false, logarithmicDepthBuffer: true }}
+        dpr={[1, 1.5]}
         camera={{ fov: 45, near: 0.1, far: 100, position: [0, 12, 14] }}
         style={{ background: '#0f0e17', position: 'relative', zIndex: 0 }}
       >

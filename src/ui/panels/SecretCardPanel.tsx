@@ -63,7 +63,7 @@ export function SecretCardPanel() {
   const tokenId = (myChar as any).tokenId ?? (secretId?.startsWith('nft_') ? secretId.replace('nft_', '') : undefined);
   const imageUrl = (myChar as any).imageUrl ?? (tokenId ? `/api/nft-art/${tokenId}` : undefined);
 
-  const SIZE = isMobile ? 80 : 120;
+  const SIZE = isMobile ? 120 : 180;
 
   return (
     <AnimatePresence>
@@ -109,9 +109,9 @@ export function SecretCardPanel() {
                 )}
                 <div style={{
                   position: 'absolute', top: 4, right: 4,
-                  background: 'rgba(232,164,68,0.9)', borderRadius: 4,
-                  padding: isMobile ? '1px 4px' : '2px 6px',
-                  fontSize: isMobile ? 7 : 8, fontWeight: 700, color: '#0F0E17',
+                  background: 'rgba(232,164,68,0.9)', borderRadius: 6,
+                  padding: isMobile ? '2px 6px' : '4px 8px',
+                  fontSize: isMobile ? 10 : 12, fontWeight: 800, color: '#0F0E17',
                   fontFamily: "'Space Grotesk', sans-serif",
                 }}>
                   YOU
@@ -119,8 +119,8 @@ export function SecretCardPanel() {
               </div>
             </div>
             <div style={{
-              marginTop: 3, textAlign: 'center',
-              fontSize: isMobile ? 7 : 8, fontWeight: 700,
+              marginTop: 6, textAlign: 'center',
+              fontSize: isMobile ? 10 : 12, fontWeight: 800,
               color: 'rgba(232,164,68,0.4)',
               fontFamily: "'Space Grotesk', sans-serif",
               letterSpacing: '0.04em',
@@ -146,22 +146,22 @@ export function SecretCardPanel() {
               overflowY: 'auto',
             }}>
               <div style={{
-                fontSize: isMobile ? 6 : 7, fontWeight: 700,
+                fontSize: isMobile ? 10 : 12, fontWeight: 800,
                 letterSpacing: '0.08em', color: 'rgba(224,85,85,0.7)',
                 textTransform: 'uppercase', textAlign: 'center',
-                marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif",
+                marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif",
               }}>
                 🕵️ They Know
               </div>
               {opponentTraits.length === 0 ? (
-                <div style={{ fontSize: isMobile ? 7 : 8, color: 'rgba(255,255,254,0.25)', textAlign: 'center', padding: '8px 0', fontStyle: 'italic' }}>
+                <div style={{ fontSize: isMobile ? 10 : 12, color: 'rgba(255,255,254,0.25)', textAlign: 'center', padding: '16px 0', fontStyle: 'italic' }}>
                   Nothing yet
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {opponentTraits.map((t, i) => (
                     <div key={i} style={{
-                      fontSize: isMobile ? 6 : 7, padding: '2px 3px', borderRadius: 4,
+                      fontSize: isMobile ? 10 : 12, padding: '4px 6px', borderRadius: 4,
                       background: t.answer ? 'rgba(224,85,85,0.12)' : 'rgba(255,255,255,0.03)',
                       color: t.answer ? '#FF6B6B' : 'rgba(255,255,254,0.25)',
                       fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
@@ -175,8 +175,8 @@ export function SecretCardPanel() {
               )}
             </div>
             <div style={{
-              marginTop: 3, textAlign: 'center',
-              fontSize: isMobile ? 7 : 8, fontWeight: 700,
+              marginTop: 6, textAlign: 'center',
+              fontSize: isMobile ? 10 : 12, fontWeight: 800,
               color: 'rgba(224,85,85,0.4)',
               fontFamily: "'Space Grotesk', sans-serif",
             }}>
@@ -185,6 +185,6 @@ export function SecretCardPanel() {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence >
   );
 }

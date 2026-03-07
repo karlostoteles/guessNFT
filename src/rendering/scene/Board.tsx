@@ -102,19 +102,13 @@ export function Board({ width = BOARD.width, depth = BOARD.depth }: BoardProps) 
 
   return (
     <group>
-      {/* Outermost frame — deep ebony base */}
-      <mesh position={[0, -0.15, 0]} receiveShadow>
-        <boxGeometry args={[w + 0.75, BOARD.height + 0.26, d + 0.75]} />
-        <meshStandardMaterial color="#0c0603" roughness={0.62} metalness={0.12} />
-      </mesh>
-
-      {/* Inner frame — mahogany with subtle sheen */}
+      {/* Outer frame — modern black sleek edge */}
       <mesh position={[0, -0.06, 0]} receiveShadow>
-        <boxGeometry args={[w + 0.32, BOARD.height + 0.14, d + 0.32]} />
-        <meshStandardMaterial color="#1c0c05" roughness={0.68} metalness={0.08} />
+        <boxGeometry args={[w + 0.32, BOARD.height + 0.12, d + 0.32]} />
+        <meshStandardMaterial color="#0c0603" roughness={0.72} metalness={0.05} />
       </mesh>
 
-      {/* Main board body */}
+      {/* Main inner board body */}
       <mesh position={[0, 0, 0]} receiveShadow>
         <boxGeometry args={[w, BOARD.height, d]} />
         <meshStandardMaterial color={BOARD.color} roughness={0.82} />

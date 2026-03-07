@@ -46,7 +46,7 @@ export function ConfirmedTraits() {
 
     if (!GAMEPLAY_PHASES.has(phase)) return null;
 
-    const SIZE = isMobile ? 80 : 120;
+    const SIZE = isMobile ? 120 : 180;
 
     return (
         <AnimatePresence>
@@ -77,8 +77,8 @@ export function ConfirmedTraits() {
                 }}>
                     {/* Header */}
                     <div style={{
-                        fontSize: isMobile ? 6 : 7,
-                        fontWeight: 700,
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: 800,
                         letterSpacing: '0.08em',
                         color: '#4ADE80',
                         textTransform: 'uppercase',
@@ -92,7 +92,7 @@ export function ConfirmedTraits() {
                     }}>
                         ✅ I Know
                         <span style={{
-                            fontSize: isMobile ? 7 : 8,
+                            fontSize: isMobile ? 11 : 13,
                             background: 'rgba(74,222,128,0.2)',
                             borderRadius: 4,
                             padding: '0 3px',
@@ -108,8 +108,8 @@ export function ConfirmedTraits() {
                             <div
                                 key={trait.id}
                                 style={{
-                                    fontSize: isMobile ? 6 : 7,
-                                    padding: '2px 3px',
+                                    fontSize: isMobile ? 10 : 11,
+                                    padding: '4px 6px',
                                     borderRadius: 4,
                                     background: 'rgba(74,222,128,0.08)',
                                     color: 'rgba(255,255,254,0.6)',
@@ -121,7 +121,7 @@ export function ConfirmedTraits() {
                                     whiteSpace: 'nowrap',
                                 }}
                             >
-                                <span style={{ color: '#4ADE80', fontSize: isMobile ? 6 : 7 }}>✓</span>{' '}
+                                <span style={{ color: '#4ADE80', fontSize: isMobile ? 10 : 12 }}>✓</span>{' '}
                                 {stripPrefix(trait.text)}
                             </div>
                         ))}
@@ -130,10 +130,10 @@ export function ConfirmedTraits() {
 
                 {/* Label below */}
                 <div style={{
-                    marginTop: 3,
+                    marginTop: 6,
                     textAlign: 'center',
-                    fontSize: isMobile ? 7 : 8,
-                    fontWeight: 700,
+                    fontSize: isMobile ? 10 : 12,
+                    fontWeight: 800,
                     color: 'rgba(74,222,128,0.4)',
                     fontFamily: "'Space Grotesk', sans-serif",
                     letterSpacing: '0.04em',
