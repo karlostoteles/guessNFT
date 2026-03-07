@@ -9,8 +9,9 @@ import { generateAllCollectionCharacters } from '@/services/starknet/collectionS
 import { useWalletStore, useWalletStatus, useWalletAddress } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet/hooks';
 import { WalletButton } from '../widgets/WalletButton';
+import { LeaderboardScreen } from './LeaderboardScreen';
 
-type View = 'menu' | 'free-pick' | 'real-pick' | 'online';
+type View = 'menu' | 'free-pick' | 'real-pick' | 'online' | 'leaderboard';
 
 export function MenuScreen() {
   const [view, setView] = useState<View>('menu');
@@ -102,6 +103,7 @@ export function MenuScreen() {
             key="menu"
             onFreePlay={() => setView('free-pick')}
             onPlayOnline={() => setView('real-pick')}
+            onLeaderboard={() => setView('leaderboard')}
           />
         )}
         {view === 'free-pick' && (
@@ -125,6 +127,12 @@ export function MenuScreen() {
           <OnlineLobbyScreen
             key="online"
             onBack={() => setView('real-pick')}
+          />
+        )}
+        {view === 'leaderboard' && (
+          <LeaderboardScreen
+            key="leaderboard"
+            onBack={() => setView('menu')}
           />
         )}
       </AnimatePresence>
@@ -174,9 +182,10 @@ function SubHeader({ onBack, title }: { onBack: () => void; title: string }) {
 interface MenuMainProps {
   onFreePlay: () => void;
   onPlayOnline: () => void;
+  onLeaderboard: () => void;
 }
 
-function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
+function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
   const { t, i18n } = useTranslation();
 
   const toggleLang = () => {
@@ -196,20 +205,36 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
         overflow: 'hidden',
       }}
     >
-      {/* ─── Language Toggle ─── */}
-      <motion.button
-        onClick={toggleLang}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        style={{
-          position: 'absolute', top: 20, right: 20, zIndex: 10,
-          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-          borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700,
-          color: '#FFFFFE', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
-        }}
-      >
-        {i18n.language.startsWith('es') ? '🇪🇸 ES' : '🇬🇧 EN'}
-      </motion.button>
+      {/* ─── Top Right Controls ─── */}
+      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10, display: 'flex', gap: 10 }}>
+        {/* Leaderboard Button */}
+        <motion.button
+          onClick={onLeaderboard}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            background: 'rgba(232,164,68,0.15)', border: '1px solid rgba(232,164,68,0.3)',
+            borderRadius: 8, padding: '6px 10px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#E8A444', cursor: 'pointer', outline: 'none',
+          }}
+        >
+          🏆
+        </motion.button>
+        {/* Language Toggle */}
+        <motion.button
+          onClick={toggleLang}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700,
+            color: '#FFFFFE', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+            outline: 'none',
+          }}
+        >
+          {i18n.language.startsWith('es') ? '🇪🇸 ES' : '🇬🇧 EN'}
+        </motion.button>
+      </div>
 
       {/* ─── Animated floating particles (background decoration) ─── */}
       {[...Array(6)].map((_, i) => (
