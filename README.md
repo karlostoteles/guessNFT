@@ -1,255 +1,282 @@
-# WhoisWho — SCHIZODIO Premiere
+# WhoisWho
 
-> The classic family guessing game, rebuilt for crypto. Play with your SCHIZODIO NFTs on Starknet.
+**The classic guessing game, rebuilt with Zero-Knowledge Proofs on Starknet.**
 
-![WhoisWho](https://img.shields.io/badge/Starknet-Mainnet-7C3AED?style=flat-square) ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square) ![Three.js](https://img.shields.io/badge/Three.js-3D-black?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+Pick an NFT. Ask questions. Never reveal your choice — until you win.
 
----
-
-## What is this?
-
-WhoisWho is a **1v1 deduction game** where players secretly pick a character, then take turns asking yes/no questions about the opponent's pick. First to correctly guess wins.
-
-This version is built for the **SCHIZODIO NFT collection** on Starknet — holders can play using their actual NFTs as characters, with cryptographic commit-reveal ensuring neither player can cheat by changing their character mid-game.
+[![Starknet](https://img.shields.io/badge/Starknet-7C3AED?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMkwyIDE4aDE2TDEwIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==&logoColor=white)](https://starknet.io)
+[![Noir](https://img.shields.io/badge/Noir_ZK-1.0.0--beta.16-black?style=flat-square)](https://noir-lang.org)
+[![Dojo](https://img.shields.io/badge/Dojo-1.8.0-orange?style=flat-square)](https://dojoengine.org)
+[![Garaga](https://img.shields.io/badge/Garaga-1.0.1-blue?style=flat-square)](https://github.com/keep-starknet-strange/garaga)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 ---
 
-## Game Modes
+## The Problem
 
-### Play Free (vs CPU)
-No wallet required. Play against an AI opponent using 24 crypto meme characters (Vitalik, Satoshi, CZ, SBF, Do Kwon, and 19 others). The CPU uses a binary-search strategy — it picks questions that split the remaining characters closest to 50/50.
+In the classic "Guess Who?" board game, players trust each other to answer honestly. Online, that trust doesn't exist. A player could lie about their character's traits, or secretly switch characters mid-game.
 
-### Play for Real (NFT mode)
-Connect your Starknet wallet via [Cartridge Controller](https://cartridge.gg). If you hold SCHIZODIO NFTs, they populate the board as your characters. Your NFT's on-chain traits drive the questions — hair color, eyes, skin tone, accessories, etc.
+## The Solution
+
+WhoisWho uses **Zero-Knowledge Proofs** to make cheating cryptographically impossible:
+
+1. **Commit** — Each player picks a character and commits a hash on-chain. They can't change it later.
+2. **Play** — When asked "Does your character have green eyes?", the answering player generates a ZK proof that says *"the answer is YES, and here's a proof that I'm not lying — but I'm not telling you which character I picked."*
+3. **Verify** — The Starknet contract verifies the proof on-chain. The answer is trustworthy without revealing the character.
+4. **Reveal** — At game end, both players reveal their picks. The contract verifies the reveals match the original commits.
+
+No player can cheat. No server is trusted. The blockchain is the referee.
+
+---
+
+## How It Works
+
+```
+  Player's Browser                    Starknet
+  ─────────────────                   ────────
+
+  "Does your character
+   have a Fedora Hat?"
+        │
+        ▼
+  Load character bitmap               ask_question(game_id, 263)
+  + Merkle proof from                       │
+  schizodio.json                            ▼
+        │                             Game.awaiting_answer = true
+        ▼
+  ┌─ Web Worker ───────┐
+  │ 1. Noir witness    │
+  │ 2. UltraHonk proof │
+  │ 3. Garaga calldata │
+  └────────┬───────────┘
+           │
+           ▼
+  Submit proof tx ──────────────▶ answer_question_with_proof()
+                                       │
+                                  Garaga verifier ✓
+                                       │
+                                  answer = NO
+                                  Turn flips
+```
+
+### The ZK Circuit Proves Three Things
+
+1. **You committed to this character** — your commitment hash matches
+2. **This character exists** — it's in the official Merkle tree of 999 NFTs
+3. **The answer is correct** — the trait bitmap says what you claim
+
+All without revealing *which* character you picked.
 
 ---
 
 ## Architecture
 
 ```
-src/
-├── ai/               CPU opponent (binary search strategy)
-├── audio/            Web Audio API SFX engine (zero dependencies)
-├── canvas/           Procedural portrait renderer (Canvas 2D)
-├── data/             Character definitions, traits, questions, NFT adapter
-├── hooks/            useCPUPlayer, useCharacterPreviews
-├── scene/            Three.js / React Three Fiber 3D board
-├── starknet/
-│   ├── config.ts       Contract addresses, RPC URL, chain ID
-│   ├── sdk.ts          Cartridge Controller wallet connection
-│   ├── hooks.ts        useWalletConnection React hook
-│   ├── walletStore.ts  Zustand wallet state
-│   ├── nftService.ts   ERC-721 ownership + metadata fetching
-│   ├── commitReveal.ts Commit-reveal scheme (Phase 1 local, Phase 2 on-chain stubs)
-│   └── types.ts        Shared types (NFT, wallet state)
-├── store/            Zustand + Immer game state machine
-└── ui/               All React components (Framer Motion animations)
+packages/
+  circuits/    Noir ZK circuit (answer correctness proof)
+  contracts/   Dojo Cairo smart contracts (game state machine)
+  verifier/    Garaga-generated on-chain proof verifier
+
+scripts/       Data pipeline (Merkle tree, bitmaps, deployment)
+src/           React frontend (Three.js 3D board, Web Worker prover)
 ```
 
-### Game Phase State Machine
+### Stack
+
+| Layer | Tech | What it does |
+|-------|------|-------------|
+| **ZK Circuit** | [Noir](https://noir-lang.org) 1.0.0-beta.16 | Defines what the proof proves |
+| **Proof System** | [Barretenberg](https://github.com/AztecProtocol/barretenberg) (UltraHonk) | Generates the proof in-browser via WASM |
+| **Verifier** | [Garaga](https://github.com/keep-starknet-strange/garaga) 1.0.1 | Verifies proofs on-chain in Cairo |
+| **Contracts** | [Dojo](https://dojoengine.org) 1.8.0 (Cairo 2.13.1) | Game logic, commit-reveal, state machine |
+| **Hash** | Poseidon2 (BN254) | Same hash in Noir, JavaScript, and Cairo |
+| **Frontend** | React 19 + Three.js + Zustand | 3D board, wallet integration, proof UX |
+| **Wallet** | [Cartridge Controller](https://cartridge.gg) | Account abstraction + session keys |
+| **Indexer** | [Torii](https://dojoengine.org) (WASM client) | Real-time game state sync |
+
+### Game Phases
 
 ```
-MENU → SETUP_P1 → [HANDOFF_P1_TO_P2 → SETUP_P2] → HANDOFF_START
-     → QUESTION_SELECT → HANDOFF_TO_OPPONENT → ANSWER_PENDING
-     → ANSWER_REVEALED → AUTO_ELIMINATING → TURN_TRANSITION → (repeat)
-     → GUESS_SELECT → GUESS_WRONG (lose turn) | GUESS_RESULT → GAME_OVER
+WAITING  →  COMMIT  →  PLAYING  →  REVEAL  →  COMPLETED
+  P2 joins    Both       Q&A loop     Both       Winner
+              commit     with ZK      reveal     declared
+              chars      proofs       chars
 ```
-
-In free mode (vs CPU), handoff phases are skipped/auto-advanced. The CPU acts during `QUESTION_SELECT` using `useCPUPlayer` hook.
-
-### Commit-Reveal (Anti-Cheat)
-
-When playing in NFT mode, both players commit to their chosen character before the game starts:
-
-```
-commitment = pedersen_hash(character_id_felt, random_salt)
-```
-
-- **Phase 1 (current):** commitments stored in `localStorage`. At game end, both commitments are verified — a ✅ badge confirms fair play.
-- **Phase 2 (pending contract):** commitments submitted on-chain. The Cairo contract verifies reveals and determines the winner trustlessly.
-
-The Pedersen hash used is compatible with Cairo's native hash, so Phase 1 commitments are contract-ready.
 
 ---
 
-## Tech Stack
+## Game Modes
 
-| Layer | Technology |
-|---|---|
-| Framework | React 18 + TypeScript + Vite |
-| 3D Board | Three.js + @react-three/fiber |
-| Animations | Framer Motion |
-| State | Zustand + Immer |
-| Wallet | Cartridge Controller (@cartridge/controller) |
-| Chain | Starknet Mainnet |
-| Starknet SDK | starknet.js v9 + starkzap |
-| Portraits | Canvas 2D API (procedural, no images) |
-| SFX | Web Audio API (no dependencies) |
-| Deployment | Netlify / Vercel (config included) |
+### Free Mode (vs CPU)
+No wallet needed. Play against a binary-search AI using 24 meme characters.
+
+### Online Mode (NFT)
+Connect your Starknet wallet. If you hold [SCHIZODIO](https://unframed.co/collection/0x077485a949c130cf0d98819d2b0749f5860b0734ea28cb678dd3f39379131bfa) NFTs, the board populates with your actual NFTs. 418 yes/no questions derived from 14 trait categories (Background, Body, Clothing, Eyes, Hair, Headwear, Weapons, etc.).
 
 ---
 
-## Getting Started
+## Quick Start
+
+### Prerequisites
+
+- Node.js 20+
+- [Noir](https://noir-lang.org/docs/getting_started/installation/) 1.0.0-beta.16 (`nargo`)
+- [Barretenberg](https://github.com/AztecProtocol/barretenberg) 3.0.0-nightly (`bb`)
+- [Scarb](https://docs.swmansion.com/scarb/) 2.13.1 / 2.14.0
+- [Dojo](https://dojoengine.org) 1.8.0 (`sozo`, `katana`, `torii`)
+- [Garaga](https://github.com/keep-starknet-strange/garaga) 1.0.1 (`pip install garaga`)
+
+### Install & Run
 
 ```bash
+# Install frontend dependencies
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # production build → dist/
+
+# Start local Starknet node
+katana --dev --dev.no-fee
+
+# Deploy contracts (verifier + game logic)
+bash scripts/deploy-local.sh
+
+# Start Torii indexer
+torii --world <WORLD_ADDRESS> --rpc http://localhost:5050
+
+# Start frontend dev server
+npm run dev
 ```
 
----
-
-## Deployment
-
-### Netlify (recommended)
-Connect this repo in the Netlify dashboard — `netlify.toml` handles everything.
-
-### Vercel
-Connect this repo in Vercel — `vercel.json` handles SPA routing and caching.
-
-### Manual
-```bash
-npm run build
-# Deploy the dist/ folder to any static host
-```
-
----
-
-## Configuration
-
-`src/starknet/config.ts`:
-
-```ts
-export const SCHIZODIO_CONTRACT = '0x077485a949c130...'; // ERC-721 contract
-export const RPC_URL = 'https://api.cartridge.gg/x/starknet/mainnet';
-export const SN_MAIN_CHAIN_ID = '0x534e5f4d41494e'; // Cartridge uses SN_MAIN not SN_MAINNET
-export const GAME_CONTRACT = '0x0'; // TODO: deploy WhoisWho Cairo contract and set here
-```
-
----
-
-## Roadmap — What's Missing Until Full Vision
-
-### ✅ Done (v0.2)
-- [x] 3D board with procedurally generated character portraits
-- [x] Local 2-player pass-and-play mode
-- [x] vs CPU mode with binary-search AI strategy
-- [x] SCHIZODIO NFT integration — fetches owned NFTs, maps traits to game characters
-- [x] Cartridge Controller login (chain ID bug fixed — was `SN_MAINNET`, needs `SN_MAIN`)
-- [x] Auto-elimination after each answer
-- [x] Risk It button (guess before turn ends, lose turn if wrong)
-- [x] Wrong-guess penalty (costs a turn, not the game)
-- [x] SFX engine (Web Audio API, zero deps)
-- [x] CPU thinking indicator + auto-advance for CPU turns
-- [x] Asked-question tracking (grayed out with ✓ badge)
-- [x] Commit-reveal Phase 1 (local Pedersen hash commitments, verified at game end)
-- [x] Netlify + Vercel deployment config
-
----
-
-### 🔴 Critical — Needed for Real Play
-
-#### 1. Cairo Game Contract (Phase 2 commit-reveal)
-The biggest missing piece. For truly trustless 1v1 play, we need an on-chain contract.
-
-**What the contract needs to do:**
-```cairo
-// Players commit before seeing opponent's choice
-fn commit_character(game_id: felt252, commitment: felt252)
-
-// Questions submitted as signed transactions (prevents retroactive manipulation)
-fn ask_question(game_id: felt252, question_id: felt252)
-
-// Opponent answers (their answer is verified against their committed character at reveal)
-fn answer_question(game_id: felt252, answer: bool)
-
-// Guess — contract checks if guesser wins
-fn make_guess(game_id: felt252, character_id: felt252)
-
-// Both players reveal their characters — contract verifies pedersen(char, salt) === commitment
-fn reveal_character(game_id: felt252, character_id: felt252, salt: felt252)
-```
-
-**Frontend stubs are in** `src/starknet/commitReveal.ts` — `submitCommitmentOnChain()` and `revealCharacterOnChain()`. Once the contract is deployed, set `GAME_CONTRACT` in `config.ts` and uncomment `SESSION_POLICIES`.
-
-#### 2. Matchmaking / Game Lobby
-Currently there's no way for two players to find each other online. Needs either:
-- A simple backend (Supabase, Firebase) for game room creation + WebSocket signaling
-- Or a fully on-chain lobby where players post game invitations as contract events
-
-#### 3. Online Game Flow (P1/P2 on separate devices)
-The current handoff phases assume one shared device. Online play needs:
-- P1 creates a game → generates a room code / shares a link
-- P2 joins via the link
-- Both connect wallets and commit characters
-- Questions/answers happen as signed Starknet transactions
-- Real-time updates (poll contract events or WebSocket relay)
-
----
-
-### 🟡 Important — Polish & UX
-
-#### 4. SCHIZODIO Trait Verification
-The NFT adapter (`nftCharacterAdapter.ts`) uses guessed trait_type names. After testing with a real SCHIZODIO NFT, check the DEV console logs for `[nftAdapter] Token #X traits: ...` and update the `findAttribute()` calls to match the actual trait names the contract returns.
-
-#### 5. NFT Image Display in Game Board
-NFT mode currently uses procedurally generated portraits even when NFT images are available. In `CharacterSelectScreen.tsx` and the 3D board, NFT characters with a valid `imageUrl` should show their actual NFT image instead of the generated portrait.
-
-#### 6. Portrait Renderer for NFT Characters
-The portrait renderer (`PortraitRenderer.ts`) doesn't yet handle `source: 'nft'` characters — it always generates a procedural face. For NFT mode, it should fall back to fetching the NFT's `imageUrl`.
-
-#### 7. Game History / Replay
-No persistence of game results. Players can't review their game history or share a notable game.
-
-#### 8. Mobile Layout
-The 3D board and panels are desktop-first. The responsive layout needs work for phones — the question panel overlaps the board badly on small screens.
-
----
-
-### 🟢 Nice to Have
-
-#### 9. Leaderboard
-On-chain leaderboard tracking wins/losses per wallet address. Feasible once the game contract is deployed (read contract events).
-
-#### 10. Wager Mode
-Players stake tokens (LORDS, ETH, or a game token) before committing. Contract holds escrow, winner takes all. The commit-reveal contract already lends itself to this — add a `wager` field and an escrow release on `reveal_character`.
-
-#### 11. Spectator Mode
-Allow spectators to watch an ongoing game. Since questions/answers would be on-chain in Phase 2, a read-only spectator view is just a contract event listener.
-
-#### 12. Tournament Mode
-Bracket-based tournaments using Starknet for trustless bracket progression. Multiple games per player, automated elimination.
-
-#### 13. Custom Character Sets
-Allow communities to create their own character sets (any NFT collection, not just SCHIZODIO). The adapter pattern in `nftCharacterAdapter.ts` already supports this — it just needs a collection selector UI.
-
-#### 14. Bundle Size Optimization
-The Three.js chunk is ~1.6MB. Code-split the 3D scene with `React.lazy` + dynamic imports to improve initial load time.
-
----
-
-## Contract Deployment Guide (Phase 2)
-
-Once the Cairo contract is written:
+### Build the Collection Data
 
 ```bash
-# 1. Deploy to Starknet mainnet
-starkli deploy WhoisWho.contract_class.json --account myaccount
+# Generate bitmaps + Merkle tree for all 999 NFTs
+npx tsx scripts/prepare-collection.ts
 
-# 2. Update config.ts
-# GAME_CONTRACT = '0x<deployed_address>'
+# Generate test witness for the Noir circuit
+npx tsx scripts/test-vectors.ts
 
-# 3. Uncomment SESSION_POLICIES in config.ts
-# { target: GAME_CONTRACT, method: 'commit_character' },
-# { target: GAME_CONTRACT, method: 'ask_question' },
-# ...
-
-# 4. Implement submitCommitmentOnChain() and revealCharacterOnChain()
-#    in src/starknet/commitReveal.ts
+# Compile and test the circuit
+cd packages/circuits && nargo test && nargo prove
 ```
+
+### Test Contracts
+
+```bash
+cd packages/contracts
+sozo test              # 32 tests covering full game flow
+```
+
+### Test Verifier Standalone
+
+```bash
+bash scripts/test-verifier-local.sh
+```
+
+---
+
+## Project Structure
+
+### `packages/circuits/` — Noir ZK Circuit
+
+The circuit proves answer correctness without revealing the character. It takes 6 public inputs (game_id, turn_id, player, commitment, question_id, traits_root) and 4 private inputs (character_id, salt, trait_bitmap, merkle_path), and returns a single bit: the answer.
+
+Three constraints:
+1. Commitment binding — `hash4(game_id, player, char_id, salt) == commitment`
+2. Merkle membership — character exists in the official collection
+3. Answer correctness — bit extraction from the trait bitmap
+
+### `packages/contracts/` — Dojo Game Contracts
+
+8 entrypoints managing the full game lifecycle:
+
+| Function | What it does |
+|----------|-------------|
+| `create_game` | Creates a game session, sets Merkle root |
+| `join_game` | Second player joins |
+| `commit_character` | Submit Pedersen + Poseidon2 commitment |
+| `ask_question` | Active player asks a yes/no question |
+| `answer_question_with_proof` | Other player submits ZK proof with answer |
+| `make_guess` | Final character guess |
+| `reveal_character` | Verify commitment, determine winner |
+| `claim_timeout` | Win by opponent inactivity (45s) |
+
+### `packages/verifier/` — Garaga Verifier
+
+Auto-generated Cairo contract that verifies UltraKeccakZKHonk proofs. Generated from the circuit's verification key using `garaga gen`. The Dojo game contract calls this to verify each proof.
+
+### `scripts/` — Data Pipeline
+
+| Script | Purpose |
+|--------|---------|
+| `prepare-collection.ts` | Build `schizodio.json` (bitmaps + Merkle proofs for 999 NFTs) |
+| `merkle.ts` | Poseidon2 Merkle tree implementation (matches Noir exactly) |
+| `question-schema.ts` | Maps 418 trait values to bit positions |
+| `test-vectors.ts` | Generate circuit test witness (`Prover.toml`) |
+| `deploy-local.sh` | Deploy verifier + Dojo world to local Katana |
+| `test-verifier-local.sh` | Smoke-test the deployed verifier |
+
+### `src/` — React Frontend
+
+| Directory | Purpose |
+|-----------|---------|
+| `workers/prover.worker.ts` | Web Worker: Noir → UltraHonk → Garaga calldata |
+| `hooks/useZKAnswer.ts` | Proof generation + on-chain submission |
+| `hooks/useToriiGameSync.ts` | Real-time game state via Torii |
+| `starknet/` | Wallet, config, NFT service, commit-reveal, collection data |
+| `store/` | Zustand game state (27 phases) |
+| `scene/` | Three.js 3D game board |
+| `ui/` | 24 React components |
+
+---
+
+## Client-Side Proof Generation
+
+The browser generates the exact same proof that the on-chain verifier checks. The pipeline runs in a Web Worker to keep the UI responsive:
+
+1. **Noir witness generation** — evaluate the circuit constraints with the player's private inputs
+2. **UltraHonk proof** — generate a cryptographic proof (~5-30s depending on device)
+3. **Garaga calldata** — format the proof for the Starknet verifier contract
+
+The same `@aztec/bb.js` library (Barretenberg WASM) is used in both `scripts/merkle.ts` (offline) and `src/workers/prover.worker.ts` (browser), ensuring identical Poseidon2 hash outputs.
+
+---
+
+## Key Design Decisions
+
+**Poseidon2 over SHA-256** — ~30 Noir gates vs ~30,000. Makes the circuit practical for in-browser proving.
+
+**BN254 values stored as u256** — Poseidon2 BN254 outputs can exceed the Stark field prime (~16%). The contract stores and compares as `u256`, never recomputing hashes on-chain.
+
+**Two commitment hashes** — Pedersen (felt252) for the reveal phase (native Cairo verification), Poseidon2 BN254 (u256) for ZK proofs (circuit compatibility).
+
+**Singleton Web Worker** — WASM init is expensive (~3.5MB). One worker is reused across all proof requests.
+
+**Pre-computed Merkle paths** — The browser doesn't rebuild the tree. `schizodio.json` includes pre-computed paths for all 999 characters.
+
+**Contract-first state** — Starknet is the source of truth. The frontend derives UI state from Torii model subscriptions.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Deep technical documentation (circuit, contracts, verifier, scripts, client proof gen) |
+| [docs/DEV-GUIDE.md](docs/DEV-GUIDE.md) | Developer setup, local deployment, troubleshooting |
+| [docs/CIRCUITO-NOIR-EXPLICADO.md](docs/CIRCUITO-NOIR-EXPLICADO.md) | Circuit explanation (Spanish) |
+
+---
+
+## Built With
+
+- [SCHIZODIO](https://unframed.co/collection/0x077485a949c130cf0d98819d2b0749f5860b0734ea28cb678dd3f39379131bfa) — The NFT collection
+- [Noir](https://noir-lang.org) — ZK circuit language by Aztec
+- [Barretenberg](https://github.com/AztecProtocol/barretenberg) — UltraHonk proof system
+- [Garaga](https://github.com/keep-starknet-strange/garaga) — On-chain proof verification for Starknet
+- [Dojo](https://dojoengine.org) — On-chain game framework
+- [Cartridge](https://cartridge.gg) — Wallet & account abstraction
 
 ---
 
 ## License
 
-MIT — build on it.
+MIT
