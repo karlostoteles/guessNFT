@@ -3,7 +3,17 @@
  * Static import — no dynamic import delay before connect() is called.
  */
 import Controller from '@cartridge/controller';
-import { RPC_URL, SN_MAIN_CHAIN_ID } from './config';
+import { Account, RpcProvider } from 'starknet';
+import type { AccountInterface } from 'starknet';
+import {
+  RPC_URL,
+  SN_MAIN_CHAIN_ID,
+  KATANA_RPC,
+  KATANA_ACCOUNT_1,
+  KATANA_PRIVATE_KEY_1,
+  KATANA_ACCOUNT_2,
+  KATANA_PRIVATE_KEY_2,
+} from './config';
 
 export interface ConnectedWallet {
   address: string;
@@ -50,6 +60,23 @@ export async function connectCartridgeWallet(): Promise<ConnectedWallet> {
       }
     },
   };
+}
+
+/**
+ * Return a Starknet AccountInterface for submitting on-chain transactions.
+ * - DEV (Katana): raw Account with katana0 private key
+ * - PROD: Cartridge Controller's connected account
+ */
+export function getStarknetAccount(playerNum?: 1 | 2): AccountInterface | null {
+  if (import.meta.env.DEV) {
+    const provider = new RpcProvider({ nodeUrl: KATANA_RPC });
+    const address = playerNum === 2 ? KATANA_ACCOUNT_2 : KATANA_ACCOUNT_1;
+    const signer = playerNum === 2 ? KATANA_PRIVATE_KEY_2 : KATANA_PRIVATE_KEY_1;
+    return new Account({ provider, address, signer });
+  }
+  // Cartridge Controller's account — cast to satisfy AccountInterface
+  // (WalletAccount from @cartridge/controller may use a slightly different starknet.js version)
+  return (ctrl?.account as AccountInterface | undefined) ?? null;
 }
 
 export function resetSDK() {

@@ -18,13 +18,13 @@ import { WalletButton } from './WalletButton';
 import { CPUThinkingIndicator } from './CPUThinkingIndicator';
 import { OnlineWaitingScreen } from './OnlineWaitingScreen';
 import { SecretCardPanel } from './SecretCardPanel';
-import { useOnlineGameSync } from '../hooks/useOnlineGameSync';
+import { useToriiGameSync } from '../hooks/useToriiGameSync';
 
 export function UIOverlay() {
   const phase = usePhase();
 
-  // Mount the online sync hook for the lifetime of the overlay
-  useOnlineGameSync();
+  // Mount the Torii sync hook for online game state machine
+  useToriiGameSync();
 
   return (
     <div style={{
@@ -52,8 +52,10 @@ export function UIOverlay() {
           <CharacterSelectScreen key="select" />
         )}
 
-        {/* Online: waiting for opponent to commit character */}
-        {phase === GamePhase.ONLINE_WAITING && <OnlineWaitingScreen key="online-waiting" />}
+        {/* Online: waiting for opponent to commit character / reveal */}
+        {(phase === GamePhase.ONLINE_WAITING || phase === GamePhase.REVEAL_WAITING) && (
+          <OnlineWaitingScreen key="online-waiting" />
+        )}
 
         {(phase === GamePhase.HANDOFF_P1_TO_P2 ||
           phase === GamePhase.HANDOFF_START ||
@@ -64,7 +66,10 @@ export function UIOverlay() {
 
         {phase === GamePhase.QUESTION_SELECT && <QuestionPanel key="question" />}
 
-        {phase === GamePhase.ANSWER_PENDING && <AnswerPanel key="answer" />}
+        {(phase === GamePhase.ANSWER_PENDING ||
+          phase === GamePhase.PROVING ||
+          phase === GamePhase.SUBMITTING ||
+          phase === GamePhase.VERIFIED) && <AnswerPanel key="answer" />}
 
         {phase === GamePhase.ANSWER_REVEALED && <AnswerRevealed key="revealed" />}
 

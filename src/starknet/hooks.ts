@@ -1,10 +1,26 @@
 /**
  * Wallet connection hooks using starkzap + Cartridge Controller.
+ * In DEV mode, connects directly to Katana predeployed accounts.
  */
 import { useCallback } from 'react';
 import { useWalletStore } from './walletStore';
 import { connectCartridgeWallet, resetSDK } from './sdk';
 import { fetchAllOwnedNFTs } from './nftService';
+import { KATANA_ACCOUNT_1, KATANA_ACCOUNT_2 } from './config';
+
+/**
+ * DEV mode: connect directly to a Katana predeployed account.
+ * Skips Cartridge Controller, NFT checks, and all gating.
+ */
+function connectDevAccount(playerNum: 1 | 2) {
+  const state = useWalletStore.getState();
+  const address = playerNum === 1 ? KATANA_ACCOUNT_1 : KATANA_ACCOUNT_2;
+  state.setAddress(address);
+  state.setUsername(`Katana P${playerNum}`);
+  state.setOwnedNFTs([{ tokenId: '1' } as any]); // fake NFT to bypass gate
+  state.setStatus('ready');
+  console.log(`[wallet] DEV connect → P${playerNum} (${address.slice(0, 18)}...)`);
+}
 
 /**
  * Hook for connecting/disconnecting wallet.
@@ -12,9 +28,15 @@ import { fetchAllOwnedNFTs } from './nftService';
 export function useWalletConnection() {
   const store = useWalletStore;
 
-  const connectWallet = useCallback(async () => {
+  const connectWallet = useCallback(async (devPlayerNum?: 1 | 2) => {
     const state = store.getState();
     if (state.status === 'connecting' || state.status === 'ready') return;
+
+    // DEV mode: skip Cartridge Controller entirely
+    if (import.meta.env.DEV && devPlayerNum) {
+      connectDevAccount(devPlayerNum);
+      return;
+    }
 
     state.setStatus('connecting');
     state.setError(null);

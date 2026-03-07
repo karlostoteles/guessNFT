@@ -10,10 +10,10 @@ import { Card } from './common/Card';
 import { Button } from './common/Button';
 import { useWalletAddress, useWalletStatus, useOwnedNFTs, useWalletStore } from '../starknet/walletStore';
 import { useWalletConnection } from '../starknet/hooks';
-import { createGame, joinGame } from '../supabase/gameService';
-import { isSupabaseConfigured } from '../supabase/client';
 import { useGameActions } from '../store/selectors';
+import { GamePhase } from '../store/types';
 import { generateAllCollectionCharacters } from '../starknet/collectionService';
+import { createGameOnChain, joinGameOnChain } from '../hooks/useZKAnswer';
 
 interface Props {
   onBack: () => void;
@@ -50,23 +50,13 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   const walletStatus = useWalletStatus();
   const ownedNFTs = useOwnedNFTs();
   const { connectWallet } = useWalletConnection();
-  const { setGameMode, setOnlineGame, startSetup } = useGameActions();
+  const { setGameMode, setOnlineGame, startSetup, setPhase } = useGameActions();
   const isConnecting = walletStatus === 'connecting' || walletStatus === 'loading_nfts';
-
-  if (!isSupabaseConfigured) {
-    return (
-      <LobbyWrapper onBack={onBack}>
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,254,0.5)', fontSize: 14, padding: 32 }}>
-          <div style={{ fontSize: 32, marginBottom: 16 }}>⚙️</div>
-          <div style={{ marginBottom: 8, color: '#FFFFFE' }}>Online mode not configured</div>
-          <div>Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your <code>.env</code> file.</div>
-        </div>
-      </LobbyWrapper>
-    );
-  }
 
   if (!walletAddress) {
     const walletError = useWalletStore.getState().error;
+    const isDev = import.meta.env.DEV;
+
     return (
       <LobbyWrapper onBack={onBack}>
         <div style={{ textAlign: 'center', padding: 32 }}>
@@ -78,36 +68,85 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             fontSize: 20,
             marginBottom: 8,
           }}>
-            Log in to play online
+            {isDev ? 'DEV — Select Katana Account' : 'Log in to play online'}
           </div>
           <div style={{ color: 'rgba(255,255,254,0.4)', fontSize: 13, marginBottom: 32 }}>
-            Powered by Cartridge Controller — free, no gas needed
+            {isDev
+              ? 'Open two tabs — pick P1 in one, P2 in the other'
+              : 'Powered by Cartridge Controller — free, no gas needed'}
           </div>
-          <motion.button
-            onClick={connectWallet}
-            disabled={isConnecting}
-            whileHover={isConnecting ? {} : { scale: 1.04, filter: 'brightness(1.1)' }}
-            whileTap={isConnecting ? {} : { scale: 0.97 }}
-            style={{
-              background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
-              border: '1px solid rgba(124,58,237,0.5)',
-              borderRadius: 12,
-              padding: '14px 36px',
-              color: '#FFFFFE',
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontWeight: 700,
-              fontSize: 16,
-              cursor: isConnecting ? 'wait' : 'pointer',
-              opacity: isConnecting ? 0.7 : 1,
-              outline: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-              boxShadow: '0 0 30px rgba(124,58,237,0.35)',
-            }}
-          >
-            {isConnecting ? <><Spinner /> Logging in…</> : '🔐 Log in'}
-          </motion.button>
+
+          {isDev ? (
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <motion.button
+                onClick={() => connectWallet(1)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                style={{
+                  background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                  border: '1px solid rgba(124,58,237,0.5)',
+                  borderRadius: 12,
+                  padding: '14px 28px',
+                  color: '#FFFFFE',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: '0 0 20px rgba(124,58,237,0.25)',
+                }}
+              >
+                Player 1
+              </motion.button>
+              <motion.button
+                onClick={() => connectWallet(2)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                style={{
+                  background: 'linear-gradient(135deg, #E8A444, #C47B1A)',
+                  border: '1px solid rgba(232,164,68,0.5)',
+                  borderRadius: 12,
+                  padding: '14px 28px',
+                  color: '#0F0E17',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: '0 0 20px rgba(232,164,68,0.25)',
+                }}
+              >
+                Player 2
+              </motion.button>
+            </div>
+          ) : (
+            <motion.button
+              onClick={() => connectWallet()}
+              disabled={isConnecting}
+              whileHover={isConnecting ? {} : { scale: 1.04, filter: 'brightness(1.1)' }}
+              whileTap={isConnecting ? {} : { scale: 0.97 }}
+              style={{
+                background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                border: '1px solid rgba(124,58,237,0.5)',
+                borderRadius: 12,
+                padding: '14px 36px',
+                color: '#FFFFFE',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700,
+                fontSize: 16,
+                cursor: isConnecting ? 'wait' : 'pointer',
+                opacity: isConnecting ? 0.7 : 1,
+                outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                boxShadow: '0 0 30px rgba(124,58,237,0.35)',
+              }}
+            >
+              {isConnecting ? <><Spinner /> Logging in…</> : 'Log in'}
+            </motion.button>
+          )}
+
           {walletError && (
             <div style={{
               marginTop: 16,
@@ -283,12 +322,10 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     setLoading(true);
     try {
       const characters = generateAllCollectionCharacters();
-      const { game, playerNum } = await createGame(walletAddress, characters);
+      const gameId = await createGameOnChain(1);
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum);
-      // Both P1 and P2 go through character select immediately.
-      // Room code is prominently shown in OnlineWaitingScreen after selection.
-      startSetup();
+      setOnlineGame(gameId, 1);
+      setPhase(GamePhase.ONLINE_WAITING);
     } catch (err: any) {
       setError(err.message ?? 'Failed to create game');
     } finally {
@@ -297,18 +334,20 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   };
 
   const handleJoin = async () => {
-    if (!roomCodeInput.trim()) {
-      setError('Enter a room code');
+    const gameId = roomCodeInput.trim();
+    if (!gameId) {
+      setError('Enter a game ID');
       return;
     }
     setError('');
     setLoading(true);
     try {
-      const { game, playerNum } = await joinGame(roomCodeInput, walletAddress);
-      // Always use the deterministic 999-token collection (same as creator)
+      // Normalize: accept hex or decimal input
+      const normalizedId = gameId.startsWith('0x') ? gameId : `0x${parseInt(gameId, 10).toString(16)}`;
+      await joinGameOnChain(normalizedId, 2);
       const characters = generateAllCollectionCharacters();
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum);
+      setOnlineGame(normalizedId, 2);
       startSetup();
     } catch (err: any) {
       setError(err.message ?? 'Failed to join game');
@@ -447,7 +486,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
           >
             <div style={{ fontSize: 13, color: 'rgba(255,255,254,0.5)', textAlign: 'center', lineHeight: 1.6 }}>
-              You'll select your SCHIZODIO first. Your room code will be shown on the next screen to share with your opponent.
+              A game will be created on-chain. Your game ID will be shown on the next screen to share with your opponent.
             </div>
             {error && <ErrorMsg>{error}</ErrorMsg>}
             <Button variant="accent" size="lg" onClick={handleCreate} disabled={loading} style={{ width: '100%' }}>
@@ -465,14 +504,13 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
           >
             <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.5)', textAlign: 'center' }}>
-              Enter the 6-character room code from your opponent.
+              Enter the game ID from your opponent.
             </div>
             <input
               value={roomCodeInput}
-              onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+              onChange={(e) => setRoomCodeInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-              maxLength={6}
-              placeholder="XXXXXX"
+              placeholder="Game ID"
               autoFocus
               style={{
                 background: 'rgba(255,255,255,0.08)',
@@ -481,13 +519,12 @@ export function OnlineLobbyScreen({ onBack }: Props) {
                 padding: '14px 20px',
                 color: '#FFFFFE',
                 fontFamily: "'Space Grotesk', monospace",
-                fontSize: 28,
+                fontSize: 22,
                 fontWeight: 700,
-                letterSpacing: '0.2em',
+                letterSpacing: '0.05em',
                 textAlign: 'center',
                 width: '100%',
                 outline: 'none',
-                textTransform: 'uppercase',
               }}
             />
             {error && <ErrorMsg>{error}</ErrorMsg>}
@@ -495,7 +532,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
               variant="accent"
               size="lg"
               onClick={handleJoin}
-              disabled={loading || roomCodeInput.length < 4}
+              disabled={loading || roomCodeInput.trim().length === 0}
               style={{ width: '100%' }}
             >
               {loading ? 'Joining…' : 'Join Game'}

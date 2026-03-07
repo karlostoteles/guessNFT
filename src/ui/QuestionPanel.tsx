@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './common/Card';
-import { QUESTIONS, Question } from '../data/questions';
+import { SCHIZODIO_QUESTIONS, SchizodioCategory } from '../data/schizodioQuestions';
 import { useGameActions, useQuestionHistory, useActivePlayer, useGameMode, useOnlinePlayerNum } from '../store/selectors';
 import { sfx } from '../audio/sfx';
 
-const CATEGORIES = [
-  { key: 'hair',        label: 'Hair',        icon: '💇' },
-  { key: 'face',        label: 'Face',        icon: '👁️'  },
-  { key: 'accessories', label: 'Accessories', icon: '🎩' },
-] as const;
+// ─── Categories ──────────────────────────────────────────────────────────────
 
-type Category = typeof CATEGORIES[number]['key'];
+const CATEGORIES: Array<{ key: SchizodioCategory; label: string; icon: string }> = [
+  { key: 'hair',        label: 'Hair',       icon: '💇' },
+  { key: 'clothing',    label: 'Clothing',   icon: '👕' },
+  { key: 'eyes',        label: 'Eyes',       icon: '👁️'  },
+  { key: 'weapons',     label: 'Weapons',    icon: '⚔️'  },
+  { key: 'sidekick',    label: 'Sidekick',   icon: '🐉' },
+  { key: 'headwear',    label: 'Headwear',   icon: '🎩' },
+  { key: 'mouth',       label: 'Mouth',      icon: '👄' },
+  { key: 'background',  label: 'Background', icon: '🌄' },
+  { key: 'accessories', label: 'Extras',     icon: '✨' },
+];
 
 // ─── Minimised floating tab ───────────────────────────────────────────────────
 
@@ -118,14 +124,14 @@ function WaitingTab() {
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function QuestionPanel() {
-  const [activeCategory, setActiveCategory] = useState<Category>('hair');
-  const [minimised, setMinimised] = useState(false);
-
   const { askQuestion } = useGameActions();
   const history         = useQuestionHistory();
   const activePlayer    = useActivePlayer();
   const mode            = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
+
+  const [activeCat, setActiveCat] = useState<SchizodioCategory>('hair');
+  const [minimised, setMinimised] = useState(false);
 
   // In online mode check if it's actually my turn
   const isMyTurn = mode !== 'online' || (
@@ -133,14 +139,14 @@ export function QuestionPanel() {
     (activePlayer === 'player2' && onlinePlayerNum === 2)
   );
 
-  // Questions already asked by the current player this game
+  // Questions already asked by the active player
   const askedIds = new Set(
     history.filter((q) => q.askedBy === activePlayer).map((q) => q.questionId)
   );
 
-  const filteredQuestions = QUESTIONS.filter((q) => q.category === activeCategory);
-  const askedInCategory   = filteredQuestions.filter((q) => askedIds.has(q.id)).length;
-  const totalInCategory   = filteredQuestions.length;
+  const filteredQuestions = SCHIZODIO_QUESTIONS.filter((q) => q.category === activeCat);
+  const askedInCategory = filteredQuestions.filter((q) => askedIds.has(q.id)).length;
+  const totalInCategory = filteredQuestions.length;
 
   // ── Not my turn: compact pill ─────────────────────────────────────────────
   if (!isMyTurn) {
@@ -175,7 +181,6 @@ export function QuestionPanel() {
         transition={{ type: 'spring', stiffness: 280, damping: 26 }}
         style={{
           position: 'fixed',
-          // On mobile: anchor bottom, full-width; on desktop: centred, capped width
           bottom: 0,
           left: '50%',
           transform: 'translateX(-50%)',
@@ -185,7 +190,6 @@ export function QuestionPanel() {
           pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          // Mobile: no rounded bottom corners; desktop: rounded all round
           borderRadius: 'clamp(0px, calc((100vw - 760px) * 999), 20px) clamp(0px, calc((100vw - 760px) * 999), 20px) 0 0',
           background: 'rgba(15,14,23,0.96)',
           border: '1px solid rgba(255,255,255,0.1)',
@@ -263,20 +267,23 @@ export function QuestionPanel() {
           padding: '10px 12px 0',
           background: 'rgba(255,255,255,0.03)',
           flexShrink: 0,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch' as any,
         }}>
           {CATEGORIES.map((cat) => {
-            const catAsked = QUESTIONS.filter((q) => q.category === cat.key && askedIds.has(q.id)).length;
-            const catTotal = QUESTIONS.filter((q) => q.category === cat.key).length;
+            const catQuestions = SCHIZODIO_QUESTIONS.filter((q) => q.category === cat.key);
+            const catAsked = catQuestions.filter((q) => askedIds.has(q.id)).length;
+            const catTotal = catQuestions.length;
             const allAsked = catAsked === catTotal;
-            const isActive = activeCategory === cat.key;
+            const isActive = activeCat === cat.key;
 
             return (
               <motion.button
                 key={cat.key}
-                onClick={() => setActiveCategory(cat.key)}
+                onClick={() => setActiveCat(cat.key)}
                 whileHover={{ background: isActive ? undefined : 'rgba(255,255,255,0.08)' }}
                 style={{
-                  flex: 1,
+                  flex: '0 0 auto',
                   padding: '9px 10px 12px',
                   border: 'none',
                   borderRadius: '8px 8px 0 0',
@@ -299,6 +306,7 @@ export function QuestionPanel() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <span style={{ fontSize: 15 }}>{cat.icon}</span>
@@ -322,43 +330,43 @@ export function QuestionPanel() {
           overflowY: 'auto',
           flex: 1,
           padding: '12px 12px 16px',
-          // iOS momentum scroll
           WebkitOverflowScrolling: 'touch' as any,
         }}>
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeCategory}
+              key={activeCat}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.14 }}
               style={{
                 display: 'grid',
-                // Two columns on desktop, one column on very narrow screens
                 gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
                 gap: 8,
               }}
             >
-              {filteredQuestions.map((q, idx) => (
-                <QuestionButton
-                  key={q.id}
-                  question={q}
-                  asked={askedIds.has(q.id)}
-                  index={idx}
-                  totalAsked={askedIds.size}
-                  totalOnBoard={24} // TODO: wire real remaining-tile count for probability
-                  onClick={() => {
-                    if (askedIds.has(q.id)) return;
-                    sfx.question();
-                    askQuestion(q.id);
-                  }}
-                />
-              ))}
+              {filteredQuestions.map((q, idx) => {
+                const asked = askedIds.has(q.id);
+                return (
+                  <QuestionButton
+                    key={q.id}
+                    text={q.text}
+                    asked={asked}
+                    index={idx}
+                    totalAsked={askedIds.size}
+                    onClick={() => {
+                      if (asked) return;
+                      sfx.question();
+                      askQuestion(q.id);
+                    }}
+                  />
+                );
+              })}
             </motion.div>
           </AnimatePresence>
 
           {/* All asked in this category */}
-          {askedInCategory === totalInCategory && (
+          {askedInCategory === totalInCategory && totalInCategory > 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -370,7 +378,7 @@ export function QuestionPanel() {
                 fontStyle: 'italic',
               }}
             >
-              All {activeCategory} questions asked — try another category
+              All {activeCat} questions asked — try another category
             </motion.div>
           )}
         </div>
@@ -381,37 +389,29 @@ export function QuestionPanel() {
 
 // ─── Individual question button ───────────────────────────────────────────────
 
-/**
- * A question button with a stat indicator on the right.
- * `riskLevel` is a placeholder (0–2) that will later be driven by
- * real board-analysis data (how many tiles would be eliminated, expected value, etc.)
- */
 function getRiskLevel(idx: number, totalAsked: number): 0 | 1 | 2 {
-  // Placeholder heuristic until real board analysis is wired:
-  // cycle through low / medium / high based on question order
+  // Placeholder heuristic until real board analysis is wired
   return (idx % 3) as 0 | 1 | 2;
 }
 
 const RISK_COLORS: Record<0 | 1 | 2, { dot: string; label: string }> = {
-  0: { dot: '#4ADE80', label: 'Safe'   }, // green
-  1: { dot: '#FACC15', label: 'Medium' }, // yellow
-  2: { dot: '#F87171', label: 'Risk'   }, // red
+  0: { dot: '#4ADE80', label: 'Safe'   },
+  1: { dot: '#FACC15', label: 'Medium' },
+  2: { dot: '#F87171', label: 'Risk'   },
 };
 
 function QuestionButton({
-  question,
+  text,
   asked,
   index,
   totalAsked,
-  totalOnBoard,
   onClick,
 }: {
-  question:     Question;
-  asked:        boolean;
-  index:        number;
-  totalAsked:   number;
-  totalOnBoard: number;
-  onClick:      () => void;
+  text:       string;
+  asked:      boolean;
+  index:      number;
+  totalAsked: number;
+  onClick:    () => void;
 }) {
   const riskLevel = getRiskLevel(index, totalAsked);
   const risk      = RISK_COLORS[riskLevel];
@@ -445,12 +445,9 @@ function QuestionButton({
         width: '100%',
       }}
     >
-      {/* Question text */}
-      <span style={{ flex: 1 }}>{question.text}</span>
+      <span style={{ flex: 1 }}>{text}</span>
 
-      {/* Stat indicator — right side */}
       {asked ? (
-        /* Asked: golden check */
         <span style={{
           fontSize: 12, fontWeight: 700,
           color: 'rgba(232,164,68,0.6)',
@@ -459,7 +456,6 @@ function QuestionButton({
           ✓
         </span>
       ) : (
-        /* Not asked: risk/probability dot (placeholder for future stats) */
         <span
           title={risk.label}
           style={{

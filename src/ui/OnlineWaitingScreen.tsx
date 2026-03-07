@@ -7,16 +7,29 @@
  */
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOnlineRoomCode, useOnlinePlayerNum } from '../store/selectors';
+import {
+  useOnlinePlayerNum,
+  usePlayerState,
+  usePhase,
+  useStarknetGameId,
+} from '../store/selectors';
+import { GamePhase } from '../store/types';
 
 export function OnlineWaitingScreen() {
-  const roomCode    = useOnlineRoomCode();
+  const starknetGameId = useStarknetGameId();
   const playerNum   = useOnlinePlayerNum();
+  const phase       = usePhase();
   const [copied, setCopied] = useState(false);
+  const myPlayerKey = playerNum === 1 ? 'player1' : 'player2';
+  const myState = usePlayerState(myPlayerKey as 'player1' | 'player2');
+  const hasSelectedCharacter = !!myState.secretCharacterId;
+
+  const isRevealWaiting = phase === GamePhase.REVEAL_WAITING;
+  const displayCode = starknetGameId;
 
   const handleCopy = () => {
-    if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode).catch(() => {});
+    if (!displayCode) return;
+    navigator.clipboard.writeText(displayCode).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -58,7 +71,11 @@ export function OnlineWaitingScreen() {
           marginBottom: 8,
           textShadow: '0 0 40px rgba(232,164,68,0.4)',
         }}>
-          Character Locked In ✓
+          {isRevealWaiting
+            ? 'Revealing Characters…'
+            : hasSelectedCharacter
+              ? 'Character Locked In ✓'
+              : 'Game Created'}
         </div>
 
         <div style={{
@@ -66,11 +83,15 @@ export function OnlineWaitingScreen() {
           color: 'rgba(255,255,254,0.45)',
           marginBottom: 28,
         }}>
-          You're Player {playerNum} · Waiting for opponent to choose their SCHIZODIO…
+          {isRevealWaiting
+            ? 'Verifying commitments on-chain. The winner will be announced shortly.'
+            : hasSelectedCharacter
+              ? `You're Player ${playerNum} · Waiting for opponent to choose their SCHIZODIO…`
+              : `You're Player ${playerNum} · Share the Game ID below and wait for your opponent to join`}
         </div>
 
-        {/* Room code — prominent for creator, subtle for joiner */}
-        {roomCode && (
+        {/* Room code — prominent for creator, subtle for joiner, hidden during reveal */}
+        {displayCode && !isRevealWaiting && (
           <div style={{
             background: isCreator
               ? 'rgba(232,164,68,0.08)'
@@ -91,7 +112,7 @@ export function OnlineWaitingScreen() {
                 color: 'rgba(232,164,68,0.6)',
                 marginBottom: 8,
               }}>
-                Share this code with your opponent
+                Share this Game ID with your opponent
               </div>
             )}
 
@@ -122,7 +143,7 @@ export function OnlineWaitingScreen() {
                 filter: 'drop-shadow(0 0 16px rgba(232,164,68,0.35))',
                 display: 'block',
               }}>
-                {roomCode}
+                {displayCode}
               </span>
 
               {/* Copy feedback */}

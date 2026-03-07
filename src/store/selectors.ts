@@ -13,9 +13,9 @@ export const useWinner = () => useGameStore((s) => s.winner);
 export const useGuessedCharacterId = () => useGameStore((s) => s.guessedCharacterId);
 export const useGameSessionId = () => useGameStore((s) => s.gameSessionId);
 export const useCommitmentStatus = () => useGameStore((s) => s.commitmentStatus);
-export const useOnlineGameId = () => useGameStore((s) => s.onlineGameId);
-export const useOnlineRoomCode = () => useGameStore((s) => s.onlineRoomCode);
 export const useOnlinePlayerNum = () => useGameStore((s) => s.onlinePlayerNum);
+export const useStarknetGameId = () => useGameStore((s) => s.starknetGameId);
+export const useProofError = () => useGameStore((s) => s.proofError);
 
 export const usePlayerState = (player: PlayerId) =>
   useGameStore((s) => s.players[player]);
@@ -44,6 +44,10 @@ const actions = {
   get applyOpponentAnswer() { return useGameStore.getState().applyOpponentAnswer; },
   get receiveOpponentGuess() { return useGameStore.getState().receiveOpponentGuess; },
   get applyGuessResult() { return useGameStore.getState().applyGuessResult; },
+  get setPhase() { return useGameStore.getState().setPhase; },
+  get setVerifiedAnswer() { return useGameStore.getState().setVerifiedAnswer; },
+  get setProofError() { return useGameStore.getState().setProofError; },
+  get clearProofError() { return useGameStore.getState().clearProofError; },
 };
 
 export const useGameActions = () => actions;

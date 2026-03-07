@@ -96,7 +96,7 @@ function deriveBool(attrValue: string | undefined, seed: number, offset: number)
  */
 export function nftToCharacter(nft: SchizodioNFT): NFTCharacter {
   const seed = hashString(nft.tokenId);
-  const attrs = nft.attributes;
+  const attrs = nft.attributes ?? [];
 
   // Log trait types present in this NFT for development debugging
   if (import.meta.env.DEV && attrs.length > 0) {

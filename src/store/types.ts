@@ -20,15 +20,18 @@ export enum GamePhase {
   GUESS_WRONG = 'GUESS_WRONG',   // Wrong Risk It — brief reveal, turn ends, game continues
   GUESS_RESULT = 'GUESS_RESULT', // Correct guess — winner declared
   GAME_OVER = 'GAME_OVER',
+  // ZK proof phases (nft/online mode only)
+  PROVING = 'PROVING',       // Web Worker generating ZK proof
+  SUBMITTING = 'SUBMITTING', // Submitting proof tx to Starknet
+  VERIFIED = 'VERIFIED',     // On-chain verification confirmed
+  REVEAL_WAITING = 'REVEAL_WAITING', // Waiting for both players to reveal characters
 }
 
 export type PlayerId = 'player1' | 'player2';
 
 export interface QuestionRecord {
-  questionId: string;
+  questionId: number;
   questionText: string;
-  traitKey: string;
-  traitValue: string | boolean;
   answer: boolean | null;
   askedBy: PlayerId;
   turnNumber: number;
@@ -56,9 +59,15 @@ export interface GameState {
   // Whether both players have valid on-chain (or local) commitments
   commitmentStatus: 'none' | 'partial' | 'both';
   // Online multiplayer metadata (null in free/nft mode)
-  onlineGameId: string | null;
-  onlineRoomCode: string | null;
   onlinePlayerNum: 1 | 2 | null;
+  // On-chain Dojo game ID (felt252 as hex string)
+  starknetGameId: string | null;
+  // ZK proof error message (null when no error). Separate from phase — a player in PROOF_ERROR
+  // is still logically in ANSWER_PENDING and can retry.
+  proofError: string | null;
+  // Synchronous dedup: turn numbers for which we've already started proof generation.
+  // Prevents double proof gen from duplicate Torii entity update callbacks.
+  processedTurnIds: Set<number>;
 }
 
 export interface GameActions {
@@ -66,18 +75,23 @@ export interface GameActions {
   startSetup: () => void;
   selectSecretCharacter: (player: PlayerId, characterId: string) => void;
   advancePhase: () => void;
-  askQuestion: (questionId: string) => void;
+  askQuestion: (questionId: number) => void;
   answerQuestion: (answer: boolean) => void;
+  // ZK-specific actions (nft/online mode)
+  setPhase: (phase: GamePhase) => void;
+  setVerifiedAnswer: (answer: boolean) => void;
+  setProofError: (message: string) => void;
+  clearProofError: () => void;
   toggleElimination: (characterId: string) => void;
   finishElimination: () => void;
   startGuess: () => void;
   makeGuess: (characterId: string) => void;
   cancelGuess: () => void;
   resetGame: () => void;
-  // Online-specific actions (called by useOnlineGameSync hook)
-  setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2) => void;
+  // Online-specific actions (called by useToriiGameSync hook)
+  setOnlineGame: (gameId: string, playerNum: 1 | 2) => void;
   advanceToGameStart: () => void;
-  receiveOpponentQuestion: (questionId: string, answer: boolean) => void;
+  receiveOpponentQuestion: (questionId: number, turnNumber: number) => void;
   applyOpponentAnswer: (answer: boolean) => void;
   receiveOpponentGuess: (characterId: string, isCorrect: boolean, winnerPlayerNum: 1 | 2 | null) => void;
   applyGuessResult: (isCorrect: boolean, winner: PlayerId | null) => void;

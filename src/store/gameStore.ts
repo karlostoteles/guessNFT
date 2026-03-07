@@ -1,14 +1,31 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { GamePhase, GameState, GameActions, PlayerId } from './types';
-import { QUESTIONS } from '../data/questions';
+import { SCHIZODIO_QUESTIONS } from '../data/schizodioQuestions';
 import { CHARACTERS } from '../data/characters';
-import { evaluateQuestion } from '../utils/evaluateQuestion';
+import { evaluateBit } from '../utils/evaluateBit';
 import { createCommitment, generateGameSessionId, clearCommitments } from '../starknet/commitReveal';
 import { generateAllCollectionCharacters } from '../starknet/collectionService';
+import { getCachedCollectionData, loadCollectionData } from '../starknet/collectionData';
 
 function getOpponent(player: PlayerId): PlayerId {
   return player === 'player1' ? 'player2' : 'player1';
+}
+
+/**
+ * Get the bitmap for an NFT character from the runtime-cached schizodio.json.
+ * Character IDs in nft/online mode are "nft_1" through "nft_999".
+ * schizodio.json is 0-indexed: characters[0].id === 0 corresponds to tokenId 1.
+ */
+function getNftBitmap(characterId: string): [string, string, string, string] | null {
+  if (!characterId.startsWith('nft_')) return null;
+  const tokenId = parseInt(characterId.replace('nft_', ''), 10);
+  if (isNaN(tokenId) || tokenId < 1 || tokenId > 999) return null;
+  const dataset = getCachedCollectionData();
+  if (!dataset) return null;
+  const char = dataset.characters[tokenId - 1];
+  if (!char) return null;
+  return char.bitmap as [string, string, string, string];
 }
 
 const initialState: GameState = {
@@ -28,16 +45,19 @@ const initialState: GameState = {
   guessedCharacterId: null,
   gameSessionId: generateGameSessionId(),
   commitmentStatus: 'none',
-  onlineGameId: null,
-  onlineRoomCode: null,
   onlinePlayerNum: null,
+  starknetGameId: null,
+  proofError: null,
+  processedTurnIds: new Set<number>(),
 };
 
 export const useGameStore = create<GameState & GameActions>()(
   immer((set) => ({
     ...initialState,
 
-    setGameMode: (mode, characters) =>
+    setGameMode: (mode, characters) => {
+      // Pre-load collection data for bitmap lookups (async, caches for sync access)
+      loadCollectionData().catch(() => {});
       set((state) => {
         state.mode = mode;
         if (characters) {
@@ -48,7 +68,8 @@ export const useGameStore = create<GameState & GameActions>()(
         } else {
           state.characters = CHARACTERS;
         }
-      }),
+      });
+    },
 
     startSetup: () =>
       set((state) => {
@@ -106,15 +127,17 @@ export const useGameStore = create<GameState & GameActions>()(
             const q = state.currentQuestion;
             if (q) {
               const eliminated = state.players[state.activePlayer].eliminatedCharacterIds;
-              const fullQuestion = QUESTIONS.find((qn) => qn.id === q.questionId);
-              if (fullQuestion) {
-                for (const char of state.characters) {
-                  if (eliminated.includes(char.id)) continue;
-                  const matchesQuestion = evaluateQuestion(fullQuestion, char);
-                  const shouldEliminate = q.answer ? !matchesQuestion : matchesQuestion;
-                  if (shouldEliminate) {
-                    eliminated.push(char.id);
-                  }
+
+              for (const char of state.characters) {
+                if (eliminated.includes(char.id)) continue;
+
+                const bitmap = getNftBitmap(char.id);
+                if (!bitmap) continue;
+                const matchesQuestion = evaluateBit(bitmap, q.questionId);
+
+                const shouldEliminate = q.answer ? !matchesQuestion : matchesQuestion;
+                if (shouldEliminate) {
+                  eliminated.push(char.id);
                 }
               }
             }
@@ -146,49 +169,39 @@ export const useGameStore = create<GameState & GameActions>()(
           case GamePhase.GUESS_RESULT:
             state.phase = GamePhase.GAME_OVER;
             break;
+          // ZK phases advance automatically via useZKAnswer hook — no manual advance needed
         }
       }),
 
     askQuestion: (questionId) =>
       set((state) => {
-        const q = QUESTIONS.find((q) => q.id === questionId);
-        if (!q) return;
+        const sq = SCHIZODIO_QUESTIONS.find((q) => q.id === questionId);
+        if (!sq) return;
+
+        const record = {
+          questionId,
+          questionText: sq.text,
+          answer: null as boolean | null,
+          askedBy: state.activePlayer,
+          turnNumber: state.turnNumber,
+        };
 
         if (state.mode === 'online') {
-          // Online mode: set question, go to ANSWER_PENDING, sync hook sends event
-          const record = {
-            questionId,
-            questionText: q.text,
-            traitKey: q.traitKey,
-            traitValue: q.traitValue,
-            answer: null,
-            askedBy: state.activePlayer,
-            turnNumber: state.turnNumber,
-          };
+          // Online: set question, go to ANSWER_PENDING, sync hook sends on-chain tx
           state.currentQuestion = record;
           state.questionHistory.push(record);
           state.phase = GamePhase.ANSWER_PENDING;
           return;
         }
 
-        // Local/free mode: auto-evaluate immediately
+        // Local (free or nft): auto-evaluate via bitmap
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
-        const secretChar = state.characters.find((c) => c.id === secretId);
-        const autoAnswer = secretChar ? evaluateQuestion(q, secretChar) : false;
+        const bitmap = secretId ? getNftBitmap(secretId) : null;
+        const autoAnswer = bitmap ? evaluateBit(bitmap, questionId) : false;
 
-        const record = {
-          questionId,
-          questionText: q.text,
-          traitKey: q.traitKey,
-          traitValue: q.traitValue,
-          answer: autoAnswer,
-          askedBy: state.activePlayer,
-          turnNumber: state.turnNumber,
-        };
-
-        state.currentQuestion = record;
-        state.questionHistory.push(record);
+        state.currentQuestion = { ...record, answer: autoAnswer };
+        state.questionHistory.push({ ...record, answer: autoAnswer });
         state.phase = GamePhase.ANSWER_REVEALED;
       }),
 
@@ -275,18 +288,44 @@ export const useGameStore = create<GameState & GameActions>()(
         state.questionHistory = [];
         state.gameSessionId = generateGameSessionId();
         state.commitmentStatus = 'none';
-        state.onlineGameId = null;
-        state.onlineRoomCode = null;
         state.onlinePlayerNum = null;
+        state.starknetGameId = null;
+        state.proofError = null;
+        state.processedTurnIds = new Set<number>();
+      }),
+
+    // ─── ZK-specific actions ───────────────────────────────────────────────────
+
+    setPhase: (phase) =>
+      set((state) => {
+        state.phase = phase;
+      }),
+
+    setVerifiedAnswer: (answer) =>
+      set((state) => {
+        if (state.currentQuestion) {
+          state.currentQuestion.answer = answer;
+        }
+        state.phase = GamePhase.VERIFIED;
+      }),
+
+    setProofError: (message) =>
+      set((state) => {
+        state.proofError = message;
+        state.phase = GamePhase.ANSWER_PENDING;
+      }),
+
+    clearProofError: () =>
+      set((state) => {
+        state.proofError = null;
       }),
 
     // ─── Online-specific actions ───────────────────────────────────────────────
 
-    setOnlineGame: (gameId, roomCode, playerNum) =>
+    setOnlineGame: (gameId, playerNum) =>
       set((state) => {
-        state.onlineGameId = gameId;
-        state.onlineRoomCode = roomCode;
         state.onlinePlayerNum = playerNum;
+        state.starknetGameId = gameId;
       }),
 
     advanceToGameStart: () =>
@@ -298,24 +337,26 @@ export const useGameStore = create<GameState & GameActions>()(
         state.phase = GamePhase.HANDOFF_START;
       }),
 
-    receiveOpponentQuestion: (questionId, answer) =>
+    receiveOpponentQuestion: (questionId, turnNumber) =>
       set((state) => {
-        const q = QUESTIONS.find((q) => q.id === questionId);
-        if (!q) return;
+        // Idempotency guard: processedTurnIds survives component lifecycle.
+        // Prevents double proof gen after remount (proofInFlightRef resets to false).
+        if (state.processedTurnIds.has(turnNumber)) return;
+        state.processedTurnIds.add(turnNumber);
+
+        const sq = SCHIZODIO_QUESTIONS.find((q) => q.id === questionId);
+        if (!sq) return;
 
         const record = {
           questionId,
-          questionText: q.text,
-          traitKey: q.traitKey,
-          traitValue: q.traitValue,
-          answer,
-          askedBy: state.activePlayer, // opponent is currently the active player
-          turnNumber: state.turnNumber,
+          questionText: sq.text,
+          answer: null as boolean | null,
+          askedBy: state.activePlayer,
+          turnNumber,
         };
         state.currentQuestion = record;
         state.questionHistory.push(record);
-        // Skip ANSWER_PENDING — I already answered, jump to reveal
-        state.phase = GamePhase.ANSWER_REVEALED;
+        state.phase = GamePhase.ANSWER_PENDING;
       }),
 
     applyOpponentAnswer: (answer) =>

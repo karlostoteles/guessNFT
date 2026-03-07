@@ -22,14 +22,16 @@
  *   so commitments are compatible with what the future Cairo contract will verify.
  */
 import { hash } from 'starknet';
+import { BarretenbergSync } from '@aztec/bb.js';
 
 const STORAGE_KEY = 'whoiswho_commitments';
 
 export interface Commitment {
   playerId: 'player1' | 'player2';
   characterId: string;
-  salt: string;        // hex string, 32 bytes
-  commitment: string;  // hex Pedersen hash
+  salt: string;          // hex string
+  commitment: string;    // hex Pedersen hash (commit-reveal)
+  zkCommitment?: string; // hex Poseidon2 BN254 hash (ZK proofs) — u256
   gameSessionId: string;
 }
 
@@ -43,18 +45,76 @@ export interface Commitment {
  */
 const STARK_PRIME = BigInt('0x800000000000011000000000000000000000000000000000000000000000001');
 
+/**
+ * Rejection-sampled salt: uniform in [0, STARK_PRIME) with zero modulo bias.
+ */
 function generateSalt(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  const raw = BigInt('0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join(''));
-  return '0x' + (raw % STARK_PRIME).toString(16);
+  while (true) {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const val = bytes.reduce((acc, b) => (acc << 8n) | BigInt(b), 0n);
+    if (val < STARK_PRIME) return '0x' + val.toString(16);
+  }
+}
+
+// ─── Poseidon2 BN254 helpers (matches hash4 / hash5 in Noir circuit) ────────
+
+function toBE32(n: bigint): Uint8Array {
+  const buf = new Uint8Array(32);
+  let v = n;
+  for (let i = 31; i >= 0; i--) { buf[i] = Number(v & 0xffn); v >>= 8n; }
+  return buf;
+}
+
+function fromBE32(bytes: Uint8Array): bigint {
+  let v = 0n;
+  for (let i = 0; i < 32; i++) v = (v << 8n) | BigInt(bytes[i]);
+  return v;
+}
+
+function add32(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const va = fromBE32(a);
+  const vb = fromBE32(b);
+  return toBE32(va + vb);
+}
+
+const ZERO_32 = new Uint8Array(32);
+
+let bbInstance: BarretenbergSync | null = null;
+async function getBB(): Promise<BarretenbergSync> {
+  if (!bbInstance) {
+    await BarretenbergSync.initSingleton();
+    bbInstance = BarretenbergSync.getSingleton();
+  }
+  return bbInstance;
+}
+
+/**
+ * Poseidon2 BN254 commitment: hash4(game_id, player, character_id, salt).
+ * Matches the circuit's `hash4()` exactly.
+ * Returns bigint (stored as u256 on Starknet).
+ */
+export async function computeZKCommitment(
+  gameId: bigint,
+  player: bigint,
+  characterId: bigint,
+  salt: bigint,
+): Promise<bigint> {
+  const bb = await getBB();
+  // hash4: perm([a, b, c, 0]) → mid; perm([mid[0]+d, mid[1], mid[2], mid[3]])[0]
+  const mid = bb.poseidon2Permutation({
+    inputs: [toBE32(gameId), toBE32(player), toBE32(characterId), ZERO_32],
+  });
+  const result = bb.poseidon2Permutation({
+    inputs: [add32(mid.outputs[0], toBE32(salt)), mid.outputs[1], mid.outputs[2], mid.outputs[3]],
+  });
+  return fromBE32(result.outputs[0]);
 }
 
 /**
  * Convert a string character ID to a felt252-compatible value.
  * We hash the string to get a numeric felt.
  */
-function characterIdToFelt(characterId: string): string {
+export function characterIdToFelt(characterId: string): string {
   // Encode string as bytes, then take modulo of the Starknet field prime
   let val = BigInt(0);
   for (let i = 0; i < characterId.length; i++) {
@@ -71,6 +131,23 @@ function characterIdToFelt(characterId: string): string {
  */
 function computeCommitment(characterIdFelt: string, salt: string): string {
   return hash.computePedersenHash(characterIdFelt, salt);
+}
+
+/**
+ * Convert app character IDs to the circuit's 0-based character index:
+ * - "nft_1"   -> 0
+ * - "nft_999" -> 998
+ * - "42"      -> 42 (already numeric)
+ */
+function characterIdToCircuitId(characterId: string): bigint {
+  if (characterId.startsWith('nft_')) {
+    const tokenId = Number.parseInt(characterId.slice(4), 10);
+    if (!Number.isFinite(tokenId) || tokenId < 1) {
+      throw new Error(`Invalid NFT character id: ${characterId}`);
+    }
+    return BigInt(tokenId - 1);
+  }
+  return BigInt(characterId);
 }
 
 // ─── Phase 1 API (local storage) ─────────────────────────────────────────────
@@ -103,7 +180,6 @@ export function createCommitment(
 
   const c: Commitment = { playerId, characterId, salt, commitment, gameSessionId };
 
-  // Store locally (Phase 1). Phase 2: also call game_contract.commit_character(commitment)
   const all = loadAll().filter(
     (x) => !(x.playerId === playerId && x.gameSessionId === gameSessionId)
   );
@@ -111,11 +187,74 @@ export function createCommitment(
 
   console.log(`[commitReveal] Committed ${playerId} character #${characterId}`, {
     commitment,
-    // Never log salt in production — shown here for Phase 1 dev visibility
     salt: import.meta.env.DEV ? salt : '***',
   });
 
   return c;
+}
+
+/**
+ * Create commitment with ZK commitment (for NFT/online mode).
+ * Computes both Pedersen (commit-reveal) and Poseidon2 BN254 (ZK proofs).
+ */
+export async function createCommitmentWithZK(
+  playerId: 'player1' | 'player2',
+  characterId: string,
+  gameSessionId: string,
+  gameId: bigint,
+  playerAddress: bigint,
+): Promise<Commitment> {
+  const c = createCommitment(playerId, characterId, gameSessionId);
+
+  const numericId = characterIdToCircuitId(characterId);
+
+  const zkHash = await computeZKCommitment(
+    gameId,
+    playerAddress,
+    numericId,
+    BigInt(c.salt),
+  );
+  c.zkCommitment = '0x' + zkHash.toString(16);
+
+  // Re-save with zkCommitment
+  const all = loadAll().filter(
+    (x) => !(x.playerId === playerId && x.gameSessionId === gameSessionId)
+  );
+  saveAll([...all, c]);
+
+  return c;
+}
+
+/**
+ * Add/update zkCommitment on an existing stored commitment, reusing the same salt.
+ * Safe to call repeatedly; no-op if the stored zkCommitment already matches.
+ */
+export async function ensureZKCommitment(
+  playerId: 'player1' | 'player2',
+  gameSessionId: string,
+  gameId: bigint,
+  playerAddress: bigint,
+): Promise<Commitment> {
+  const all = loadAll();
+  const idx = all.findIndex((c) => c.playerId === playerId && c.gameSessionId === gameSessionId);
+  if (idx < 0) {
+    throw new Error(`No stored commitment for ${playerId} in session ${gameSessionId}`);
+  }
+
+  const c = all[idx];
+  const numericId = characterIdToCircuitId(c.characterId);
+  const zkHash = await computeZKCommitment(gameId, playerAddress, numericId, BigInt(c.salt));
+  const zkHex = '0x' + zkHash.toString(16);
+
+  if (c.zkCommitment === zkHex) {
+    return c;
+  }
+
+  const updated: Commitment = { ...c, zkCommitment: zkHex };
+  const next = [...all];
+  next[idx] = updated;
+  saveAll(next);
+  return updated;
 }
 
 /**
@@ -176,45 +315,3 @@ export function generateGameSessionId(): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ─── Phase 2 stubs (on-chain) ─────────────────────────────────────────────────
-// When the Cairo contract is deployed, replace the Phase 1 localStorage calls above
-// with these Starknet transaction calls. The commitment value stays identical.
-
-/**
- * [Phase 2 stub] Submit commitment on-chain.
- * Replace localStorage with a contract call:
- *
- *   const account = cartridgeController.getAccount();
- *   await account.execute([{
- *     contractAddress: GAME_CONTRACT,
- *     entrypoint: 'commit_character',
- *     calldata: [gameId, commitment],
- *   }]);
- */
-export async function submitCommitmentOnChain(
-  _commitment: string,
-  _gameId: string
-): Promise<string> {
-  throw new Error(
-    '[Phase 2] Contract not deployed yet. Set GAME_CONTRACT in config.ts and implement this function.'
-  );
-}
-
-/**
- * [Phase 2 stub] Reveal character on-chain.
- *
- *   await account.execute([{
- *     contractAddress: GAME_CONTRACT,
- *     entrypoint: 'reveal_character',
- *     calldata: [gameId, characterIdFelt, salt],
- *   }]);
- */
-export async function revealCharacterOnChain(
-  _characterId: string,
-  _salt: string,
-  _gameId: string
-): Promise<string> {
-  throw new Error(
-    '[Phase 2] Contract not deployed yet. Set GAME_CONTRACT in config.ts and implement this function.'
-  );
-}
