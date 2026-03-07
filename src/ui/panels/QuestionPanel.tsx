@@ -16,6 +16,7 @@ import { QUESTIONS, type Question } from '@/core/data/questions';
 import {
   useGameActions, useQuestionHistory, useActivePlayer,
   usePhase, useGameCharacters, usePlayerState, useGameMode, useOnlinePlayerNum,
+  useEliminatedIds,
 } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 import { WaitingPill, RiskItPill, AskPill } from './question/Pills';
@@ -61,7 +62,11 @@ export function QuestionPanel() {
     [characters, playerState.eliminatedCharacterIds],
   );
 
-  const isDangerous = remaining.length <= 8;
+  // Opponent's remaining tiles — danger = they're close to guessing YOUR pick
+  const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
+  const opponentEliminatedIds = useEliminatedIds(opponent);
+  const opponentRemaining = characters.length - opponentEliminatedIds.length;
+  const isDangerous = opponentRemaining <= 8;
 
 
 

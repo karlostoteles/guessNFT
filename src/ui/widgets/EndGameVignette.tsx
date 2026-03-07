@@ -28,10 +28,13 @@ export function EndGameVignette() {
     const phase = usePhase();
     const activePlayer = useActivePlayer();
     const characters = useGameCharacters();
-    const eliminatedIds = useEliminatedIds(activePlayer);
+
+    // Track OPPONENT's remaining tiles — danger = they're close to guessing YOUR pick
+    const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
+    const opponentEliminatedIds = useEliminatedIds(opponent);
     const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const remaining = characters.length - eliminatedIds.length;
+    const remaining = characters.length - opponentEliminatedIds.length;
     const isGameplay = GAMEPLAY_PHASES.has(phase);
 
     // Intensity levels
@@ -49,16 +52,17 @@ export function EndGameVignette() {
             ? 'rgba(224,85,85,0.3)'
             : 'rgba(232,164,68,0.15)';
 
-    // Heartbeat SFX loop when ≤ 8 tiles
+    // Heartbeat SFX loop — restarts when pace changes (dangerous → critical)
     useEffect(() => {
-        if (isDangerous && !heartbeatRef.current) {
+        // Clear any existing interval so pace updates properly
+        if (heartbeatRef.current) {
+            clearInterval(heartbeatRef.current);
+            heartbeatRef.current = null;
+        }
+        if (isDangerous) {
             const play = () => sfx.heartbeat();
             play(); // immediate first beat
             heartbeatRef.current = setInterval(play, isCritical ? 800 : 1200);
-        }
-        if (!isDangerous && heartbeatRef.current) {
-            clearInterval(heartbeatRef.current);
-            heartbeatRef.current = null;
         }
         return () => {
             if (heartbeatRef.current) {
