@@ -15,6 +15,7 @@ packages/circuits/proof_out*/
 packages/circuits/proof.bin
 packages/verifier/target/
 packages/verifier/.scarb-cache/
+packages/verifier/.snfoundry_cache/
 
 # Noir witnesses — may contain real player salts
 packages/circuits/Prover.toml
