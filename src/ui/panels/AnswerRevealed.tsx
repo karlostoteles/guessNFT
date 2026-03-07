@@ -12,9 +12,14 @@ export function AnswerRevealed() {
   const { advancePhase } = useGameActions();
 
   useEffect(() => {
-    if (!question) return;
-    if (question.answer) sfx.answerYes();
-    else sfx.answerNo();
+    if (!question && !cpuQuestion) return;
+    if (question) {
+      if (question.answer) sfx.answerYes();
+      else sfx.answerNo();
+    } else if (cpuQuestion) {
+      if (cpuQuestion.answer) sfx.answerYes();
+      else sfx.answerNo();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -23,7 +28,7 @@ export function AnswerRevealed() {
     return () => clearTimeout(timer);
   }, [advancePhase]);
 
-  if (!question) return null;
+  if (!question && !cpuQuestion) return null;
 
   const content = (
     <motion.div
@@ -47,31 +52,35 @@ export function AnswerRevealed() {
         pointerEvents: 'auto',
       }}>
         {/* Player's question + answer */}
-        <div style={{
-          fontSize: 13,
-          color: 'rgba(255,255,254,0.4)',
-          marginBottom: 8,
-        }}>
-          {question.questionText}
-        </div>
+        {question && (
+          <>
+            <div style={{
+              fontSize: 13,
+              color: 'rgba(255,255,254,0.4)',
+              marginBottom: 8,
+            }}>
+              {question.questionText}
+            </div>
 
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          style={{
-            fontSize: 'clamp(36px, 10vw, 56px)',
-            fontWeight: 800,
-            fontFamily: "'Space Grotesk', sans-serif",
-            color: question.answer ? '#4CAF50' : '#E05555',
-            textShadow: question.answer
-              ? '0 0 40px rgba(76,175,80,0.4)'
-              : '0 0 40px rgba(224,85,85,0.4)',
-            marginBottom: cpuQuestion && (mode === 'free' || mode === 'nft-free') ? 16 : 0,
-          }}
-        >
-          {question.answer ? 'YES' : 'NO'}
-        </motion.div>
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              style={{
+                fontSize: 'clamp(36px, 10vw, 56px)',
+                fontWeight: 800,
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: question.answer ? '#4CAF50' : '#E05555',
+                textShadow: question.answer
+                  ? '0 0 40px rgba(76,175,80,0.4)'
+                  : '0 0 40px rgba(224,85,85,0.4)',
+                marginBottom: cpuQuestion && (mode === 'free' || mode === 'nft-free') ? 16 : 0,
+              }}
+            >
+              {question.answer ? 'YES' : 'NO'}
+            </motion.div>
+          </>
+        )}
 
         {/* CPU's simultaneous question (free modes only) */}
         {(mode === 'free' || mode === 'nft-free') && cpuQuestion && (

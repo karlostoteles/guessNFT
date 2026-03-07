@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useGameActions, useGameCharacters, useGuessedCharacterId } from '@/core/store/selectors';
+import { useGameActions, useGameCharacters, useGuessedCharacterId, useActivePlayer } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 
 /**
@@ -12,6 +12,8 @@ export function GuessWrongOverlay() {
   const characters = useGameCharacters();
   const guessedId = useGuessedCharacterId();
   const guessedChar = characters.find((c) => c.id === guessedId);
+  const activePlayer = useActivePlayer();
+  const isOpponent = activePlayer === 'player2';
 
   useEffect(() => {
     sfx.wrongGuess();
@@ -64,7 +66,7 @@ export function GuessWrongOverlay() {
           textShadow: '0 0 40px rgba(224,85,85,0.5)',
           marginBottom: 8,
         }}>
-          Wrong!
+          {isOpponent ? "Opponent Wrong!" : "Wrong!"}
         </div>
 
         {guessedChar && (
