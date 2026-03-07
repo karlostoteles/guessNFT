@@ -236,25 +236,29 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
         </motion.button>
       </div>
 
-      {/* ─── Animated floating particles (background decoration) ─── */}
+      {/* ─── Animated floating meme NFTs (background decoration) ─── */}
       {[...Array(6)].map((_, i) => (
-        <motion.div
-          key={`p${i}`}
-          initial={{ opacity: 0 }}
+        <motion.img
+          key={`nft_float_${i}`}
+          src={`/nft/${i + 1}.png`} // Assuming nft 1.png to 6.png exist based on standard Schizodio numbers
+          alt="Floating Meme"
+          initial={{ opacity: 0, rotate: Math.random() * 360, scale: 0.5 }}
           animate={{
-            opacity: [0, 0.15, 0],
-            y: [0, -60 - i * 20],
-            x: [0, (i % 2 === 0 ? 30 : -30)],
+            opacity: [0, 0.25, 0],
+            y: [0, -100 - i * 30],
+            x: [0, (i % 2 === 0 ? 50 : -50)],
+            rotate: [Math.random() * 360, Math.random() * 360 + 100],
           }}
-          transition={{ duration: 4 + i, repeat: Infinity, delay: i * 0.7 }}
+          transition={{ duration: 6 + i, repeat: Infinity, delay: i * 0.9, ease: "linear" }}
           style={{
             position: 'absolute',
-            width: 4 + i * 2, height: 4 + i * 2,
-            borderRadius: '50%',
-            background: i % 2 === 0 ? '#E8A444' : '#7C3AED',
+            width: 40 + i * 10, height: 40 + i * 10,
+            borderRadius: '12px',
             left: `${15 + i * 13}%`,
-            bottom: `${10 + i * 8}%`,
+            bottom: `${5 + i * 10}%`,
             pointerEvents: 'none',
+            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.5))',
+            objectFit: 'cover'
           }}
         />
       ))}
@@ -270,27 +274,52 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
           width: 'clamp(240px, 60vw, 480px)',
           height: 'auto',
           filter: 'drop-shadow(0 0 50px rgba(124,58,237,0.5))',
-          marginBottom: 4,
+          marginBottom: -16, // Strongly reduced spacing between logo and subtitle
+          position: 'relative',
+          zIndex: 2,
         }}
       />
 
-      {/* ─── Title: scales in with spring ─── */}
-      <motion.div
-        initial={{ scale: 0.3, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.45, type: 'spring', stiffness: 180, damping: 14 }}
-        style={{
-          fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: 'clamp(28px, 8vw, 48px)',
-          fontWeight: 800, letterSpacing: '-0.02em',
-          background: 'linear-gradient(135deg, #E8A444 0%, #F0C060 50%, #E8A444 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          filter: 'drop-shadow(0 0 30px rgba(232,164,68,0.3))',
-          marginBottom: 4, textAlign: 'center',
-        }}
-      >
-        {t('menu.title')}
-      </motion.div>
+      {/* ─── Title: Pixar-style jumping letters ─── */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '4px',
+        marginBottom: 8, position: 'relative', zIndex: 1, width: '90%'
+      }}>
+        {t('menu.title').split(' ').map((word, wordIdx) => (
+          <div key={`word-${wordIdx}`} style={{ display: 'flex', whiteSpace: 'pre' }}>
+            {word.split('').map((char, charIdx) => {
+              const letterIndex = wordIdx * 10 + charIdx; // rough staggered delay grouping
+              return (
+                <motion.span
+                  key={`char-${wordIdx}-${charIdx}`}
+                  initial={{ y: -40, opacity: 0, scale: 0.5 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 10 + Math.random() * 5,
+                    delay: 0.6 + (letterIndex * 0.05), // stagger effect
+                  }}
+                  whileHover={{ y: -10, scale: 1.2, color: "#FFF" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 'clamp(20px, 5vw, 36px)',
+                    fontWeight: 800, letterSpacing: '-0.02em',
+                    background: 'linear-gradient(135deg, #E8A444 0%, #F0C060 50%, #E8A444 100%)',
+                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 0 10px rgba(232,164,68,0.2))',
+                    display: 'inline-block',
+                    cursor: 'default',
+                  }}
+                >
+                  {char}
+                </motion.span>
+              );
+            })}
+            {wordIdx !== t('menu.title').split(' ').length - 1 && <span style={{ width: '8px' }}></span>}
+          </div>
+        ))}
+      </div>
 
       {/* ─── Badge: slides up with fade ─── */}
       <motion.div
