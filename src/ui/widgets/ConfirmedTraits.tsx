@@ -7,6 +7,7 @@
  */
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { QUESTIONS } from '@/core/data/questions';
 import {
     useQuestionHistory, useActivePlayer, usePhase, useGameMode,
@@ -25,6 +26,7 @@ const GAMEPLAY_PHASES = new Set([
 ]);
 
 export function ConfirmedTraits() {
+    const { t } = useTranslation();
     const phase = usePhase();
     const mode = useGameMode();
     const history = useQuestionHistory();
@@ -90,7 +92,7 @@ export function ConfirmedTraits() {
                         justifyContent: 'center',
                         gap: 3,
                     }}>
-                        ✅ I Know
+                        ✅ {t('game.i_know')}
                         <span style={{
                             fontSize: isMobile ? 11 : 13,
                             background: 'rgba(74,222,128,0.2)',
@@ -138,7 +140,7 @@ export function ConfirmedTraits() {
                     fontFamily: "'Space Grotesk', sans-serif",
                     letterSpacing: '0.04em',
                 }}>
-                    CONFIRMED
+                    {t('game.confirmed')}
                 </div>
             </motion.div>
         </AnimatePresence>

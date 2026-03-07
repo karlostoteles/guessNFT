@@ -7,6 +7,7 @@
  */
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { usePhase, useGameMode, useOnlinePlayerNum, useQuestionHistory } from '@/core/store/selectors';
 import { useGameStore } from '@/core/store/gameStore';
 import { GamePhase } from '@/core/store/types';
@@ -27,6 +28,7 @@ const GAMEPLAY_PHASES = new Set([
 ]);
 
 export function SecretCardPanel() {
+  const { t } = useTranslation();
   const phase = usePhase();
   const mode = useGameMode();
   const playerNum = useOnlinePlayerNum();
@@ -125,7 +127,7 @@ export function SecretCardPanel() {
               fontFamily: "'Space Grotesk', sans-serif",
               letterSpacing: '0.04em',
             }}>
-              MY CARD
+              {t('game.my_card')}
             </div>
           </div>
 
@@ -151,11 +153,11 @@ export function SecretCardPanel() {
                 textTransform: 'uppercase', textAlign: 'center',
                 marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif",
               }}>
-                🕵️ They Know
+                🕵️ {t('game.they_know')}
               </div>
               {opponentTraits.length === 0 ? (
                 <div style={{ fontSize: isMobile ? 10 : 12, color: 'rgba(255,255,254,0.25)', textAlign: 'center', padding: '16px 0', fontStyle: 'italic' }}>
-                  Nothing yet
+                  {t('game.nothing_yet')}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -180,7 +182,7 @@ export function SecretCardPanel() {
               color: 'rgba(224,85,85,0.4)',
               fontFamily: "'Space Grotesk', sans-serif",
             }}>
-              ENEMY INFO
+              {t('game.enemy_info')}
             </div>
           </div>
         </motion.div>

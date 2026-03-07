@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 // ─── Waiting pill ─────────────────────────────────────────────────────────────
 
 export function WaitingPill() {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -33,7 +35,7 @@ export function WaitingPill() {
       >
         ⏳
       </motion.span>
-      Waiting for opponent's question…
+      {t('game.thinking')}
     </motion.div>
   );
 }
@@ -41,6 +43,7 @@ export function WaitingPill() {
 // ─── Risk-it pill (minimised) ─────────────────────────────────────────────────
 
 export function RiskItPill({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <motion.button
       onClick={onClick}
@@ -63,7 +66,7 @@ export function RiskItPill({ onClick }: { onClick: () => void }) {
         <rect x="3" y="14" width="7" height="7" />
         <rect x="14" y="14" width="7" height="7" />
       </svg>
-      BOARD
+      {t('game.board')}
     </motion.button>
   );
 }
@@ -74,6 +77,7 @@ export function AskPill({
   askedCount,
   onClick,
 }: { askedCount: number; onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <motion.button
       onClick={onClick}
@@ -91,7 +95,7 @@ export function AskPill({
       }}
     >
       <span style={{ fontSize: 16 }}>❓</span>
-      Ask a Question
+      {t('game.ask_question')}
       {askedCount > 0 && (
         <span style={{
           background: 'rgba(232,164,68,0.2)', border: '1px solid rgba(232,164,68,0.25)',

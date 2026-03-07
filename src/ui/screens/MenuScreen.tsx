@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sfx } from '@/shared/audio/sfx';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { OnlineLobbyScreen } from './OnlineLobbyScreen';
 import { useGameActions } from '@/core/store/selectors';
 import { MEME_CHARACTERS } from '@/core/data/memeCharacters';
@@ -176,6 +177,12 @@ interface MenuMainProps {
 }
 
 function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
+  const { t, i18n } = useTranslation();
+
+  const toggleLang = () => {
+    i18n.changeLanguage(i18n.language.startsWith('es') ? 'en' : 'es');
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -189,6 +196,21 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
         overflow: 'hidden',
       }}
     >
+      {/* ─── Language Toggle ─── */}
+      <motion.button
+        onClick={toggleLang}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        style={{
+          position: 'absolute', top: 20, right: 20, zIndex: 10,
+          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700,
+          color: '#FFFFFE', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        {i18n.language.startsWith('es') ? '🇪🇸 ES' : '🇬🇧 EN'}
+      </motion.button>
+
       {/* ─── Animated floating particles (background decoration) ─── */}
       {[...Array(6)].map((_, i) => (
         <motion.div
@@ -242,7 +264,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
           marginBottom: 4, textAlign: 'center',
         }}
       >
-        Guess it right, win twice
+        {t('menu.title')}
       </motion.div>
 
       {/* ─── Badge: slides up with fade ─── */}
@@ -259,7 +281,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
           color: '#A78BFA', marginBottom: 8,
         }}
       >
-        SCHIZODIO Premiere
+        {t('menu.badge')}
       </motion.div>
 
       {/* ─── Subtitle: gentle fade in ─── */}
@@ -269,7 +291,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
         transition={{ delay: 0.95, duration: 0.8 }}
         style={{ fontSize: 15, color: 'rgba(255,255,254,0.38)', fontWeight: 500, marginBottom: 24, textAlign: 'center' }}
       >
-        The classic family game, now yours
+        {t('menu.subtitle')}
       </motion.div>
 
       {/* Login Button (if not connected) */}
@@ -305,6 +327,7 @@ function MenuMain({ onFreePlay, onPlayOnline }: MenuMainProps) {
 // ─── Tile: Play for Real ───────────────────────────────────────────────────────
 
 function PlayRealTile({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <motion.button
       onClick={() => { sfx.cardClick(); onClick(); }}
@@ -340,10 +363,10 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(232,164,68,0.45), transparent)', flexShrink: 0 }} />
       <div style={{ padding: '11px 13px 13px', textAlign: 'left', fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFE', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
-          Play for Real
+          {t('menu.play_real')}
         </div>
         <div style={{ fontSize: 10, color: 'rgba(232,164,68,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
-          online mode
+          {t('menu.play_real_sub')}
         </div>
       </div>
       <div style={{
@@ -357,6 +380,7 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
 // ─── Tile: Play for Free ───────────────────────────────────────────────────────
 
 function PlayFreeTile({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <motion.button
       onClick={() => { sfx.cardClick(); onClick(); }}
@@ -394,16 +418,16 @@ function PlayFreeTile({ onClick }: { onClick: () => void }) {
           letterSpacing: '0.1em', color: '#A78BFA',
           fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' as const,
         }}>
-          FREE TO PLAY
+          {t('menu.free_to_play')}
         </div>
       </div>
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(124,58,237,0.38), transparent)', flexShrink: 0 }} />
       <div style={{ padding: '11px 13px 13px', textAlign: 'left', fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFE', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
-          Practice
+          {t('menu.practice')}
         </div>
         <div style={{ fontSize: 10, color: 'rgba(167,139,250,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
-          vs AI
+          {t('menu.practice_sub')}
         </div>
       </div>
       <div style={{
@@ -425,6 +449,7 @@ interface FreePickProps {
 }
 
 function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: FreePickProps) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -440,7 +465,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
       }}
     >
       <div style={{ width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column' }}>
-        <SubHeader onBack={onBack} title="Practice" />
+        <SubHeader onBack={onBack} title={t('menu.practice')} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* CT Version */}
@@ -449,8 +474,8 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
             accent="#7C3AED"
             accentRgb="124,58,237"
             icon="🤖"
-            title="CT"
-            subtitle="Crypto Twitter meme characters"
+            title={t('menu.ct_version')}
+            subtitle={t('menu.ct_version_sub')}
             tag="24 CHARACTERS"
           />
           {/* Schizodio vs AI — connects wallet & checks NFT ownership */}
@@ -459,8 +484,8 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
             accent="#06B6D4"
             accentRgb="6,182,212"
             icon="💀"
-            title={nftStatus || "NFT version"}
-            subtitle="Connect wallet & play with your NFTs"
+            title={nftStatus || t('menu.nft_version')}
+            subtitle={t('menu.nft_version_sub')}
             tag="NFT"
             disabled={loading}
           />
@@ -478,6 +503,7 @@ interface RealPickProps {
 }
 
 function RealPickView({ onBack, onNormal }: RealPickProps) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -493,7 +519,7 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
       }}
     >
       <div style={{ width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column' }}>
-        <SubHeader onBack={onBack} title="Play for Real" />
+        <SubHeader onBack={onBack} title={t('menu.play_real')} />
 
         {/* Collection badge */}
         <div style={{
@@ -520,9 +546,9 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             accent="#E8A444"
             accentRgb="232,164,68"
             icon="⚔️"
-            title="Normal"
-            subtitle="Classic 1v1 — each player picks their SCHIZODIO"
-            tag="ONLINE"
+            title={t('menu.normal')}
+            subtitle={t('menu.normal_sub')}
+            tag={t('menu.online')}
           />
           {/* SCHIZO Mode — soon */}
           <OptionCard
@@ -530,9 +556,9 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             accent="#E05555"
             accentRgb="224,85,85"
             icon="🔥"
-            title="SCHIZO Mode"
-            subtitle="Bet your SCHIZODIO against your opponent's"
-            tag="SOON"
+            title={t('menu.schizo_mode')}
+            subtitle={t('menu.schizo_mode_sub')}
+            tag={t('menu.coming_soon')}
             disabled
           />
           {/* Ducks — soon */}
@@ -543,7 +569,7 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             icon="🦆"
             title="Starknet Ducks"
             subtitle="The quackiest collection descends on the board"
-            tag="SOON"
+            tag={t('menu.coming_soon')}
             disabled
           />
           {/* Blobert — soon */}
@@ -554,7 +580,7 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             icon="🧙‍♂️"
             title="Blobert"
             subtitle="A magical assembly of highly intelligent blobs"
-            tag="SOON"
+            tag={t('menu.coming_soon')}
             disabled
           />
           {/* SchizoSol — soon */}
@@ -565,7 +591,7 @@ function RealPickView({ onBack, onNormal }: RealPickProps) {
             icon="☀️"
             title="SchizoSol"
             subtitle="The Solana integration expands the madness"
-            tag="SOON"
+            tag={t('menu.coming_soon')}
             disabled
           />
         </div>
@@ -654,6 +680,7 @@ function OptionCard({ onClick, accent, accentRgb, icon, title, subtitle, tag, di
 // ─── Login Button Section ──────────────────────────────────────────────────
 
 function LoginButtonSection() {
+  const { t } = useTranslation();
   const status = useWalletStatus();
   const address = useWalletAddress();
   const { connectWallet } = useWalletConnection();
@@ -692,13 +719,13 @@ function LoginButtonSection() {
           boxShadow: '0 0 20px rgba(124,58,237,0.25)',
         }}
       >
-        {isConnecting ? <><Spinner /> Authenticating...</> : (
+        {isConnecting ? <><Spinner /> {t('auth.authenticating')}</> : (
           <>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, opacity: 0.9 }}>
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
-            Login
+            {t('auth.login')}
           </>
         )}
       </motion.button>

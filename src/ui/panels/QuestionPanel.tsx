@@ -23,8 +23,10 @@ import { RarityInfoButton } from './question/QuestionButtons';
 import { NFTModeBody } from './question/NFTModeBody';
 import { FreeModeBody } from './question/FreeModeBody';
 import { useIsMobile } from '@/shared/hooks/useMediaQuery';
+import { useTranslation } from 'react-i18next';
 
 export function QuestionPanel() {
+  const { t } = useTranslation();
   const [minimised, setMinimised] = useState(false);
   const [activeZone, setActiveZone] = useState<string | null>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export function QuestionPanel() {
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontWeight: 700, fontSize: isMobile ? 15 : 17, margin: 0, color: '#FFFFFE',
                 }}>
-                  Ask a Question
+                  {t('game.ask_question')}
                 </h3>
                 {askedIds.size > 0 && (
                   <span style={{
@@ -158,7 +160,7 @@ export function QuestionPanel() {
                     border: '1px solid rgba(232,164,68,0.18)',
                     borderRadius: 20, padding: '1px 8px',
                   }}>
-                    SCHIZODIO TRAITS
+                    {t('game.schizodio_traits')}
                   </span>
                 )}
               </div>
@@ -186,7 +188,7 @@ export function QuestionPanel() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
-                    GUESS NOW!
+                    {t('game.risk_it').toUpperCase()}!
                   </motion.button>
                 )}
                 <motion.button
@@ -204,7 +206,7 @@ export function QuestionPanel() {
                     justifyContent: 'center',
                   }}
                 >
-                  📋 BOARD
+                  📋 {t('game.board')}
                 </motion.button>
                 {isNFTMode && <RarityInfoButton />}
                 <motion.button
