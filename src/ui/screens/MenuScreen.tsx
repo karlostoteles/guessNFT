@@ -192,6 +192,11 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
       {/* Spacer — pushes content to center when viewport is tall, collapses when scrolling */}
       <div style={{ flex: '1 1 0', minHeight: 0 }} />
 
+      {/* ─── Top Left Controls ─── */}
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+        <LoginButtonSection />
+      </div>
+
       {/* ─── Top Right Controls ─── */}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10, display: 'flex', gap: 10 }}>
         {/* Leaderboard Button */}
@@ -342,9 +347,6 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
           marginBottom: 16,
         }}
       />
-
-      {/* Login Button (if not connected) */}
-      <LoginButtonSection />
 
       {/* ─── Two main tiles: slide in from sides ─── */}
       <div style={{

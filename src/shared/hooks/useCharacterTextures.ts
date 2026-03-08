@@ -14,6 +14,8 @@ function extractImageHash(url: string): string | null {
   return match ? match[1] : null;
 }
 
+const globalTextureCache = new Map<string, THREE.Texture>();
+
 /**
  * Returns a texture map for all game characters.
  *
@@ -28,14 +30,11 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
   const isMinimal = lod === 'minimal';
   const isLargeBoard = characters.length > 100;
 
-  const [textures, setTextures] = useState<Map<string, THREE.Texture>>(new Map());
+  const [textures, setTextures] = useState<Map<string, THREE.Texture>>(() => new Map(globalTextureCache));
 
   // 1. Build procedural textures
   useEffect(() => {
-    if (isMinimal) {
-      setTextures(new Map());
-      return;
-    }
+    if (isMinimal) return;
 
     if (isLargeBoard) {
       const placeholder = renderPortrait({
@@ -49,27 +48,36 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         } as any
       }, undefined, true);
 
-      const map = new Map<string, THREE.Texture>();
-      for (const char of characters) {
-        map.set(char.id, placeholder);
-      }
-      setTextures(map);
-      return () => { placeholder.dispose(); };
+      setTextures((prev) => {
+        const next = new Map(prev);
+        for (const char of characters) {
+          if (!globalTextureCache.has(char.id) && !next.has(char.id)) {
+            next.set(char.id, placeholder);
+          } else if (globalTextureCache.has(char.id)) {
+            next.set(char.id, globalTextureCache.get(char.id)!);
+          }
+        }
+        return next;
+      });
+      return; // Not automatically disposing placeholder on unmount to avoid breaking cache usage later
     }
 
-    const map = new Map<string, THREE.Texture>();
-    for (const char of characters) {
-      map.set(char.id, renderPortrait(char, undefined, false));
-    }
-    setTextures(map);
-    return () => {
-      for (const texture of map.values()) texture.dispose();
-    };
+    setTextures((prev) => {
+      const next = new Map(prev);
+      for (const char of characters) {
+        if (!globalTextureCache.has(char.id) && !next.has(char.id)) {
+          const tex = renderPortrait(char, undefined, false);
+          next.set(char.id, tex);
+        } else if (globalTextureCache.has(char.id)) {
+          next.set(char.id, globalTextureCache.get(char.id)!);
+        }
+      }
+      return next;
+    });
   }, [isMinimal, characters, isLargeBoard]);
 
-  // Track all async loaded textures so we can dispose them
-  const asyncTexturesRef = useRef<THREE.Texture[]>([]);
-
+  // Track all async loaded textures during THIS effect so we can potentially clean them up if needed
+  // However we now keep them globally so they avoid reloading 
   // 2. Async upgrade: load real art
   useEffect(() => {
     if (isMinimal || !characters || characters.length === 0) return;
@@ -112,6 +120,8 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         await Promise.all(
           batch.map(async (char) => {
             if (cancelled) return;
+            if (globalTextureCache.has(char.id)) return;
+
             const numericId = char.id.replace('nft_', '');
 
             // Fast path: use image hash directly (skips metadata fetch)
@@ -125,8 +135,8 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
             for (const url of urls) {
               const texture = await loadImageAsTexture(url);
               if (texture && !cancelled) {
+                globalTextureCache.set(char.id, texture);
                 batchTextures.set(char.id, texture);
-                asyncTexturesRef.current.push(texture);
                 break;
               } else if (texture) {
                 texture.dispose();
@@ -154,9 +164,8 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     loadBatches();
     return () => {
       cancelled = true;
-      // Safely dispose all async textures off GPU
-      asyncTexturesRef.current.forEach(t => t.dispose());
-      asyncTexturesRef.current = [];
+      // We purposefully DO NOT dispose them off the GPU because 
+      // they remain in globalTextureCache for instant restoration
     };
   }, [characters, isMinimal]);
 
