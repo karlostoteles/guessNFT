@@ -23,6 +23,29 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+
+  // COOP+COEP: required for SharedArrayBuffer (bb.js WASM multi-threading)
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+    proxy: {
+      '/world.World': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
+
+  // @aztec/bb.js WASM breaks if Vite pre-bundles it
+  optimizeDeps: {
+    exclude: ['@aztec/bb.js'],
+  },
+
+  // Web Workers must use ES module format for top-level imports
+  worker: { format: 'es' },
+
   build: {
     chunkSizeWarningLimit: 2500,
     rollupOptions: {

@@ -1,5 +1,5 @@
 {
-  "name": "guessnft",
+  "name": "whoiswho",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -9,11 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aztec/bb.js": "3.0.0-nightly.20251104",
+    "@dojoengine/torii-client": "^1.8.2",
+    "@noir-lang/noir_js": "1.0.0-beta.16",
     "@react-spring/three": "^10.0.3",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@supabase/supabase-js": "^2.98.0",
     "framer-motion": "^12.34.3",
+    "garaga": "^1.0.1",
     "i18next": "^25.8.14",
     "i18next-browser-languagedetector": "^8.2.1",
     "immer": "^11.1.4",
@@ -24,6 +28,8 @@
     "starkzap": "^1.0.0",
     "three": "^0.183.1",
     "vite-plugin-node-polyfills": "^0.25.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
