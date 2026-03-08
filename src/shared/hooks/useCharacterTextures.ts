@@ -4,8 +4,15 @@ import { useGameCharacters } from '@/core/store/selectors';
 import { renderPortrait, renderCardBack } from '@/rendering/canvas/PortraitRenderer';
 import { getTileLOD } from '@/core/rules/constants';
 
-// No longer needed: we use procedural canvases exclusively
-// export const globalTextureCache = new Map<string, THREE.Texture>();
+/**
+ * Extract the image hash from a schizodio URL.
+ * Input:  "https://v1assets.schizod.io/images/revealed/5b377cf6...png"
+ * Output: "5b377cf6..."
+ */
+function extractImageHash(url: string): string | null {
+  const match = url.match(/\/([a-f0-9]+)\.png$/i);
+  return match ? match[1] : null;
+}
 
 export const globalTextureCache = new Map<string, THREE.Texture>();
 
@@ -69,7 +76,94 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
     });
   }, [isMinimal, characters, isLargeBoard]);
 
-  // We no longer do Async PNG upgrades — using procedural light versions globally!
+  // Track all async loaded textures during THIS effect so we can potentially clean them up if needed
+  // However we now keep them globally so they avoid reloading 
+  // 2. Async upgrade: load real art
+  useEffect(() => {
+    if (isMinimal || !characters || characters.length === 0) return;
+
+    let cancelled = false;
+    const BATCH_SIZE = 20;
+    const BATCH_DELAY = 80;
+    const IMG_SIZE = 64; // Small for WebGL tiles — saves GPU memory
+
+    function loadImageAsTexture(url: string): Promise<THREE.Texture | null> {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const texture = new THREE.Texture(img);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.needsUpdate = true;
+            resolve(texture);
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        setTimeout(() => resolve(null), 12000);
+        img.src = url;
+      });
+    }
+
+    const loadBatches = async () => {
+      for (let i = 0; i < characters.length; i += BATCH_SIZE) {
+        if (cancelled) break;
+        const batch = characters.slice(i, i + BATCH_SIZE);
+        const batchTextures = new Map<string, THREE.Texture>();
+
+        await Promise.all(
+          batch.map(async (char) => {
+            if (cancelled) return;
+            if (globalTextureCache.has(char.id)) return;
+
+            const numericId = char.id.replace('nft_', '');
+
+            // Fast path: use image hash directly (skips metadata fetch)
+            const hash = char.imageUrl ? extractImageHash(char.imageUrl) : null;
+            const urls = [
+              hash ? `/api/nft-img?hash=${hash}` : null,
+              `/nft/${numericId}.png`,           // local (from download pipeline)
+              `/api/nft-art/${numericId}`,        // slow fallback (metadata + image)
+            ].filter(Boolean) as string[];
+
+            for (const url of urls) {
+              const texture = await loadImageAsTexture(url);
+              if (texture && !cancelled) {
+                globalTextureCache.set(char.id, texture);
+                batchTextures.set(char.id, texture);
+                break;
+              } else if (texture) {
+                texture.dispose();
+              }
+            }
+          })
+        );
+
+        if (cancelled) break;
+
+        if (batchTextures.size > 0) {
+          setTextures((prev) => {
+            const next = new Map(prev);
+            for (const [id, tex] of batchTextures) {
+              next.set(id, tex);
+            }
+            return next;
+          });
+        }
+
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
+      }
+    };
+
+    loadBatches();
+    return () => {
+      cancelled = true;
+      // We purposefully DO NOT dispose them off the GPU because 
+      // they remain in globalTextureCache for instant restoration
+    };
+  }, [characters, isMinimal]);
 
   return textures;
 }
