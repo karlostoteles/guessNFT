@@ -23,6 +23,7 @@ import { CharacterTile } from './CharacterTile';
 import { TextureAtlas } from '@/rendering/canvas/TextureAtlas';
 import { renderPortraitCanvas } from '@/rendering/canvas/PortraitRenderer';
 import { sfx } from '@/shared/audio/sfx';
+import { globalTextureCache } from '@/shared/hooks/useCharacterTextures';
 
 interface CharacterGridProps {
   textures: Map<string, THREE.Texture>;
@@ -188,22 +189,33 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     // Bind atlas texture to shader uniform
     material.uniforms.uAtlas.value = atlas.texture;
 
-    // Fill all cells with a HSL color immediately (instant visual)
+    // Fill all cells with existing cached images or fallback to procedural
     for (let i = 0; i < characters.length; i++) {
-      const hue = idToHue(characters[i].id);
-      const hsl = `hsl(${Math.round(hue)}, 70%, 55%)`;
-      atlas.fillCell(i, hsl);
+      const char = characters[i];
+      const cached = globalTextureCache.get(char.id);
+
+      if (cached && cached.image) {
+        // Draw the cached image/canvas instantly
+        atlas.drawCell(i, cached.image as HTMLCanvasElement | HTMLImageElement);
+      } else {
+        const hue = idToHue(char.id);
+        const hsl = `hsl(${Math.round(hue)}, 70%, 55%)`;
+        atlas.fillCell(i, hsl);
+      }
     }
 
-    // Batch-render procedural portraits into atlas cells (50 per rAF to avoid jank)
+    // Batch-render procedural portraits into atlas cells
     let procIdx = 0;
     let rafId = 0;
     const PROC_BATCH = 50;
     function renderProceduralBatch() {
       const end = Math.min(procIdx + PROC_BATCH, characters.length);
       for (; procIdx < end; procIdx++) {
-        const canvas = renderPortraitCanvas(characters[procIdx], undefined, true);
-        atlas.drawCell(procIdx, canvas);
+        const char = characters[procIdx];
+        if (!globalTextureCache.has(char.id)) {
+          const canvas = renderPortraitCanvas(char, undefined, true);
+          atlas.drawCell(procIdx, canvas);
+        }
       }
       // Mark dirty once per batch (not per cell)
       atlas.markDirty();
@@ -254,6 +266,9 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
             const atlas = atlasRef.current;
             if (!atlas) return;
 
+            // Skip if already in global cache
+            if (globalTextureCache.has(char.id)) return;
+
             const numericId = char.id.replace('nft_', '');
             const hash = char.imageUrl ? extractImageHash(char.imageUrl) : null;
             const urls = [
@@ -265,6 +280,16 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
             for (const url of urls) {
               const img = await loadImage(url);
               if (img && !cancelled && atlasRef.current) {
+                // Populate global cache for IndividualGrid to use later
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, 64, 64);
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                globalTextureCache.set(char.id, texture);
+
                 const idx = charIndexMapRef.current.get(char.id);
                 if (idx !== undefined) {
                   atlasRef.current.drawCell(idx, img);

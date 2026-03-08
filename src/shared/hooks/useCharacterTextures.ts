@@ -14,7 +14,7 @@ function extractImageHash(url: string): string | null {
   return match ? match[1] : null;
 }
 
-const globalTextureCache = new Map<string, THREE.Texture>();
+export const globalTextureCache = new Map<string, THREE.Texture>();
 
 /**
  * Returns a texture map for all game characters.
