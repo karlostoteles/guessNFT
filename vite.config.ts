@@ -1,14 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
+import path from 'path'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+    dedupe: ['react', 'react-dom', '@react-three/fiber'],
+  },
   plugins: [
     react(),
-    wasm(),
-    topLevelAwait(),
     nodePolyfills({
       include: ['buffer', 'process', 'stream', 'util'],
       globals: {
@@ -20,25 +23,13 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
-  // Required for @aztec/bb.js: prevents Vite from rewriting worker URLs inside the WASM bundle
-  optimizeDeps: {
-    exclude: [
-      '@aztec/bb.js',
-      '@dojoengine/torii-client',
-      '@noir-lang/noir_js',
-      '@noir-lang/acvm_js',
-      '@noir-lang/noirc_abi',
-    ],
-    include: ['@aztec/bb.js > pino'],
-  },
-  // Required for SharedArrayBuffer (multi-threaded WASM in bb.js proof generation)
+
+  // COOP+COEP: required for SharedArrayBuffer (bb.js WASM multi-threading)
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
-    // Proxy Torii gRPC-web requests through Vite to avoid CORS/COEP conflicts.
-    // COEP require-corp blocks cross-origin fetches to Torii; same-origin proxy bypasses this.
     proxy: {
       '/world.World': {
         target: 'http://localhost:8080',
@@ -46,10 +37,15 @@ export default defineConfig({
       },
     },
   },
-  worker: {
-    format: 'es',
-    plugins: () => [wasm(), topLevelAwait()],
+
+  // @aztec/bb.js WASM breaks if Vite pre-bundles it
+  optimizeDeps: {
+    exclude: ['@aztec/bb.js'],
   },
+
+  // Web Workers must use ES module format for top-level imports
+  worker: { format: 'es' },
+
   build: {
     chunkSizeWarningLimit: 2500,
     rollupOptions: {
