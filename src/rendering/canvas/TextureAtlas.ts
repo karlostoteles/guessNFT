@@ -93,6 +93,16 @@ export class TextureAtlas {
     return [uOffset, vOffset, uScale, vScale];
   }
 
+  /**
+   * Draw a pre-built atlas image over the entire canvas in one operation.
+   * Use this when a server-side baked WebP is available — faster than per-cell updates.
+   */
+  drawFull(source: HTMLImageElement | HTMLCanvasElement): void {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(source, 0, 0, this.canvas.width, this.canvas.height);
+    this.texture.needsUpdate = true;
+  }
+
   /** Mark the texture as needing a GPU upload (call after batch updates). */
   markDirty(): void {
     this.texture.needsUpdate = true;

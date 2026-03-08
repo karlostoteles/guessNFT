@@ -151,6 +151,8 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
   // Stable atlas + per-character index (created once per character list)
   const atlasRef = useRef<TextureAtlas | null>(null);
   const charIndexMapRef = useRef<Map<string, number>>(new Map());
+  // True once a pre-built /atlas/schizodio-atlas.webp has been drawn — skip per-image loading
+  const prebuiltLoadedRef = useRef(false);
 
   // Per-instance UV attribute
   const uvAttrRef = useRef<THREE.InstancedBufferAttribute | null>(null);
@@ -188,6 +190,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     // Create atlas
     const atlas = new TextureAtlas(characters.length, 128);
     atlasRef.current = atlas;
+    prebuiltLoadedRef.current = false;
 
     // Bind atlas texture to shader uniform
     material.uniforms.uAtlas.value = atlas.texture;
@@ -214,8 +217,10 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     // Batch-render procedural portraits into atlas cells
     let procIdx = 0;
     let rafId = 0;
+    let procCancelled = false;
     const PROC_BATCH = 50;
     function renderProceduralBatch() {
+      if (procCancelled) return;
       const end = Math.min(procIdx + PROC_BATCH, characters.length);
       for (; procIdx < end; procIdx++) {
         const char = characters[procIdx];
@@ -233,7 +238,21 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     }
     rafId = requestAnimationFrame(renderProceduralBatch);
 
+    // Try loading pre-built static atlas (one HTTP request replaces all procedural work)
+    const prebuilt = new Image();
+    prebuilt.onload = () => {
+      if (!procCancelled && atlasRef.current === atlas) {
+        procCancelled = true;
+        cancelAnimationFrame(rafId);
+        atlas.drawFull(prebuilt);
+        prebuiltLoadedRef.current = true;
+      }
+    };
+    // onerror: silently fall through to procedural + per-image NFT loading
+    prebuilt.src = '/atlas/schizodio-atlas.webp';
+
     return () => {
+      procCancelled = true;
       cancelAnimationFrame(rafId);
       atlas.dispose();
       atlasRef.current = null;
@@ -261,8 +280,10 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     }
 
     const loadBatches = async () => {
-      // Wait for atlas to be ready (procedural rendering may still be in progress)
-      await new Promise(r => setTimeout(r, 200));
+      // Wait for atlas to be ready; also allows pre-built atlas time to load
+      await new Promise(r => setTimeout(r, 300));
+      // If pre-built atlas loaded successfully, it already has all 999 NFT images — skip
+      if (prebuiltLoadedRef.current) return;
 
       for (let i = 0; i < characters.length; i += BATCH_SIZE) {
         if (cancelled) break;

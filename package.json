@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:atlas": "node scripts/build-schizodio-atlas.mjs"
   },
   "dependencies": {
     "@react-spring/three": "^10.0.3",
@@ -31,6 +32,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^5.1.4",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   }
