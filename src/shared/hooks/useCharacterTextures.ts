@@ -93,7 +93,12 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         img.crossOrigin = 'anonymous';
         img.onload = () => {
           try {
-            const texture = new THREE.Texture(img);
+            const canvas = document.createElement('canvas');
+            canvas.width = IMG_SIZE;
+            canvas.height = IMG_SIZE;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
+            const texture = new THREE.CanvasTexture(canvas);
             texture.colorSpace = THREE.SRGBColorSpace;
             texture.needsUpdate = true;
             resolve(texture);

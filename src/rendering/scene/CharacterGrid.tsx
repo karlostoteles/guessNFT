@@ -288,15 +288,20 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
             for (const url of urls) {
               const img = await loadImage(url);
               if (img && !cancelled && atlasRef.current) {
-                // Populate global cache for IndividualGrid to use later
-                const texture = new THREE.Texture(img);
+                // Generate a fully initialized CanvasTexture to guarantee WebGL survival across component bounds
+                const canvas = document.createElement('canvas');
+                canvas.width = IMG_SIZE;
+                canvas.height = IMG_SIZE;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
+                const texture = new THREE.CanvasTexture(canvas);
                 texture.colorSpace = THREE.SRGBColorSpace;
                 texture.needsUpdate = true;
                 globalTextureCache.set(char.id, texture);
 
                 const idx = charIndexMapRef.current.get(char.id);
                 if (idx !== undefined) {
-                  atlasRef.current.drawCell(idx, img);
+                  atlasRef.current.drawCell(idx, canvas); // Draw using the canvas to preserve precise bounds
                 }
                 break;
               }

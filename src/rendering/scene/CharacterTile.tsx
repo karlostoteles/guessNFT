@@ -136,7 +136,7 @@ export const CharacterTile = memo(({
         {texture && (
           <mesh position={[0, 0, (isFlat ? 0 : DEPTH / 2) + 0.001]}>
             <planeGeometry args={[tileW * 0.93, tileH * 0.86]} />
-            <meshStandardMaterial map={texture} roughness={0.55} transparent />
+            <meshBasicMaterial map={texture} transparent />
           </mesh>
         )}
 
