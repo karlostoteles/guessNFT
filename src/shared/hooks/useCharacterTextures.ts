@@ -116,7 +116,11 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
         await Promise.all(
           batch.map(async (char) => {
             if (cancelled) return;
-            if (globalTextureCache.has(char.id)) return;
+            const existing = globalTextureCache.get(char.id);
+            if (existing) {
+              batchTextures.set(char.id, existing);
+              return;
+            }
 
             const numericId = char.id.replace('nft_', '');
 
