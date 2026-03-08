@@ -366,59 +366,28 @@ function MenuMain({ onFreePlay, onPlayOnline, onLeaderboard }: MenuMainProps) {
         }}
       />
 
-      {/* ─── Menu: Game Modes embedded in Nanobanana Framework ─── */}
+      {/* ─── Two main tiles: slide in from sides ─── */}
       <div style={{
-        position: 'relative',
-        width: 'clamp(340px, 90vw, 480px)',
-        margin: '20px auto 0',
-        padding: '12%', // Give space for the thick plastic border
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'flex', gap: 'clamp(12px, 3vw, 28px)',
+        alignItems: 'stretch', justifyContent: 'center',
+        flexWrap: 'wrap',
+        marginTop: 20,
+        padding: '0 16px',
       }}>
-        {/* Nanobanana Framework Image */}
-        <img
-          src="/images/board_card_framework.png"
-          alt="Board Game Framework"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            zIndex: 0,
-            pointerEvents: 'none',
-            filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.6))',
-          }}
-        />
-
-        {/* Embedded Game Modes */}
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex',
-          gap: '4%',
-          width: '100%',
-          alignItems: 'stretch',
-          justifyContent: 'center',
-        }}>
-          <motion.div
-            initial={{ x: -60, opacity: 0, scale: 0.9 }}
-            animate={{ x: 0, opacity: 1, scale: 1 }}
-            transition={{ delay: 1.1, type: 'spring', stiffness: 130, damping: 16 }}
-            style={{ flex: 1 }}
-          >
-            <PlayRealTile onClick={onPlayOnline} />
-          </motion.div>
-          <motion.div
-            initial={{ x: 60, opacity: 0, scale: 0.9 }}
-            animate={{ x: 0, opacity: 1, scale: 1 }}
-            transition={{ delay: 1.25, type: 'spring', stiffness: 130, damping: 16 }}
-            style={{ flex: 1 }}
-          >
-            <PlayFreeTile onClick={onFreePlay} />
-          </motion.div>
-        </div>
+        <motion.div
+          initial={{ x: -100, opacity: 0, rotate: -5 }}
+          animate={{ x: 0, opacity: 1, rotate: 0 }}
+          transition={{ delay: 1.1, type: 'spring', stiffness: 130, damping: 16 }}
+        >
+          <PlayRealTile onClick={onPlayOnline} />
+        </motion.div>
+        <motion.div
+          initial={{ x: 100, opacity: 0, rotate: 5 }}
+          animate={{ x: 0, opacity: 1, rotate: 0 }}
+          transition={{ delay: 1.25, type: 'spring', stiffness: 130, damping: 16 }}
+        >
+          <PlayFreeTile onClick={onFreePlay} />
+        </motion.div>
       </div>
 
       {/* Bottom spacer — mirrors top spacer for centering */}
@@ -438,13 +407,12 @@ function PlayRealTile({ onClick }: { onClick: () => void }) {
       whileTap={{ scale: 0.97 }}
       initial={false}
       style={{
-        width: '100%',
-        aspectRatio: '0.69',
-        height: 'auto',
+        width: 'clamp(156px, 42vw, 188px)',
+        height: 'clamp(228px, 60vw, 272px)',
         background: 'linear-gradient(165deg, #1c1228 0%, #0e0c1e 100%)',
-        border: '2px solid #E8A444', borderRadius: 12,
+        border: '1.5px solid rgba(232,164,68,0.5)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', padding: 0, overflow: 'hidden',
-        boxShadow: 'inset 0 0 16px rgba(0,0,0,0.8), 0 4px 12px rgba(0,0,0,0.4)',
+        boxShadow: '0 0 28px rgba(232,164,68,0.16), 0 4px 20px rgba(0,0,0,0.4)',
         display: 'flex', flexDirection: 'column', position: 'relative',
       }}
     >
@@ -492,13 +460,12 @@ function PlayFreeTile({ onClick }: { onClick: () => void }) {
       whileTap={{ scale: 0.97 }}
       initial={false}
       style={{
-        width: '100%',
-        aspectRatio: '0.69',
-        height: 'auto',
+        width: 'clamp(156px, 42vw, 188px)',
+        height: 'clamp(228px, 60vw, 272px)',
         background: 'linear-gradient(165deg, #101428 0%, #080c1e 100%)',
-        border: '2px solid #7C3AED', borderRadius: 12,
+        border: '1.5px solid rgba(124,58,237,0.4)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', padding: 0, overflow: 'hidden',
-        boxShadow: 'inset 0 0 16px rgba(0,0,0,0.8), 0 4px 12px rgba(0,0,0,0.4)',
+        boxShadow: '0 0 22px rgba(124,58,237,0.12), 0 4px 20px rgba(0,0,0,0.4)',
         display: 'flex', flexDirection: 'column', position: 'relative',
       }}
     >
