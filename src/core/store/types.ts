@@ -68,6 +68,7 @@ export interface GameActions {
   setGameMode: (mode: GameMode, characters?: Character[]) => void;
   startSetup: () => void;
   selectSecretCharacter: (player: PlayerId, characterId: string) => void;
+  assignRandomSecretCharacter: (player: PlayerId) => void;
   advancePhase: () => void;
   askQuestion: (questionId: string) => void;
   answerQuestion: (answer: boolean) => void;

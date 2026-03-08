@@ -116,6 +116,41 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       }),
 
+    assignRandomSecretCharacter: (player) =>
+      set((state) => {
+        const pool = state.characters;
+        const randomChar = pool[Math.floor(Math.random() * pool.length)];
+        if (!randomChar) return;
+
+        state.players[player].secretCharacterId = randomChar.id;
+
+        if (state.mode === 'nft' || state.mode === 'online') {
+          createCommitment(player, randomChar.id, state.gameSessionId);
+        }
+
+        if (state.mode === 'online') {
+          state.commitmentStatus = state.commitmentStatus === 'partial' ? 'both' : 'partial';
+          state.phase = GamePhase.ONLINE_WAITING;
+          return;
+        }
+
+        if (player === 'player1') {
+          if (state.mode === 'free' || state.mode === 'nft-free') {
+            const opponentPool = state.characters.filter((c) => c.id !== randomChar.id);
+            const cpuPick = opponentPool[Math.floor(Math.random() * opponentPool.length)];
+            if (cpuPick) state.players.player2.secretCharacterId = cpuPick.id;
+            state.commitmentStatus = 'both';
+            state.phase = GamePhase.HANDOFF_START;
+          } else {
+            state.commitmentStatus = 'partial';
+            state.phase = GamePhase.HANDOFF_P1_TO_P2;
+          }
+        } else {
+          state.commitmentStatus = 'both';
+          state.phase = GamePhase.HANDOFF_START;
+        }
+      }),
+
     advancePhase: () =>
       set((state) => {
         switch (state.phase) {

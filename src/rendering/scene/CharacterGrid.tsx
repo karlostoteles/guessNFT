@@ -101,12 +101,7 @@ void main() {
 }
 `;
 
-// ─── Helpers for NFT image loading ────────────────────────────────────────────
-
-function extractImageHash(url: string): string | null {
-  const match = url.match(/\/([a-f0-9]+)\.png$/i);
-  return match ? match[1] : null;
-}
+// ─── No image fetching — we use procedural rendering ──────────────────────────
 
 // X-axis unit vector (pre-allocated for quaternion rotation)
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -232,85 +227,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     };
   }, [characters, material]);
 
-  // ── Progressive NFT image loading ───────────────────────────────────────────
-  useEffect(() => {
-    if (!characters || characters.length === 0) return;
 
-    let cancelled = false;
-    const BATCH_SIZE = 20;
-    const BATCH_DELAY = 80;
-    const IMG_SIZE = 128; // Match atlas cell size for crisp rendering
-
-    function loadImage(url: string): Promise<HTMLImageElement | null> {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        setTimeout(() => resolve(null), 12000);
-        img.src = url;
-      });
-    }
-
-    const loadBatches = async () => {
-      // Wait for atlas to be ready (procedural rendering may still be in progress)
-      await new Promise(r => setTimeout(r, 200));
-
-      for (let i = 0; i < characters.length; i += BATCH_SIZE) {
-        if (cancelled) break;
-        const batch = characters.slice(i, i + BATCH_SIZE);
-
-        await Promise.all(
-          batch.map(async (char) => {
-            if (cancelled) return;
-            const atlas = atlasRef.current;
-            if (!atlas) return;
-
-            // Skip if already in global cache
-            if (globalTextureCache.has(char.id)) return;
-
-            const numericId = char.id.replace('nft_', '');
-            const hash = char.imageUrl ? extractImageHash(char.imageUrl) : null;
-            const urls = [
-              hash ? `/api/nft-img?hash=${hash}` : null,
-              `/nft/${numericId}.png`,
-              `/api/nft-art/${numericId}`,
-            ].filter(Boolean) as string[];
-
-            for (const url of urls) {
-              const img = await loadImage(url);
-              if (img && !cancelled && atlasRef.current) {
-                // Populate global cache for IndividualGrid to use later
-                const canvas = document.createElement('canvas');
-                canvas.width = 64;
-                canvas.height = 64;
-                const ctx = canvas.getContext('2d')!;
-                ctx.drawImage(img, 0, 0, 64, 64);
-                const texture = new THREE.CanvasTexture(canvas);
-                texture.colorSpace = THREE.SRGBColorSpace;
-                globalTextureCache.set(char.id, texture);
-
-                const idx = charIndexMapRef.current.get(char.id);
-                if (idx !== undefined) {
-                  atlasRef.current.drawCell(idx, img);
-                }
-                break;
-              }
-            }
-          })
-        );
-
-        if (cancelled) break;
-
-        // Mark atlas dirty once per batch
-        if (atlasRef.current) atlasRef.current.markDirty();
-        await new Promise(r => setTimeout(r, BATCH_DELAY));
-      }
-    };
-
-    loadBatches();
-    return () => { cancelled = true; };
-  }, [characters]);
 
   // Create UV attribute buffer
   useEffect(() => {

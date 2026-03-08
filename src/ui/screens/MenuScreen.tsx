@@ -10,6 +10,8 @@ import { useWalletStatus, useWalletAddress } from '@/services/starknet/walletSto
 import { useWalletConnection } from '@/services/starknet/hooks';
 import { WalletButton } from '../widgets/WalletButton';
 import { LeaderboardScreen } from './LeaderboardScreen';
+import { useOwnedNFTs } from '@/services/starknet/walletStore';
+import { useGameStore } from '@/core/store/gameStore';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online' | 'leaderboard';
 
@@ -81,6 +83,22 @@ export function MenuScreen() {
             onBack={() => setView('menu')}
             onCTVersion={handleFreePlay}
             onSchizodio={handleSchizodioFreePlay}
+            onSchizodioRandom={async () => {
+              // Assign the player a random character bypassing the setup phase
+              setLoading(true);
+              setNftStatus('Assigning random character...');
+              try {
+                const allChars = await generateAllCollectionCharacters();
+                setGameMode('nft-free', allChars);
+                startSetup();
+                useGameStore.getState().assignRandomSecretCharacter('player1');
+              } catch (err: any) {
+                console.error('[MenuScreen] Random collection load failed:', err);
+              } finally {
+                setLoading(false);
+                setNftStatus('');
+              }
+            }}
             loading={loading}
             nftStatus={nftStatus}
           />
@@ -500,10 +518,30 @@ interface FreePickProps {
   onSchizodio: () => void;
   loading?: boolean;
   nftStatus?: string;
+  onSchizodioRandom: () => void;
 }
 
-function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: FreePickProps) {
+function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loading, nftStatus }: FreePickProps) {
   const { t } = useTranslation();
+  const { connectWallet } = useWalletConnection();
+  const walletStatus = useWalletStatus();
+  const ownedNFTs = useOwnedNFTs();
+  const [showNoNFTModal, setShowNoNFTModal] = useState(false);
+
+  const handleSchizodioClick = () => {
+    if (loading) return;
+    if (walletStatus !== 'ready') {
+      connectWallet();
+      return;
+    }
+    // Logged in. Check NFTs.
+    if (ownedNFTs.length === 0) {
+      setShowNoNFTModal(true);
+    } else {
+      onSchizodio();
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -532,19 +570,117 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, loading, nftStatus }: 
             subtitle={t('menu.ct_version_sub')}
             tag="24 CHARACTERS"
           />
-          {/* Schizodio vs AI — instant play, no wallet needed */}
+          {/* Schizodio vs AI — requires login, prompts random if 0 NFTs */}
           <OptionCard
-            onClick={loading ? () => { } : onSchizodio}
+            onClick={handleSchizodioClick}
             accent="#E8A444"
             accentRgb="232,164,68"
             icon="💀"
             title={nftStatus || t('menu.nft_version')}
-            subtitle="Play with the full Schizodio collection — no NFT needed"
+            subtitle={walletStatus === 'ready' ? "Play with the full Schizodio collection." : "Login required to play Schizodio mode."}
             tag="999 CHARACTERS"
             disabled={loading}
           />
         </div>
       </div>
+
+      {/* No NFT Modal */}
+      <AnimatePresence>
+        {showNoNFTModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 50,
+              background: 'rgba(15,14,23,0.85)', backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 24,
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              style={{
+                width: '100%', maxWidth: 400,
+                background: '#1c1228', border: '1px solid rgba(232,164,68,0.4)',
+                borderRadius: 24, padding: 32,
+                display: 'flex', flexDirection: 'column', gap: 24,
+                boxShadow: '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>💀</div>
+                <h3 style={{
+                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 24,
+                  color: '#FFFFFE', margin: '0 0 8px 0'
+                }}>
+                  No Schizodios Found
+                </h3>
+                <p style={{
+                  color: 'rgba(255,255,254,0.7)', fontSize: 15,
+                  lineHeight: 1.5, margin: 0
+                }}>
+                  You need a Schizodio to select your own character. You can still play by letting us assign you a random character!
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button
+                  onClick={() => {
+                    sfx.click();
+                    setShowNoNFTModal(false);
+                    onSchizodioRandom();
+                  }}
+                  style={{
+                    width: '100%', padding: '16px',
+                    background: '#E8A444', color: '#0f0e17',
+                    border: 'none', borderRadius: 12,
+                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700,
+                    cursor: 'pointer', outline: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  🎲 Play with Random
+                </button>
+                <button
+                  onClick={() => {
+                    sfx.click();
+                    window.open('https://schizodio.art', '_blank');
+                  }}
+                  style={{
+                    width: '100%', padding: '16px',
+                    background: 'rgba(255,255,255,0.05)', color: '#FFFFFE',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 600,
+                    cursor: 'pointer', outline: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  🛒 Get an NFT at schizodio.art
+                </button>
+                <button
+                  onClick={() => {
+                    sfx.click();
+                    setShowNoNFTModal(false);
+                  }}
+                  style={{
+                    width: '100%', padding: '12px',
+                    background: 'transparent', color: 'rgba(255,255,254,0.5)',
+                    border: 'none', borderRadius: 12,
+                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', outline: 'none', marginTop: 8,
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
