@@ -75,8 +75,10 @@ function computeTargetPositions(
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function CharacterGrid({ textures, tileW }: CharacterGridProps) {
+  const startedMinimalRef = useRef(false);
   const lod = getTileLOD(tileW);
-  if (lod === 'minimal') {
+  if (lod === 'minimal') startedMinimalRef.current = true;
+  if (startedMinimalRef.current) {
     return <MinimalGrid tileW={tileW} />;
   }
   return <IndividualGrid textures={textures} tileW={tileW} />;
@@ -249,6 +251,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
         if (procTimeout !== null) { clearTimeout(procTimeout); procTimeout = null; }
         cancelAnimationFrame(rafId);
         atlas.drawFull(prebuilt);
+        ImageCache.clearProcedural(); // free ~16 MB of procedural canvases
         prebuiltLoadedRef.current = true;
       }
     };

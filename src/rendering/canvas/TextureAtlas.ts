@@ -108,8 +108,10 @@ export class TextureAtlas {
     this.texture.needsUpdate = true;
   }
 
-  /** Release GPU resources. */
+  /** Release GPU resources and CPU canvas memory. */
   dispose(): void {
     this.texture.dispose();
+    this.canvas.width = 0;
+    this.canvas.height = 0;
   }
 }

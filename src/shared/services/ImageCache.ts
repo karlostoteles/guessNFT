@@ -334,6 +334,14 @@ export const ImageCache = {
   },
 
   /**
+   * Clear only procedural canvas placeholders.
+   * Call after a pre-built atlas loads — the canvases are no longer needed.
+   */
+  clearProcedural(): void {
+    proceduralCache.clear();
+  },
+
+  /**
    * Clear all cached data
    */
   clear(): void {

@@ -9,7 +9,7 @@ import { CameraController } from './CameraController';
 import { SlotGridOverlay } from './SlotGridOverlay';
 import { useCharacterTextures, useCardBackTexture } from '@/shared/hooks/useCharacterTextures';
 import { useAdaptiveGrid } from '@/shared/hooks/useAdaptiveGrid';
-import { useBoardRotation } from '@/core/store/selectors';
+import { useBoardRotation, useGameCharacters } from '@/core/store/selectors';
 import { BOARD } from '@/core/rules/constants';
 import { useCPUPlayer } from '@/shared/hooks/useCPUPlayer';
 
@@ -17,7 +17,8 @@ export function GameScene() {
   useCPUPlayer(); // Drive CPU opponent in free mode
 
   const { layout }      = useAdaptiveGrid();
-  const textures        = useCharacterTextures(layout.tileW);
+  const characters      = useGameCharacters() || [];
+  const textures        = useCharacterTextures(characters.length >= 100 ? 0 : layout.tileW);
   const cardBackTexture = useCardBackTexture();
   const boardRotation   = useBoardRotation();
   const boardRef        = useRef<THREE.Group>(null);
