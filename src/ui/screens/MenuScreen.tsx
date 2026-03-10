@@ -10,8 +10,11 @@ import { useWalletStatus } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet/hooks';
 import { WalletButton } from '../widgets/WalletButton';
 import { LeaderboardScreen } from './LeaderboardScreen';
-import { useOwnedNFTs } from '@/services/starknet/walletStore';
+import { useOwnedNFTs, useWalletAddress } from '@/services/starknet/walletStore';
 import { useGameStore } from '@/core/store/gameStore';
+
+import { getActiveGamesForAddress } from '@/services/supabase/gameService';
+import type { SupabaseGame } from '@/services/supabase/types';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online' | 'leaderboard';
 
@@ -19,8 +22,10 @@ export function MenuScreen() {
   const [view, setView] = useState<View>('menu');
   const [loading, setLoading] = useState(false);
   const [nftStatus, setNftStatus] = useState<string>('');
-  const { startSetup, setGameMode, recoverOnlineGame } = useGameActions();
+  const [recoverableGames, setRecoverableGames] = useState<SupabaseGame[]>([]);
+  const { startSetup, setGameMode, recoverOnlineGame, setOnlineGame } = useGameActions();
   const walletStatus = useWalletStatus();
+  const walletAddress = useWalletAddress();
 
   const handleFreePlay = () => {
     setGameMode('free', MEME_CHARACTERS);
@@ -44,23 +49,63 @@ export function MenuScreen() {
     }
   };
 
-  // Attempt session recovery on mount
+  // Attempt session recovery on mount or wallet change
   useEffect(() => {
     const saved = localStorage.getItem('guessnft_online_session');
     if (saved) {
-      setLoading(true);
-      setNftStatus('Reconnecting to room...');
-      generateAllCollectionCharacters()
-        .then((allChars) => {
-          recoverOnlineGame(allChars);
-          setView('online');
-        })
-        .finally(() => {
-          setLoading(false);
-          setNftStatus('');
-        });
+      try {
+        const parsed = JSON.parse(saved);
+        const ONE_HOUR = 60 * 60 * 1000;
+        if (Date.now() - parsed.timestamp < ONE_HOUR) {
+          // If wallet matches or we don't have a wallet yet, try automatic recovery
+          if (!walletAddress || parsed.playerAddress === walletAddress) {
+            setLoading(true);
+            setNftStatus('Reconnecting to room...');
+            generateAllCollectionCharacters()
+              .then((allChars) => {
+                recoverOnlineGame(allChars, walletAddress || undefined);
+                // If it successfully recovered (phase changed), go to online view
+                if (useGameStore.getState().onlineGameId) {
+                  setView('online');
+                }
+              })
+              .finally(() => {
+                setLoading(false);
+                setNftStatus('');
+              });
+          }
+        } else {
+          localStorage.removeItem('guessnft_online_session');
+        }
+      } catch (e) {
+        localStorage.removeItem('guessnft_online_session');
+      }
     }
-  }, [recoverOnlineGame]);
+
+    // Also look for active games in DB when wallet is ready
+    if (walletStatus === 'ready' && walletAddress) {
+      getActiveGamesForAddress(walletAddress).then(games => {
+        setRecoverableGames(games);
+      });
+    }
+  }, [walletStatus, walletAddress, recoverOnlineGame]);
+
+  const handleResumeGame = async (game: SupabaseGame) => {
+    setLoading(true);
+    setNftStatus('Resuming game...');
+    try {
+      const allChars = await generateAllCollectionCharacters();
+      const playerNum = game.player1_address === walletAddress ? 1 : 2;
+      setGameMode('online', allChars);
+      setOnlineGame(game.id, game.room_code, playerNum as 1 | 2, walletAddress!);
+      setView('online');
+    } catch (err) {
+      console.error('Failed to resume game:', err);
+    } finally {
+      setLoading(false);
+      setNftStatus('');
+    }
+  };
 
   // Compute which sub-view to show within the 'menu' view
   const mainSubView =
@@ -98,6 +143,8 @@ export function MenuScreen() {
             onLocal={() => setView('free-pick')}
             onOnline={() => setView('real-pick')}
             onLeaderboard={() => setView('leaderboard')}
+            recoverableGames={recoverableGames}
+            onResumeGame={handleResumeGame}
           />
         )}
         {animKey === 'free-pick' && (
@@ -418,10 +465,18 @@ function ConnectingView({ walletStatus }: { walletStatus: string }) {
 
 // ─── Mode select view — shown after wallet is ready ───────────────────────────
 
-function ModeSelectView({ onLocal, onOnline, onLeaderboard }: {
+function ModeSelectView({
+  onLocal,
+  onOnline,
+  onLeaderboard,
+  recoverableGames = [],
+  onResumeGame
+}: {
   onLocal: () => void;
   onOnline: () => void;
   onLeaderboard: () => void;
+  recoverableGames?: SupabaseGame[];
+  onResumeGame: (game: SupabaseGame) => void;
 }) {
   return (
     <motion.div
@@ -453,6 +508,64 @@ function ModeSelectView({ onLocal, onOnline, onLeaderboard }: {
       <div style={{ flex: '1 1 0', minHeight: 0 }} />
 
       <LogoAndTitle delayBase={0} />
+
+      {/* Recoverable Games Section */}
+      {recoverableGames.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            width: 'min(400px, 90%)',
+            background: 'rgba(232,164,68,0.05)',
+            border: '1px solid rgba(232,164,68,0.2)',
+            borderRadius: 16,
+            padding: '16px 20px',
+            marginBottom: 24,
+            zIndex: 10,
+          }}
+        >
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: '#E8A444',
+            letterSpacing: '0.05em', textTransform: 'uppercase',
+            marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8
+          }}>
+            <span style={{ fontSize: 16 }}>⚡</span> Active Games Found
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {recoverableGames.slice(0, 2).map((game) => (
+              <div
+                key={game.id}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '10px 14px',
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFE' }}>Room: {game.room_code}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,254,0.4)', marginTop: 2 }}>
+                    Last move {new Date(game.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05, background: '#E8A444', color: '#0F0E17' }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => onResumeGame(game)}
+                  style={{
+                    background: 'rgba(232,164,68,0.15)',
+                    border: '1px solid rgba(232,164,68,0.4)',
+                    borderRadius: 8, padding: '6px 14px',
+                    fontSize: 12, fontWeight: 700, color: '#E8A444',
+                    cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
+                  }}
+                >
+                  Resume
+                </motion.button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Two mode tiles */}
       <div style={{

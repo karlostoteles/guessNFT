@@ -218,3 +218,19 @@ export function subscribeToEvents(
     )
     .subscribe();
 }
+export async function getActiveGamesForAddress(
+  address: string
+): Promise<SupabaseGame[]> {
+  const ONE_HOUR_AGO = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('games')
+    .select()
+    .or(`player1_address.eq.${address},player2_address.eq.${address}`)
+    .neq('status', 'finished')
+    .gt('updated_at', ONE_HOUR_AGO)
+    .order('updated_at', { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as SupabaseGame[];
+}

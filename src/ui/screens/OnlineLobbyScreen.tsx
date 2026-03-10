@@ -187,7 +187,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
       const characters = await generateAllCollectionCharacters();
       const { game, playerNum } = await createGame(walletAddress, characters);
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum);
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
       // Both P1 and P2 go through character select immediately.
       // Room code is prominently shown in OnlineWaitingScreen after selection.
       startSetup();
@@ -210,7 +210,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
       // Always use the deterministic 999-token collection (same as creator)
       const characters = await generateAllCollectionCharacters();
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum);
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
       startSetup();
     } catch (err: any) {
       setError(err.message ?? 'Failed to join game');

@@ -509,26 +509,37 @@ export const useGameStore = create<GameState & GameActions>()(
 
     // ─── Online-specific actions ───────────────────────────────────────────────
 
-    recoverOnlineGame: (characters) =>
+    recoverOnlineGame: (characters, currentAddress) =>
       set((state) => {
         const saved = localStorage.getItem('guessnft_online_session');
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
-            state.mode = 'online';
-            state.characters = characters;
-            state.onlineGameId = parsed.gameId;
-            state.onlineRoomCode = parsed.roomCode;
-            state.onlinePlayerNum = parsed.playerNum;
-            // Temporarily set phase to waiting, the sync hook will verify status
-            state.phase = GamePhase.ONLINE_WAITING;
+            
+            // 1-hour expiration check
+            const ONE_HOUR = 60 * 60 * 1000;
+            const isExpired = Date.now() - parsed.timestamp > ONE_HOUR;
+            
+            // Address check (if we have a current wallet connected)
+            const addressMatches = !currentAddress || !parsed.playerAddress || parsed.playerAddress === currentAddress;
+
+            if (!isExpired && addressMatches) {
+              state.mode = 'online';
+              state.characters = characters;
+              state.onlineGameId = parsed.gameId;
+              state.onlineRoomCode = parsed.roomCode;
+              state.onlinePlayerNum = parsed.playerNum;
+              state.phase = GamePhase.ONLINE_WAITING;
+            } else {
+              localStorage.removeItem('guessnft_online_session');
+            }
           } catch (e) {
             localStorage.removeItem('guessnft_online_session');
           }
         }
       }),
 
-    setOnlineGame: (gameId, roomCode, playerNum) =>
+    setOnlineGame: (gameId, roomCode, playerNum, playerAddress) =>
       set((state) => {
         state.onlineGameId = gameId;
         state.onlineRoomCode = roomCode;
@@ -539,6 +550,7 @@ export const useGameStore = create<GameState & GameActions>()(
           gameId,
           roomCode,
           playerNum,
+          playerAddress,
           timestamp: Date.now()
         }));
       }),
