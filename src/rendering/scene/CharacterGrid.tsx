@@ -24,7 +24,6 @@ import { BOARD, getTileLOD, computeAdaptiveGrid } from '@/core/rules/constants';
 import { useGameCharacters, useActivePlayer, useEliminatedIds, useGameMode, useOnlinePlayerNum, useSecretCharacterId } from '@/core/store/selectors';
 import { CharacterTile } from './CharacterTile';
 import { TextureAtlas } from '@/rendering/canvas/TextureAtlas';
-import { renderPortraitCanvas } from '@/rendering/canvas/PortraitRenderer';
 import { sfx } from '@/shared/audio/sfx';
 import ImageCache from '@/shared/services/ImageCache';
 
@@ -284,7 +283,8 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
       }
 
       // Pre-built not yet loaded: fill cells with solid HSL colors immediately
-      // so the board isn't blank, then start the procedural batch as a fallback.
+      // as a clean placeholder — no procedural portraits, no competing process.
+      // Solid color → NFT art is a clean one-step transition.
       for (let i = 0; i < characters.length; i++) {
         const char = characters[i];
         const hue = idToHue(char.id);
@@ -292,32 +292,8 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
       }
       atlas.markDirty();
 
-      // Procedural portrait batch (runs until pre-built atlas takes over)
-      let procIdx = 0;
-      let rafId = 0;
-      const PROC_BATCH = 50;
-
-      function renderProceduralBatch() {
-        if (cancelled) return;
-        const end = Math.min(procIdx + PROC_BATCH, characters.length);
-        for (; procIdx < end; procIdx++) {
-          const char = characters[procIdx];
-          if (!ImageCache.has(char.id)) {
-            const canvas = renderPortraitCanvas(char, undefined, true);
-            ImageCache.setProcedural(char.id, canvas);
-            atlas.drawCell(procIdx, canvas);
-          }
-        }
-        atlas.markDirty();
-        if (procIdx < characters.length) {
-          rafId = requestAnimationFrame(renderProceduralBatch);
-        }
-      }
-      rafId = requestAnimationFrame(renderProceduralBatch);
-
-      // Load pre-built atlas (first session only — subsequent hits module cache)
+      // Load pre-built atlas (downloads once; window cache avoids re-download on remount)
       const img = await loadPrebuiltAtlas();
-      cancelAnimationFrame(rafId);
 
       if (!cancelled && atlasRef.current === atlas && img) {
         atlas.drawFull(img);
