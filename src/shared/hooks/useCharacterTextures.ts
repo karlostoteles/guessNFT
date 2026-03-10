@@ -51,33 +51,13 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
       }
 
       // Generate procedural placeholder
-      if (!isLargeBoard) {
-        const canvas = renderPortraitCanvas(char, undefined, true);
-        if (canvas instanceof HTMLCanvasElement) {
-          ImageCache.setProcedural(char.id, canvas);
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.needsUpdate = true;
-          newTextures.set(char.id, texture);
-        }
-      } else {
-        // Large board: use single placeholder texture
-        const placeholderCanvas = renderPortraitCanvas({
-          id: 'placeholder', name: 'Loading...',
-          traits: {
-            hair_color: 'black', hair_style: 'short',
-            skin_tone: 'medium', eye_color: 'brown',
-            gender: 'male', has_glasses: false,
-            has_hat: false, has_beard: false,
-            has_earrings: false,
-          } as any
-        }, undefined, true);
-        if (placeholderCanvas instanceof HTMLCanvasElement) {
-          const placeholderTex = new THREE.CanvasTexture(placeholderCanvas);
-          placeholderTex.colorSpace = THREE.SRGBColorSpace;
-          placeholderTex.needsUpdate = true;
-          newTextures.set(char.id, placeholderTex);
-        }
+      const canvas = renderPortraitCanvas(char, undefined, true);
+      if (canvas instanceof HTMLCanvasElement) {
+        ImageCache.setProcedural(char.id, canvas);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
+        newTextures.set(char.id, texture);
       }
     }
 

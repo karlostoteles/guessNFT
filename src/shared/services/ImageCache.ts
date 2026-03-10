@@ -125,13 +125,11 @@ export const ImageCache = {
 
     const loadPromise = (async (): Promise<HTMLImageElement | HTMLCanvasElement | null> => {
       const urls = getLoadUrls(charId, imageUrl);
-      console.log(`[ImageCache] Loading #${charId} from:`, urls);
 
       for (const url of urls) {
         try {
           const img = await loadImage(url);
           if (img) {
-            console.log(`[ImageCache] Success: #${charId} from ${url}`);
             const resized = resizeImage(img, size);
             imageCache.set(charId, {
               image: resized,
