@@ -1,5 +1,0 @@
-# Individual NFT PNGs — excluded from Vercel deployment (2.2 GB).
-# The pre-built atlas (public/atlas/schizodio-atlas.webp) contains all
-# 999 portraits in one 6.9 MB WebP file. The /api/nft-art/:id serverless
-# function remains as a fallback for the rare case the atlas fails to load.
-public/nft

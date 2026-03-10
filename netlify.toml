@@ -5,6 +5,12 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Route /api/* to Netlify Functions — must be before the SPA catch-all
+[[redirects]]
+  from = "/api/:func"
+  to = "/.netlify/functions/:func"
+  status = 200
+
 # SPA redirect — all routes serve index.html
 [[redirects]]
   from = "/*"
