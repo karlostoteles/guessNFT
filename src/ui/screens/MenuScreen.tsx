@@ -10,7 +10,7 @@ import { useWalletStatus } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet/hooks';
 import { WalletButton } from '../widgets/WalletButton';
 import { LeaderboardScreen } from './LeaderboardScreen';
-import { useOwnedNFTs } from '@/services/starknet/walletStore';
+import { useOwnedNFTs, useWalletAddress } from '@/services/starknet/walletStore';
 import { useGameStore } from '@/core/store/gameStore';
 
 import { getActiveGamesForAddress } from '@/services/supabase/gameService';
@@ -25,7 +25,7 @@ export function MenuScreen() {
   const [recoverableGames, setRecoverableGames] = useState<SupabaseGame[]>([]);
   const { startSetup, setGameMode, recoverOnlineGame, setOnlineGame } = useGameActions();
   const walletStatus = useWalletStatus();
-  const walletAddress = useWalletStore(s => s.address);
+  const walletAddress = useWalletAddress();
 
   const handleFreePlay = () => {
     setGameMode('free', MEME_CHARACTERS);
