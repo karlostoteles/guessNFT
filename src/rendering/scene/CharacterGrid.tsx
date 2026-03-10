@@ -220,9 +220,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
   // ── Atlas construction using unified ImageCache ──────────────────────────
   useEffect(() => {
     if (!characters || characters.length === 0) return;
-
-    // Reset animation states so round-2 characters aren't stuck in 'dead' phase
-    animRef.current.clear();
+    console.log(`[MinimalGrid] Mounting with ${characters.length} characters`);
 
     // Build stable index map: character.id → atlas cell index
     const indexMap = new Map<string, number>();
@@ -290,6 +288,7 @@ function MinimalGrid({ tileW: _tileW }: { tileW: number }) {
     let procTimeout: ReturnType<typeof setTimeout> | null = null;
 
     prebuilt.onload = () => {
+      console.log('[MinimalGrid] Static atlas image loaded successfully');
       if (!procCancelled && atlasRef.current === atlas) {
         procCancelled = true;
         if (procTimeout !== null) { clearTimeout(procTimeout); procTimeout = null; }
