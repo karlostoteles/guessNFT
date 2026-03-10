@@ -79,7 +79,22 @@ function computeTargetPositions(
 
 export function CharacterGrid({ textures, tileW }: CharacterGridProps) {
   const characters = useGameCharacters();
-  const lod = getTileLOD(tileW);
+
+  // LOD is based on the TOTAL character count, not the active player's tile width.
+  //
+  // Why: useAdaptiveGrid computes tileW from the *active player's* eliminated IDs.
+  // When players have asymmetric eliminations (e.g. P1 has 300 left, P2 has 800),
+  // tileW oscillates across the LOD threshold every turn switch, unmounting and
+  // remounting MinimalGrid. Each remount rebuilds the atlas and briefly shows
+  // UV=0 (all tiles sample cell 0 → identical face) until effects re-settle.
+  //
+  // Using characters.length ensures MinimalGrid stays mounted for the entire game
+  // on a 999-char board. IndividualGrid is only used for small boards (≤~300 total
+  // characters) where per-tile rendering quality matters.
+  const lodTileW = characters && characters.length > 0
+    ? computeAdaptiveGrid(characters.length).tileW
+    : tileW;
+  const lod = getTileLOD(lodTileW);
 
   if (lod === 'minimal') {
     return <MinimalGrid tileW={tileW} />;
