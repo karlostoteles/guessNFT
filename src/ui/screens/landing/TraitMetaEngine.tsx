@@ -38,7 +38,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
                 marginBottom: 24,
                 display: 'block'
             }}>
-                The Trait Meta Engine activates Day 1 • Built for every blue-chip IP
+                TRAIT META ENGINE
             </span>
             <h2 style={{ 
                 fontFamily: "'Space Grotesk', sans-serif", 
@@ -51,8 +51,8 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
             }}>
-                Static JPEGs Are Dead.<br />
-                <span style={{ color: '#E8A444' }}>Welcome to the Trait Meta Engine.</span>
+                NFTs aren't dead,<br />
+                <span style={{ color: '#E8A444' }}>they were just waiting for us.</span>
             </h2>
             <p style={{ 
                 fontSize: 'clamp(16px, 1.5vw, 20px)', 
@@ -125,7 +125,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
                         <span style={{ color: '#22D3EE' }}>✓</span> Classic Guess Who + NFT traits (real utility)
                     </li>
                     <li style={{ display: 'flex', gap: 12, fontSize: 15, color: 'rgba(255,255,254,0.7)' }}>
-                        <span style={{ color: '#22D3EE' }}>✓</span> Betting Mode: Stake your NFT + Floor Unlock Fee
+                        <span style={{ color: '#22D3EE' }}>✓</span> Betting Mode: Stake your NFT + Winner Unlock Fee
                     </li>
                     <li style={{ display: 'flex', gap: 12, fontSize: 15, color: 'rgba(255,255,254,0.7)' }}>
                         <span style={{ color: '#22D3EE' }}>✓</span> Rare/weird trait combos = Win-rate advantage
@@ -195,10 +195,10 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
             }} />
             
             <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 'clamp(24px, 4vw, 42px)', fontWeight: 800, marginBottom: 24 }}>
-                GuessNFT is not just a game.
+                Not just a game.
             </h3>
             <p style={{ fontSize: 18, color: 'rgba(255,255,254,0.65)', lineHeight: 1.6, marginBottom: 40 }}>
-                It’s the solid foundation of the future IP economy — where speculation meets real demand usage, P2E mechanics, PMF and community endeavor. This model unlocks dozens of liquid opportunity layers that currently sit dormant in the NFT space. We start with one collection and are building the rails for every major blue-chip IP to join crosschain.
+                Solid IP Foundation economy. Where speculation meets real demand usage, P2E mechanics, PMF and community endeavor. Making liquid assets that currently sit dormant in the space, we are building the rails for every major blue-chip IP.
             </p>
 
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -226,6 +226,49 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
             </div>
         </motion.div>
       </Section>
+
+      {/* 6. Legal & Social Footer overlay */}
+      <footer style={{ 
+        width: '100%', 
+        padding: '60px 20px', 
+        borderTop: '1px solid rgba(255,255,255,0.05)',
+        background: '#050505',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 32
+      }}>
+        <motion.div 
+          whileHover={{ scale: 1.1 }}
+          style={{ cursor: 'pointer' }}
+          onClick={() => window.open('https://x.com/carldlfr', '_blank')}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="#FFFFFE">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z"/>
+          </svg>
+        </motion.div>
+
+        <div style={{ textAlign: 'center', maxWidth: 800 }}>
+          <div style={{ 
+            fontFamily: "'Space Grotesk', sans-serif", 
+            fontSize: 12, 
+            fontWeight: 700, 
+            color: 'rgba(255,255,254,0.3)', 
+            letterSpacing: '0.1em',
+            marginBottom: 16
+          }}>
+            ZK private end to end. Using Dojo, Cairo, Noir and Garaga to make this game possible.
+          </div>
+          <div style={{ 
+            fontSize: 11, 
+            color: 'rgba(255,255,254,0.15)', 
+            lineHeight: 1.6 
+          }}>
+            © 2026 GuessNFT™. All rights reserved. GuessNFT, Trait Meta Engine and registered marks are trademarks of the protocol. 
+            NFT assets remain property of their respective IP holders. Experimental software. Use at your own risk.
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

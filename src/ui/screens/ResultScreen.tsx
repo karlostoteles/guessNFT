@@ -133,9 +133,26 @@ export function ResultScreen() {
           )}
 
           {!isDraw && guessedChar && (
-            <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.45)', marginBottom: 24 }}>
-              Correctly guessed <strong style={{ color: '#FFFFFE' }}>{guessedChar.name}</strong>
-            </div>
+            <>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.45)', marginBottom: 8 }}>
+                Correctly guessed <strong style={{ color: '#FFFFFE' }}>{guessedChar.name}</strong>
+              </div>
+              {isMyWin && (
+                <div style={{ 
+                  fontSize: 12, 
+                  color: '#E8A444', 
+                  fontWeight: 600, 
+                  marginBottom: 24,
+                  padding: '8px 16px',
+                  background: 'rgba(232,164,68,0.1)',
+                  borderRadius: 10,
+                  display: 'inline-block'
+                }}>
+                  Someone is winning SCHIZODIOS for real when winning, you don't.
+                </div>
+              )}
+              {!isMyWin && <div style={{ marginBottom: 24 }} />}
+            </>
           )}
 
           {/* Secret character reveal */}

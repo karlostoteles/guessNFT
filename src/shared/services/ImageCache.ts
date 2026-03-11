@@ -10,15 +10,15 @@ import { resolveUrl } from '@/services/starknet/nftService';
 // ─── Types ────────────────────────────────────────────────────────────────
 
 interface CachedImage {
-  /** The loaded image element (source) */
-  image: HTMLImageElement | HTMLCanvasElement;
-  /** Pre-computed THREE.Texture (lazy-created on demand) */
+  /** The loaded image element at a specific size */
+  image: HTMLCanvasElement;
+  /** Pre-computed THREE.Texture */
   texture: THREE.Texture | null;
-  /** Data URL for React <img> (lazy-created on demand) */
+  /** Data URL for React <img> */
   dataUrl: string | null;
-  /** Original URL used to load this image */
+  /** Original URL */
   sourceUrl: string;
-  /** Timestamp when loaded */
+  sourceSize: number;
   loadedAt: number;
 }
 
@@ -32,8 +32,12 @@ interface LoadOptions {
 // ─── Global Cache & Deduplication ─────────────────────────────────────────
 
 const imageCache = new Map<string, CachedImage>();
-const pendingLoads = new Map<string, Promise<HTMLImageElement | HTMLCanvasElement | null>>();
+const pendingLoads = new Map<string, Promise<HTMLCanvasElement | null>>();
 const proceduralCache = new Map<string, HTMLCanvasElement>();
+
+// Map of charId -> Original Image (to avoid repeated network fetch)
+const originalImageCache = new Map<string, HTMLImageElement>();
+
 
 const DEFAULT_SIZE = 128;
 const MAX_CACHE_SIZE = 1500;
@@ -108,66 +112,67 @@ export const ImageCache = {
     charId: string,
     imageUrl?: string,
     options: LoadOptions = {}
-  ): Promise<HTMLImageElement | HTMLCanvasElement | null> {
+  ): Promise<HTMLCanvasElement | null> {
     const { size = DEFAULT_SIZE, force = false } = options;
+    const cacheKey = `${charId}_${size}`;
 
-    if (!force && imageCache.has(charId)) {
-      const cached = imageCache.get(charId)!;
-      // If it's just a procedural placeholder and we have an imageUrl, try loading the real one
-      if (cached.sourceUrl !== 'procedural' || !imageUrl) {
-        return cached.image;
-      }
+    if (!force && imageCache.has(cacheKey)) {
+      return imageCache.get(cacheKey)!.image;
     }
 
-    if (pendingLoads.has(charId)) {
-      return pendingLoads.get(charId)!;
+    if (pendingLoads.has(cacheKey)) {
+      return pendingLoads.get(cacheKey)!;
     }
 
-    const loadPromise = (async (): Promise<HTMLImageElement | HTMLCanvasElement | null> => {
-      const urls = getLoadUrls(charId, imageUrl);
+    const loadPromise = (async (): Promise<HTMLCanvasElement | null> => {
+      let img = originalImageCache.get(charId);
 
-      for (const url of urls) {
-        try {
-          const img = await loadImage(url);
-          if (img) {
-            const resized = resizeImage(img, size);
-            imageCache.set(charId, {
-              image: resized,
-              texture: null,
-              dataUrl: null,
-              sourceUrl: url,
-              loadedAt: Date.now(),
-            });
-            evictIfNeeded();
-            return resized;
-          }
-        } catch (err) {
-          console.warn(`[ImageCache] Failed: #${charId} from ${url}`);
+      if (!img) {
+        const urls = getLoadUrls(charId, imageUrl);
+        for (const url of urls) {
+          try {
+            img = await loadImage(url) as HTMLImageElement;
+            if (img) {
+              originalImageCache.set(charId, img);
+              break;
+            }
+          } catch (err) {}
         }
+      }
+
+      if (img) {
+        const resized = resizeImage(img, size);
+        imageCache.set(cacheKey, {
+          image: resized,
+          texture: null,
+          dataUrl: null,
+          sourceUrl: imageUrl || 'local',
+          sourceSize: size,
+          loadedAt: Date.now(),
+        });
+        evictIfNeeded();
+        return resized;
       }
       return null;
     })();
 
-    pendingLoads.set(charId, loadPromise);
+    pendingLoads.set(cacheKey, loadPromise);
     const result = await loadPromise;
-    pendingLoads.delete(charId);
+    pendingLoads.delete(cacheKey);
     return result;
   },
 
-  get(charId: string): HTMLImageElement | HTMLCanvasElement | null {
-    return imageCache.get(charId)?.image ?? null;
+  get(charId: string, size: number = DEFAULT_SIZE): HTMLCanvasElement | null {
+    return imageCache.get(`${charId}_${size}`)?.image ?? null;
   },
 
-  getTexture(charId: string): THREE.Texture | null {
-    const cached = imageCache.get(charId);
+  getTexture(charId: string, size: number = DEFAULT_SIZE): THREE.Texture | null {
+    const cacheKey = `${charId}_${size}`;
+    const cached = imageCache.get(cacheKey);
     if (!cached) return null;
 
     if (!cached.texture) {
-      const texture = new THREE.CanvasTexture(
-        cached.image instanceof HTMLCanvasElement
-          ? cached.image
-          : resizeImage(cached.image, DEFAULT_SIZE)
-      );
+      const texture = new THREE.CanvasTexture(cached.image);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.needsUpdate = true;
       cached.texture = texture;
@@ -175,17 +180,13 @@ export const ImageCache = {
     return cached.texture;
   },
 
-  getUrl(charId: string): string | null {
-    const cached = imageCache.get(charId);
+  getUrl(charId: string, size: number = DEFAULT_SIZE): string | null {
+    const cacheKey = `${charId}_${size}`;
+    const cached = imageCache.get(cacheKey);
     if (!cached) return null;
 
     if (!cached.dataUrl) {
-      if (cached.image instanceof HTMLCanvasElement) {
-        cached.dataUrl = (cached.image as HTMLCanvasElement).toDataURL();
-      } else {
-        const canvas = resizeImage(cached.image, DEFAULT_SIZE);
-        cached.dataUrl = canvas.toDataURL();
-      }
+      cached.dataUrl = cached.image.toDataURL();
     }
     return cached.dataUrl;
   },
@@ -212,6 +213,7 @@ export const ImageCache = {
         texture: null,
         dataUrl: null,
         sourceUrl: 'procedural',
+        sourceSize: canvas.width,
         loadedAt: Date.now(),
       });
     }

@@ -233,7 +233,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   };
 
   return (
-    <LobbyWrapper onBack={handleBack} title={view === 'collection_select' ? 'Play for Real' : 'Select Mode'}>
+    <LobbyWrapper onBack={handleBack} title={view === 'collection_select' ? 'Choose collection' : 'Select Mode'}>
       <AnimatePresence mode="wait">
 
         {view === 'collection_select' && (
@@ -243,8 +243,9 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+              display: 'flex', 
+              flexWrap: 'wrap',
+              justifyContent: 'center',
               gap: 24,
               width: '100%',
               maxWidth: 1000

@@ -47,8 +47,9 @@ export function ValueCards() {
         </div>
 
         <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+            display: 'flex', 
+            flexWrap: 'wrap',
+            justifyContent: 'center',
             gap: 24 
         }}>
             {IMPACT_CARDS.map((card, i) => (

@@ -72,45 +72,49 @@ export function NFTQuestionButton({
   return (
     <motion.button
       onClick={onClick}
-      whileHover={asked ? {} : { scale: 1.06, boxShadow: rs.glow || 'none' }}
-      whileTap={asked ? {} : { scale: 0.95 }}
+      whileHover={asked ? {} : { scale: 1.04, boxShadow: rs.glow || 'none', y: -2 }}
+      whileTap={asked ? {} : { scale: 0.98 }}
       style={{
-        padding: '6px 14px',
+        padding: '12px 14px',
         border: `1.5px solid ${asked ? 'rgba(255,255,255,0.05)' : rs.border}`,
-        borderRadius: 20,
+        borderRadius: 14,
         background: asked ? 'rgba(255,255,255,0.02)' : rs.bg,
         color: asked ? 'rgba(255,255,254,0.2)' : rs.color,
         fontFamily: "'Space Grotesk', sans-serif",
         fontSize: 12,
-        fontWeight: 600,
+        fontWeight: 700,
         cursor: asked ? 'default' : 'pointer',
         outline: 'none',
-        transition: 'all 0.18s',
-        display: 'inline-flex',
+        transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 6,
-        whiteSpace: 'nowrap' as const,
+        minWidth: 80,
+        minHeight: 80,
+        maxWidth: 120,
+        flex: '1 1 auto',
+        whiteSpace: 'normal',
+        textAlign: 'center',
         textDecoration: asked ? 'line-through' : 'none',
         boxShadow: (!asked && rs.glow) ? rs.glow : 'none',
       }}
     >
       {question.icon && (
-        <span style={{ fontSize: 13, opacity: asked ? 0.2 : 0.8 }}>
+        <span style={{ fontSize: 20, opacity: asked ? 0.2 : 1 }}>
           {question.icon}
         </span>
       )}
-      {label}
+      <span style={{ lineHeight: 1.1 }}>{label}</span>
       {impact && !asked && (
         <div style={{
-          display: 'flex', gap: 4, marginLeft: 6, fontSize: 8, fontWeight: 800,
+          display: 'flex', gap: 6, marginTop: 4, fontSize: 9, fontWeight: 800,
           fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em'
         }}>
-          <span style={{ color: '#4ADE80', opacity: 0.9 }}>-{impact.yes}Y</span>
-          <span style={{ color: '#F87171', opacity: 0.9 }}>-{impact.no}N</span>
+          <span style={{ color: '#4ADE80' }}>-{impact.yes}Y</span>
+          <span style={{ color: '#F87171' }}>-{impact.no}N</span>
         </div>
-      )}
-      {asked && (
-        <span style={{ fontSize: 10, color: 'rgba(232,164,68,0.5)' }}>✓</span>
       )}
     </motion.button>
   );

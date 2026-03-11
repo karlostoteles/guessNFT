@@ -2,7 +2,7 @@
     "menu": {
         "title": "Adivina bien, gana el doble",
         "badge": "SCHIZODIO Estreno",
-        "subtitle": "El clásico juego familiar, ahora tuyo",
+        "subtitle": "Es justo, es técnica. Es GuessNFT",
         "practice": "Práctica Gratis",
         "practice_sub": "Local",
         "play_real": "Jugar de Verdad",
@@ -21,7 +21,7 @@
         "back": "Atrás"
     },
     "auth": {
-        "login": "Conectar",
+        "login": "Login",
         "authenticating": "Autenticando..."
     },
     "game": {

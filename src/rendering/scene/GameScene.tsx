@@ -41,7 +41,6 @@ export function GameScene() {
           <Board width={layout.gridW} depth={layout.gridD} />
           <SlotGridOverlay />
           <CharacterGrid textures={textures} tileW={layout.tileW} />
-          <MysteryCard textures={textures} cardBackTexture={cardBackTexture} />
         </group>
       </group>
     </>

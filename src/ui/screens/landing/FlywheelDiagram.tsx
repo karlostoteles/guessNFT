@@ -12,7 +12,7 @@ export function FlywheelDiagram() {
         alignItems: 'center',
         gap: 60
     }}>
-        <motion.h3 
+            <motion.h3 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -25,7 +25,7 @@ export function FlywheelDiagram() {
                 textShadow: '0 0 20px rgba(232,164,68,0.3)'
             }}
         >
-            The Volume Flywheel
+            Community Flywheel
         </motion.h3>
 
         <div style={{ 
@@ -38,7 +38,7 @@ export function FlywheelDiagram() {
         }}>
             {/* Top Node */}
             <FlywheelNode 
-                title="Winner pays X% of floor price fee" 
+                title="Winner pays 5% of floor price fee" 
                 color="#E8A444" 
                 delay={0.1}
             />
@@ -102,23 +102,6 @@ export function FlywheelDiagram() {
                 {/* Visual loop would be great here on desktop */}
             </svg>
             
-            <motion.div 
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 1.2 }}
-                style={{ 
-                    fontSize: 11, 
-                    fontWeight: 700, 
-                    color: 'rgba(232,164,68,0.4)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 8,
-                    marginTop: 20
-                }}
-            >
-                <motion.span animate={{ x: [-5, 5, -5] }} transition={{ repeat: Infinity, duration: 2 }}>↺</motion.span> Back to reality
-            </motion.div>
         </div>
     </div>
   );

@@ -24,6 +24,7 @@ export function MenuScreen() {
   const [loading, setLoading] = useState(false);
   const [nftStatus, setNftStatus] = useState<string>('');
   const [recoverableGames, setRecoverableGames] = useState<SupabaseGame[]>([]);
+  const [showWIP, setShowWIP] = useState(false);
   const { startSetup, setGameMode, recoverOnlineGame, setOnlineGame } = useGameActions();
   const walletStatus = useWalletStatus();
   const walletAddress = useWalletAddress();
@@ -53,6 +54,12 @@ export function MenuScreen() {
 
   // Attempt session recovery on mount or wallet change
   useEffect(() => {
+    // Show WIP disclaimer on first load
+    const hasSeenWIP = localStorage.getItem('guessnft_wip_seen');
+    if (!hasSeenWIP) {
+      setShowWIP(true);
+    }
+
     const saved = localStorage.getItem('guessnft_online_session');
     if (saved) {
       try {
@@ -196,7 +203,7 @@ export function MenuScreen() {
         {animKey === 'online' && (
           <OnlineLobbyScreen
             key="online"
-            onBack={() => setView('real-pick')}
+            onBack={() => setView('menu')}
           />
         )}
         {animKey === 'leaderboard' && (
@@ -206,6 +213,14 @@ export function MenuScreen() {
           />
         )}
       </AnimatePresence>
+
+      <WIPDisclaimer 
+        show={showWIP} 
+        onClose={() => {
+          localStorage.setItem('guessnft_wip_seen', 'true');
+          setShowWIP(false);
+        }} 
+      />
 
       <LoadingOverlay loading={loading} status={nftStatus} />
     </motion.div>
@@ -403,17 +418,17 @@ function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; on
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          Connect with Cartridge
+          {useTranslation().t('auth.login')}
         </motion.button>
 
         <motion.button
           onClick={() => { sfx.click(); onFreePlay(); }}
-          whileHover={{ color: 'rgba(255,255,254,0.8)' }}
+          whileHover={{ color: 'rgba(255,255,254,0.8)', scale: 1.05 }}
           whileTap={{ scale: 0.97 }}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', outline: 'none',
-            color: 'rgba(255,255,254,0.4)', fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: 14, fontWeight: 500,
+            color: 'rgba(255,255,254,0.6)', fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: 18, fontWeight: 700, padding: '12px 24px'
           }}
         >
           Try free mode →
@@ -1295,5 +1310,67 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
     }}>
       {children}
     </div>
+  );
+}
+
+function WIPDisclaimer({ show, onClose }: { show: boolean; onClose: () => void }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(5, 5, 5, 0.85)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: 20
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            style={{
+              width: 'min(500px, 100%)',
+              background: 'linear-gradient(135deg, #1A1A1A 0%, #0F0E17 100%)',
+              border: '1px solid rgba(232, 164, 68, 0.3)',
+              borderRadius: 24, padding: '40px 32px',
+              textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.8)'
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 20 }}>🚧</div>
+            <h2 style={{ 
+              fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 800, 
+              color: '#FFFEFE', marginBottom: 16 
+            }}>
+              Development in Progress
+            </h2>
+            <p style={{ 
+              color: 'rgba(255,255,254,0.6)', lineHeight: 1.6, fontSize: 15, marginBottom: 32 
+            }}>
+              GuessNFT is currently in active development. You are accessing an early-stage WIP. 
+              Features and UI may change, and you might encounter bugs as we build the rails for 
+              every major blue-chip IP.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05, background: '#E8A444', color: '#0F0E17' }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onClose}
+              style={{
+                background: 'rgba(232, 164, 68, 0.1)', border: '1px solid #E8A444',
+                color: '#E8A444', padding: '14px 28px', borderRadius: 12,
+                fontWeight: 700, fontSize: 16, cursor: 'pointer', outline: 'none',
+                fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.2s'
+              }}
+            >
+              I UNDERSTAND
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

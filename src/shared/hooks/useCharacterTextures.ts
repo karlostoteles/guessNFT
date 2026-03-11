@@ -10,11 +10,6 @@ import ImageCache from '@/shared/services/ImageCache';
  *
  * OPTIMIZED: Uses unified ImageCache to prevent duplicate loading.
  * Images are loaded ONCE and shared between Three.js and React UI.
- *
- * Strategy:
- *   1. Procedural portrait (instant) - generated locally
- *   2. Unified cache check - reuse if already loaded by React UI
- *   3. Async load via ImageCache - shared with other consumers
  */
 export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Texture> {
   const characters = useGameCharacters() || [];
@@ -30,11 +25,12 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
 
     let cancelled = false;
     const newTextures = new Map<string, THREE.Texture>();
+    const targetSize = isLargeBoard ? 128 : 256;
 
     // Phase 1: Instant procedural placeholders
     for (const char of characters) {
       // Check unified cache first
-      const cachedTexture = ImageCache.getTexture(char.id);
+      const cachedTexture = ImageCache.getTexture(char.id, targetSize);
       if (cachedTexture) {
         newTextures.set(char.id, cachedTexture);
         continue;
@@ -78,27 +74,10 @@ export function useCharacterTextures(tileW: number = 1.4): Map<string, THREE.Tex
           batch.map(async (char) => {
             if (cancelled) return;
 
-            // Skip if already has real image (not procedural)
-            const cached = ImageCache.get(char.id);
-            const isProcedural = ImageCache.getProcedural(char.id) === cached;
-
-            if (cached && !isProcedural) {
-              // Already has real image, ensure texture is created
-              const texture = ImageCache.getTexture(char.id);
-              if (texture) {
-                setTextures(prev => {
-                  const next = new Map(prev);
-                  next.set(char.id, texture);
-                  return next;
-                });
-              }
-              return;
-            }
-
             // Load via unified cache (deduplicated)
-            const image = await ImageCache.load(char.id, (char as any).imageUrl);
+            const image = await ImageCache.load(char.id, (char as any).imageUrl, { size: targetSize });
             if (image && !cancelled) {
-              const texture = ImageCache.getTexture(char.id);
+              const texture = ImageCache.getTexture(char.id, targetSize);
               if (texture) {
                 setTextures(prev => {
                   const next = new Map(prev);

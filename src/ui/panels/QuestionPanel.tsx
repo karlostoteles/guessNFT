@@ -199,26 +199,6 @@ export function QuestionPanel() {
                 width: isMobile ? '100%' : 'auto',
                 justifyContent: isMobile ? 'space-between' : 'flex-end'
               }}>
-                {isDangerous && (
-                  <motion.button
-                    onClick={handleRiskIt}
-                    animate={{ boxShadow: ['0 0 0px rgba(220,38,38,0)', '0 0 15px rgba(220,38,38,0.6)', '0 0 0px rgba(220,38,38,0)'] }}
-                    transition={{ duration: 1.2, repeat: Infinity }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    style={{
-                      background: 'rgba(220,38,38,0.15)',
-                      border: '1px solid rgba(220,38,38,0.5)',
-                      borderRadius: 8, padding: '5px 12px',
-                      cursor: 'pointer', outline: 'none', color: '#FCA5A5',
-                      fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 800, letterSpacing: '0.05em',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}
-                  >
-                    {t('game.risk_it').toUpperCase()}!
-                  </motion.button>
-                )}
                 <motion.button
                   onClick={handleRiskIt}
                   whileHover={{ scale: 1.05 }}
@@ -236,6 +216,27 @@ export function QuestionPanel() {
                 >
                   📋 {t('game.board')}
                 </motion.button>
+
+                {isDangerous && (
+                  <motion.button
+                    onClick={handleRiskIt}
+                    animate={{ boxShadow: ['0 0 0px rgba(220,38,38,0)', '0 0 15px rgba(220,38,38,0.6)', '0 0 0px rgba(220,38,38,0)'] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                      background: 'rgba(220,38,38,0.15)',
+                      border: '1px solid rgba(220,38,38,0.5)',
+                      borderRadius: 8, padding: '5px 12px',
+                      cursor: 'pointer', outline: 'none', color: '#FCA5A5',
+                      fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 800, letterSpacing: '0.05em',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    ⚡ {t('game.risk_it').toUpperCase()}!
+                  </motion.button>
+                )}
                 {isNFTMode && <RarityInfoButton />}
                 <motion.button
                   onClick={() => setMinimised(true)}
