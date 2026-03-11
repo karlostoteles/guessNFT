@@ -432,9 +432,10 @@ function LobbyWrapper({ children, onBack, title = 'Play Online' }: { children: R
         justifyContent: 'center',
         pointerEvents: 'auto',
         zIndex: 20,
-        padding: 32,
+        padding: '80px 32px',
         background: 'rgba(15, 14, 23, 0.4)',
         backdropFilter: 'blur(10px)',
+        overflowY: 'auto',
       }}
     >
       <div style={{ width: '100%', maxWidth: 1000 }}>
