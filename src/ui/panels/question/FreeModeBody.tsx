@@ -22,10 +22,11 @@ type FreeCategory = typeof FREE_CATEGORIES[number]['key'];
 interface FreeModeBodyProps {
   askedIds: Set<string>;
   remaining: Character[];
+  questionImpact: Record<string, { yes: number; no: number }>;
   onAsk: (q: Question) => void;
 }
 
-export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) {
+export function FreeModeBody({ askedIds, remaining, questionImpact, onAsk }: FreeModeBodyProps) {
   const [freeCategory, setFreeCategory] = useState<FreeCategory | null>(null);
   const isMobile = useIsMobile();
 
@@ -182,6 +183,7 @@ export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) 
                     <NFTQuestionButton
                       key={q.id} question={q} asked={false}
                       onClick={() => onAsk(q)} matchPct={pct}
+                      impact={questionImpact[q.id]}
                     />
                   ))}
                 </div>
@@ -237,6 +239,7 @@ export function FreeModeBody({ askedIds, remaining, onAsk }: FreeModeBodyProps) 
                     <NFTQuestionButton
                       key={q.id} question={q} asked={askedIds.has(q.id)}
                       onClick={() => onAsk(q)} matchPct={matchPctMap.get(q.id)}
+                      impact={questionImpact[q.id]}
                     />
                   ))}
                 </div>

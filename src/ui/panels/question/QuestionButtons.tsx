@@ -63,8 +63,8 @@ function stripPrefix(text: string): string {
 // ─── NFT / Online mode question BUBBLE ────────────────────────────────────────
 
 export function NFTQuestionButton({
-  question, asked, onClick, matchPct,
-}: { question: Question; asked: boolean; onClick: () => void; matchPct?: number }) {
+  question, asked, onClick, matchPct, impact,
+}: { question: Question; asked: boolean; onClick: () => void; matchPct?: number; impact?: { yes: number; no: number } }) {
   const tier = matchPct !== undefined ? getRarityTier(matchPct) : 'common';
   const rs = asked ? RARITY_COLORS.common : RARITY_COLORS[tier];
   const label = stripPrefix(question.text);
@@ -100,6 +100,15 @@ export function NFTQuestionButton({
         </span>
       )}
       {label}
+      {impact && !asked && (
+        <div style={{
+          display: 'flex', gap: 4, marginLeft: 6, fontSize: 8, fontWeight: 800,
+          fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em'
+        }}>
+          <span style={{ color: '#4ADE80', opacity: 0.9 }}>-{impact.yes}Y</span>
+          <span style={{ color: '#F87171', opacity: 0.9 }}>-{impact.no}N</span>
+        </div>
+      )}
       {asked && (
         <span style={{ fontSize: 10, color: 'rgba(232,164,68,0.5)' }}>✓</span>
       )}

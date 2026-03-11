@@ -10,8 +10,9 @@ import { useWalletStatus } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet/hooks';
 import { WalletButton } from '../widgets/WalletButton';
 import { LeaderboardScreen } from './LeaderboardScreen';
-import { useOwnedNFTs, useWalletAddress } from '@/services/starknet/walletStore';
+import { useOwnedNFTs, useWalletAddress, useWalletStore } from '@/services/starknet/walletStore';
 import { useGameStore } from '@/core/store/gameStore';
+import { TraitMetaEngine } from './landing/TraitMetaEngine';
 
 import { getActiveGamesForAddress } from '@/services/supabase/gameService';
 import type { SupabaseGame } from '@/services/supabase/types';
@@ -26,6 +27,7 @@ export function MenuScreen() {
   const { startSetup, setGameMode, recoverOnlineGame, setOnlineGame } = useGameActions();
   const walletStatus = useWalletStatus();
   const walletAddress = useWalletAddress();
+  const { connectWallet } = useWalletConnection();
 
   const handleFreePlay = () => {
     setGameMode('free', MEME_CHARACTERS);
@@ -171,6 +173,7 @@ export function MenuScreen() {
                 setNftStatus('');
               }
             }}
+            onLogin={connectWallet}
             loading={loading}
             nftStatus={nftStatus}
           />
@@ -364,7 +367,7 @@ function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; on
 
       <TopRightControls onLeaderboard={onLeaderboard} />
 
-      <div style={{ flex: '1 1 0', minHeight: 0 }} />
+      <div style={{ flex: '0 0 auto', minHeight: '15vh' }} />
 
       <LogoAndTitle delayBase={0.15} />
 
@@ -373,7 +376,7 @@ function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; on
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.1, type: 'spring', stiffness: 260, damping: 24 }}
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, position: 'relative', zIndex: 2 }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, position: 'relative', zIndex: 2, marginBottom: '10vh' }}
       >
         <motion.button
           onClick={() => { sfx.click(); connectWallet(); }}
@@ -410,7 +413,10 @@ function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; on
         </motion.button>
       </motion.div>
 
-      <div style={{ flex: '1 1 0', minHeight: 0 }} />
+      {/* Trait Meta Engine - Continuation on scroll */}
+      <TraitMetaEngine onPlay={() => { sfx.click(); onFreePlay(); }} />
+
+      <div style={{ flex: '0 0 auto', minHeight: 0 }} />
     </motion.div>
   );
 }
@@ -651,10 +657,10 @@ function LocalGameTile({ onClick }: { onClick: () => void }) {
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(124,58,237,0.38), transparent)', flexShrink: 0 }} />
       <div style={{ padding: '11px 13px 13px', textAlign: 'left', fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0 }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: '#FFFFFE', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
-          Local Game
+          AI Mode
         </div>
         <div style={{ fontSize: 10, color: 'rgba(167,139,250,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
-          Pass &amp; play or vs AI
+          Try beat our AI
         </div>
       </div>
       <div style={{
@@ -722,10 +728,10 @@ function OnlineGameTile({ onClick }: { onClick: () => void }) {
       <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(232,164,68,0.45), transparent)', flexShrink: 0 }} />
       <div style={{ padding: '11px 13px 13px', textAlign: 'left', fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0 }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: '#FFFFFE', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
-          Online Game
+          Online Mode
         </div>
         <div style={{ fontSize: 10, color: 'rgba(232,164,68,0.65)', fontWeight: 700, marginTop: 3, letterSpacing: '0.08em', textTransform: 'uppercase' as const }}>
-          1v1 with Schizodio
+          1v1 NFT edition
         </div>
       </div>
       <div style={{
@@ -774,13 +780,15 @@ interface FreePickProps {
   onBack: () => void;
   onCTVersion: () => void;
   onSchizodio: () => void;
+  onLogin: () => void;
   loading?: boolean;
   nftStatus?: string;
   onSchizodioRandom: () => void;
 }
 
-function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loading, nftStatus }: FreePickProps) {
+function FreePickView({ onBack, onCTVersion, onSchizodio, onLogin, onSchizodioRandom, loading, nftStatus }: FreePickProps) {
   const { t } = useTranslation();
+  const walletStatus = useWalletStatus();
   const ownedNFTs = useOwnedNFTs();
   const [showNoNFTModal, setShowNoNFTModal] = useState(false);
 
@@ -808,7 +816,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loa
       }}
     >
       <div style={{ width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column' }}>
-        <SubHeader onBack={onBack} title={t('menu.practice')} />
+        <SubHeader onBack={onBack} title={walletStatus === 'ready' ? "Beat the AI" : t('menu.practice')} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* CT Version */}
@@ -843,7 +851,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loa
               </svg>
             }
             title={nftStatus || t('menu.nft_version')}
-            subtitle="Play with the full Schizodio collection."
+            subtitle="Taste what is like playing with your own toys"
             tag="999 CHARS"
             disabled={loading}
           />
@@ -883,7 +891,7 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loa
                   No Schizodios Found
                 </h3>
                 <p style={{ color: 'rgba(255,255,254,0.7)', fontSize: 15, lineHeight: 1.5, margin: 0 }}>
-                  You need a Schizodio to select your own character. You can still play by letting us assign you a random character!
+                  If you own Schizodio Log In! If not you can play random.
                 </p>
               </div>
 
@@ -902,17 +910,17 @@ function FreePickView({ onBack, onCTVersion, onSchizodio, onSchizodioRandom, loa
                   🎲 Play with Random
                 </button>
                 <button
-                  onClick={() => { sfx.click(); window.open('https://schizodio.art', '_blank'); }}
+                  onClick={() => { sfx.click(); setShowNoNFTModal(false); onLogin(); }}
                   style={{
                     width: '100%', padding: '16px',
-                    background: 'rgba(255,255,255,0.05)', color: '#FFFFFE',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 600,
+                    background: 'rgba(124,58,237,0.15)', color: '#A78BFA',
+                    border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12,
+                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700,
                     cursor: 'pointer', outline: 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
-                  🛒 Get an NFT at schizodio.art
+                  🔐 Log In
                 </button>
                 <button
                   onClick={() => { sfx.click(); setShowNoNFTModal(false); }}
@@ -1105,7 +1113,11 @@ function OptionCard({ onClick, accent, accentRgb, icon, title, subtitle, tag, di
     if (disabled || isClicked) return;
     sfx.cardClick();
     setIsClicked(true);
-    setTimeout(() => { onClick(); }, 300);
+    setTimeout(() => {
+      onClick();
+      // Reset after a bit so if we show a local modal, the card comes back
+      setTimeout(() => setIsClicked(false), 500);
+    }, 300);
   };
 
   return (

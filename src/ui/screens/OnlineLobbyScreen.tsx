@@ -19,10 +19,10 @@ interface Props {
   onBack: () => void;
 }
 
-type LobbyView = 'mode_select' | 'choice' | 'create' | 'join';
+type LobbyView = 'collection_select' | 'mode_select' | 'choice' | 'create' | 'join';
 
 export function OnlineLobbyScreen({ onBack }: Props) {
-  const [view, setView] = useState<LobbyView>('mode_select');
+  const [view, setView] = useState<LobbyView>('collection_select');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -149,10 +149,16 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             fontSize: 13,
             lineHeight: 1.6,
             maxWidth: 300,
-            margin: '0 auto 28px',
+            margin: '0 auto 20px',
           }}>
             Online mode is exclusive to SCHIZODIO NFT holders.
             Get your SCHIZODIO to join the game.
+          </div>
+          <div style={{
+            fontSize: 11, fontStyle: 'italic', color: 'rgba(232,164,68,0.6)',
+            marginBottom: 28, maxWidth: 280, margin: '0 auto 28px'
+          }}>
+            "rarer traits might be more expensive, but less provable to be found!"
           </div>
           <motion.a
             href="https://schizodio.art/"
@@ -220,7 +226,8 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   };
 
   const handleBack = () => {
-    if (view === 'mode_select') return onBack();
+    if (view === 'collection_select') return onBack();
+    if (view === 'mode_select') return setView('collection_select');
     if (view === 'choice') return setView('mode_select');
     setView('choice');
   };
@@ -228,6 +235,40 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   return (
     <LobbyWrapper onBack={handleBack}>
       <AnimatePresence mode="wait">
+
+        {view === 'collection_select' && (
+          <motion.div
+            key="collection_select"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
+            <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(255,255,254,0.4)', marginBottom: 8 }}>
+              Select a collection to play
+            </div>
+            
+            <CollectionCard 
+              name="SCHIZODIO"
+              image="/vs_background.jpg"
+              count={999}
+              rarity="Extreme"
+              played={1240}
+              onClick={() => setView('mode_select')}
+              accentRgb="232,164,68"
+            />
+
+            <CollectionCard 
+              name="DUCKS"
+              image="/images/practice-bg.jpg"
+              count={500}
+              rarity="High"
+              played={0}
+              disabled
+              accentRgb="251,191,36"
+            />
+          </motion.div>
+        )}
 
         {view === 'mode_select' && (
           <motion.div
@@ -484,6 +525,109 @@ function ErrorMsg({ children }: { children: React.ReactNode }) {
       textAlign: 'center',
     }}>
       {children}
+    </div>
+  );
+}
+
+// ─── Sub-components ─────────────────────────────────────────────────────────
+
+function CollectionCard({ name, image, count, rarity, played, onClick, disabled, accentRgb }: {
+  name: string;
+  image: string;
+  count: number;
+  rarity: string;
+  played: number;
+  onClick?: () => void;
+  disabled?: boolean;
+  accentRgb: string;
+}) {
+  return (
+    <motion.button
+      disabled={disabled}
+      onClick={onClick}
+      whileHover={disabled ? {} : { scale: 1.02, y: -4 }}
+      whileTap={disabled ? {} : { scale: 0.98 }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: 140,
+        borderRadius: 20,
+        overflow: 'hidden',
+        border: `1.5px solid ${disabled ? 'rgba(255,255,255,0.08)' : `rgba(${accentRgb}, 0.3)`}`,
+        background: `rgba(${accentRgb}, 0.05)`,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        textAlign: 'left',
+        padding: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        opacity: disabled ? 0.6 : 1,
+        boxShadow: disabled ? 'none' : `0 10px 30px rgba(0,0,0,0.3), 0 0 20px rgba(${accentRgb}, 0.1)`,
+      }}
+    >
+      {/* Background Image */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: `url(${image})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 20%',
+        filter: 'brightness(0.5) saturate(1.2)',
+        zIndex: 0,
+        transition: 'all 0.4s ease',
+      }} />
+      
+      {/* Gradient Overlay */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: `linear-gradient(180deg, transparent 0%, rgba(15,14,23,0.7) 60%, rgba(15,14,23,0.95) 100%)`,
+        zIndex: 1,
+      }} />
+
+      {/* Content */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '14px 20px', width: '100%' }}>
+        <div style={{ 
+          fontSize: 20, fontWeight: 900, color: '#FFFFFE', 
+          fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
+          marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          {name}
+          {disabled && (
+            <span style={{ 
+              fontSize: 10, background: 'rgba(255,255,255,0.1)', 
+              padding: '2px 8px', borderRadius: 20, color: 'rgba(255,255,254,0.4)',
+              fontWeight: 700 
+            }}>SOON</span>
+          )}
+        </div>
+        
+        <div style={{ display: 'flex', gap: 20, opacity: 0.9 }}>
+          <Stat label="ITEMS" value={count} />
+          <Stat label="RARITY" value={rarity} />
+          <Stat label="GAMES" value={played > 0 ? played : '-'} />
+        </div>
+      </div>
+
+      {/* Glow effect on hover */}
+      {!disabled && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+          style={{
+            position: 'absolute', inset: 0,
+            boxShadow: `inset 0 0 30px rgba(${accentRgb}, 0.4)`,
+            pointerEvents: 'none', zIndex: 3,
+          }}
+        />
+      )}
+    </motion.button>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(232,164,68,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#FFFFFE', fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
     </div>
   );
 }

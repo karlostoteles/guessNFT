@@ -22,13 +22,14 @@ interface NFTModeBodyProps {
   setHoveredZone: (z: string | null) => void;
   askedIds: Set<string>;
   remaining: Character[];
+  questionImpact: Record<string, { yes: number; no: number }>;
   onAsk: (q: Question) => void;
 }
 
 export function NFTModeBody({
   activeZone,
   setActiveZone,
-  askedIds, remaining, onAsk,
+  askedIds, remaining, questionImpact, onAsk,
 }: NFTModeBodyProps) {
 
   // Info-gain filtered question IDs
@@ -199,6 +200,7 @@ export function NFTModeBody({
                     <NFTQuestionButton
                       key={q.id} question={q} asked={false}
                       onClick={() => onAsk(q)} matchPct={pct}
+                      impact={questionImpact[q.id]}
                     />
                   ))}
                 </div>
@@ -254,6 +256,7 @@ export function NFTModeBody({
                     <NFTQuestionButton
                       key={q.id} question={q} asked={askedIds.has(q.id)}
                       onClick={() => onAsk(q)} matchPct={matchPctMap.get(q.id)}
+                      impact={questionImpact[q.id]}
                     />
                   ))}
                 </div>

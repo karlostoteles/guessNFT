@@ -62,6 +62,28 @@ export function QuestionPanel() {
     [characters, playerState.eliminatedCharacterIds],
   );
 
+  // Calculate impact for each question: how many characters would be eliminated
+  const questionImpact = useMemo(() => {
+    const impact: Record<string, { yes: number; no: number }> = {};
+    for (const q of QUESTIONS) {
+      if (askedIds.has(q.id)) continue;
+
+      let matchesCount = 0;
+      for (const char of remaining) {
+        const isMatch = q.matchFn ? q.matchFn(char) : (char.traits as any)[q.traitKey] === q.traitValue;
+        if (isMatch) matchesCount++;
+      }
+
+      // If answer is "Yes", all non-matches are eliminated
+      impact[q.id] = {
+        yes: remaining.length - matchesCount,
+        // If answer is "No", all matches are eliminated
+        no: matchesCount,
+      };
+    }
+    return impact;
+  }, [remaining, askedIds]);
+
   // Opponent's remaining tiles — danger = they're close to guessing YOUR pick
   const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
   const opponentEliminatedIds = useEliminatedIds(opponent);
@@ -245,12 +267,14 @@ export function QuestionPanel() {
                 setHoveredZone={setHoveredZone}
                 askedIds={askedIds}
                 remaining={remaining}
+                questionImpact={questionImpact}
                 onAsk={handleAsk}
               />
             ) : (
               <FreeModeBody
                 askedIds={askedIds}
                 remaining={remaining}
+                questionImpact={questionImpact}
                 onAsk={handleAsk}
               />
             )}
