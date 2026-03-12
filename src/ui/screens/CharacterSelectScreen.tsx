@@ -7,7 +7,7 @@ import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
-import { depositWagerOnChain, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
+import { depositWagerOnChain, submitCommitmentOnChain, getCommitment } from '@/services/starknet/commitReveal';
 
 // Deterministic accent colour from character id
 function idToColor(id: string): string {
