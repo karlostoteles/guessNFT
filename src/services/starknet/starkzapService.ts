@@ -23,7 +23,9 @@ export interface ConnectedWalletInfo {
 function getSDK(): StarkZap {
   if (!sdk) {
     sdk = new StarkZap({
-      network: 'mainnet', // Uses built-in mainnet preset
+      network: 'mainnet',
+      // Explicitly providing RPC and chainId avoids auto-detection issues which cause SNIP-9 errors
+      rpcUrl: 'https://api.cartridge.gg/x/starknet/mainnet',
     });
   }
   return sdk;
@@ -45,14 +47,25 @@ export async function connectWallet(policies?: Array<{ target: string; method: s
     { target: GAME_CONTRACT, method: 'opponent_won' },
   ];
 
+  console.log('[StarkZap] Connecting with policies for contract:', GAME_CONTRACT);
+
   wallet = await starkzap.connectCartridge({
     policies: defaultPolicies,
-    // Use sponsored transactions when available
     feeMode: 'sponsored',
   });
 
   // Ensure account is ready (deploy if needed)
+  console.log('[StarkZap] Ensuring account is ready...');
   await wallet.ensureReady({ deploy: 'if_needed' });
+
+  // Debug deployment status
+  try {
+    const isDeployed = await wallet.isDeployed();
+    console.log('[StarkZap] Account address:', wallet.address.toString());
+    console.log('[StarkZap] Account deployed:', isDeployed);
+  } catch (e) {
+    console.warn('[StarkZap] Could not check deployment status:', e);
+  }
 
   return {
     address: wallet.address.toString(),
