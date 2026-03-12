@@ -110,11 +110,20 @@ export function FlywheelDiagram() {
 function FlywheelNode({ title, subtitle, color, delay, pulse = false }: { title: string; subtitle?: string; color: string; delay: number; pulse?: boolean }) {
   return (
     <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
-        transition={{ delay, type: 'spring', stiffness: 200 }}
-        animate={pulse ? { boxShadow: [`0 0 20px ${color}22`, `0 0 50px ${color}44`, `0 0 20px ${color}22`] } : {}}
+        transition={pulse ? {
+            boxShadow: {
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                type: "tween"
+            },
+            default: { delay, type: 'spring', stiffness: 200 }
+        } : { delay, type: 'spring', stiffness: 200 }}
+        animate={pulse ? { 
+            opacity: 1, 
+            scale: 1,
+            boxShadow: [`0 0 20px ${color}22`, `0 0 50px ${color}44`, `0 0 20px ${color}22`] 
+        } : { opacity: 1, scale: 1 }}
         style={{
             padding: '24px 32px',
             borderRadius: 16,
