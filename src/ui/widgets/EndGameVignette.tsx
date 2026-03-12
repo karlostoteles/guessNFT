@@ -83,7 +83,7 @@ export function EndGameVignette() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 1.0 }}
                 style={{
-                    position: 'fixed',
+                    position: 'absolute',
                     inset: 0,
                     pointerEvents: 'none',
                     zIndex: 5,

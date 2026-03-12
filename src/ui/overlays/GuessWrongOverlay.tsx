@@ -27,7 +27,7 @@ export function GuessWrongOverlay() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         display: 'flex',
         alignItems: 'center',

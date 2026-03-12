@@ -139,7 +139,7 @@ export function CharacterSelectScreen() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
-          position: 'fixed', inset: 0,
+          position: 'absolute', inset: 0,
           background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'auto', zIndex: 20, padding: 24,
@@ -209,7 +209,7 @@ export function CharacterSelectScreen() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.88)',
         backdropFilter: 'blur(12px)',

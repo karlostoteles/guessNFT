@@ -59,7 +59,7 @@ export function WalletButton() {
             exit={{ opacity: 0 }}
             onClick={() => { sfx.click(); setOpen(false); }}
             style={{
-              position: 'fixed',
+              position: 'absolute',
               inset: 0,
               zIndex: 98,
               cursor: 'default',
@@ -71,7 +71,7 @@ export function WalletButton() {
       {/* ── Anchor container (fixed to top-left) ────────────────────── */}
       {/*   zIndex 100 so the dropdown rides above the backdrop (98)    */}
       <div style={{
-        position: 'fixed',
+        position: 'absolute',
         top: 16,
         left: 16,
         zIndex: 100,

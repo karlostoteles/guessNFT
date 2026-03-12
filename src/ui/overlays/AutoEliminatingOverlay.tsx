@@ -39,7 +39,7 @@ export function AutoEliminatingOverlay() {
       exit={{ opacity: 0, y: 30, scale: 0.95 }}
       transition={{ duration: 0.25, type: 'spring', stiffness: 300, damping: 25 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         bottom: 28,
         left: '50%',
         transform: 'translateX(-50%)',

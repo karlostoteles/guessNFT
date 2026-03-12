@@ -127,11 +127,10 @@ export function MenuScreen() {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{ 
-        position: 'fixed', 
+        position: 'absolute', 
         inset: 0, 
         pointerEvents: 'auto', 
         zIndex: 20,
@@ -453,11 +452,10 @@ function ConnectingView({ walletStatus }: { walletStatus: string }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'fixed', inset: 0,
+        position: 'absolute', inset: 0,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         background: 'radial-gradient(ellipse at center, rgba(15,14,23,0.6) 0%, rgba(15,14,23,0.95) 70%)',
@@ -1268,11 +1266,10 @@ function LoadingOverlay({ loading, status }: { loading: boolean; status: string 
     <AnimatePresence>
       {loading && (
         <motion.div
-          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           style={{
-            position: 'fixed', inset: 0,
+            position: 'absolute', inset: 0,
             background: 'rgba(15, 14, 23, 0.85)',
             backdropFilter: 'blur(8px)',
             display: 'flex', flexDirection: 'column',
@@ -1318,11 +1315,10 @@ function WIPDisclaimer({ show, onClose }: { show: boolean; onClose: () => void }
     <AnimatePresence>
       {show && (
         <motion.div
-          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           style={{
-            position: 'fixed', inset: 0,
+            position: 'absolute', inset: 0,
             background: 'rgba(5, 5, 5, 0.85)',
             backdropFilter: 'blur(12px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',

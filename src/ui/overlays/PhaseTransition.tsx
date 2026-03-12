@@ -76,7 +76,7 @@ export function PhaseTransition() {
       transition={{ duration: 0.3 }}
       onClick={isAutoTransition ? undefined : advancePhase}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.85)',
         backdropFilter: 'blur(10px)',

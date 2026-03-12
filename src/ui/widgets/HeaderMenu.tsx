@@ -88,7 +88,7 @@ export function HeaderMenu() {
                         exit={{ opacity: 0 }}
                         onClick={() => { sfx.click(); setOpen(false); }}
                         style={{
-                            position: 'fixed',
+                            position: 'absolute',
                             inset: 0,
                             zIndex: 98,
                             cursor: 'default',
@@ -98,7 +98,7 @@ export function HeaderMenu() {
             </AnimatePresence>
 
             <div style={{
-                position: 'fixed',
+                position: 'absolute',
                 top: 16,
                 left: 16,
                 zIndex: 100,

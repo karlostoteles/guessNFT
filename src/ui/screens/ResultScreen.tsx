@@ -74,7 +74,7 @@ export function ResultScreen() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.9)',
         backdropFilter: 'blur(16px)',

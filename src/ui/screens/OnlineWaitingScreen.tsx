@@ -32,7 +32,7 @@ export function OnlineWaitingScreen() {
       exit={{ opacity: 0, y: 24 }}
       transition={{ type: 'spring', stiffness: 280, damping: 28 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         bottom: 28,
         left: '50%',
         transform: 'translateX(-50%)',

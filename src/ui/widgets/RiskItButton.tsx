@@ -84,7 +84,7 @@ export function RiskItButton() {
                     onClick={handleClick}
                     disabled={!canAct}
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         bottom: 'clamp(100px, 15vh, 140px)',
                         right: 16,
                         zIndex: 40,

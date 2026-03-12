@@ -26,7 +26,7 @@ export function CPUThinkingIndicator() {
           exit={{ opacity: 0, y: -20 }}
           transition={{ type: 'spring', stiffness: 300, damping: 28 }}
           style={{
-            position: 'fixed',
+            position: 'absolute',
             top: 16,
             left: '50%',
             transform: 'translateX(-50%)',

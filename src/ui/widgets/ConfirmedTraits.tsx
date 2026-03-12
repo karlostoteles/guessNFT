@@ -59,7 +59,7 @@ export function ConfirmedTraits() {
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.4 }}
                 style={{
-                    position: 'fixed',
+                    position: 'absolute',
                     bottom: isMobile ? 10 : 16,
                     right: isMobile ? 8 : 16,
                     zIndex: 15,

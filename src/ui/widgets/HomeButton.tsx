@@ -25,7 +25,7 @@ export function HomeButton() {
             whileHover={{ scale: 1.1, background: 'rgba(255,255,255,0.1)' }}
             whileTap={{ scale: 0.9 }}
             style={{
-                position: 'fixed',
+                position: 'absolute',
                 top: 16,
                 left: leftOffset,
                 zIndex: 100,

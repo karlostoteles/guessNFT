@@ -43,7 +43,7 @@ export function TurnIndicator() {
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 16,
           left: 0,
           right: 0,
