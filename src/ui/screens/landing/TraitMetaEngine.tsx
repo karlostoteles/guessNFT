@@ -24,9 +24,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
       {/* 1. Hero-style Section Opener */}
       <Section style={{ minHeight: '80vh', justifyContent: 'center', textAlign: 'center' }}>
         <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
+            animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
         >
             <span style={{ 
@@ -91,9 +89,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
         }}>
             {/* Old World */}
             <motion.div 
-                initial={{ x: -50, opacity: 0 }}
-                whileInView={{ x: 0, opacity: 1 }}
-                viewport={{ once: true, margin: "-100px" }}
+                animate={{ x: 0, opacity: 1 }}
                 style={{ 
                     padding: 40, 
                     borderRadius: 24, 
@@ -120,9 +116,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
 
             {/* New World */}
             <motion.div 
-                initial={{ x: 50, opacity: 0 }}
-                whileInView={{ x: 0, opacity: 1 }}
-                viewport={{ once: true, margin: "-100px" }}
+                animate={{ x: 0, opacity: 1 }}
                 style={{ 
                     padding: 40, 
                     borderRadius: 24, 
@@ -149,9 +143,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
 
             {/* Continuous Reinforcement Arrow */}
             <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
+                animate={{ opacity: 1, scale: 1 }}
                 style={{ 
                     gridColumn: '1 / -1', 
                     display: 'flex', 
@@ -187,9 +179,7 @@ export function TraitMetaEngine({ onPlay }: { onPlay: () => void }) {
       {/* 5. Closing Vision Block */}
       <Section style={{ paddingBottom: 160 }}>
         <motion.div 
-            initial={{ y: 40, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ y: 0, opacity: 1 }}
             style={{ 
                 width: '100%', 
                 maxWidth: 900, 

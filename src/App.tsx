@@ -26,7 +26,7 @@ const canvasFallback = (
 export default function App() {
   return (
     <ErrorBoundary>
-      <div style={{ width: '100vw', height: '100vh', position: 'relative', isolation: 'isolate' }}>
+      <div style={{ width: '100%', height: '100%', position: 'relative', isolation: 'isolate' }}>
         <ErrorBoundary fallback={canvasFallback}>
           <Canvas
             shadows
