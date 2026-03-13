@@ -20,6 +20,7 @@ import { CPUThinkingIndicator } from './widgets/CPUThinkingIndicator';
 import { OpponentCounter } from './widgets/OpponentCounter';
 import { ConfirmedTraits } from './widgets/ConfirmedTraits';
 import { EndGameVignette } from './widgets/EndGameVignette';
+import { ToastContainer } from './widgets/ToastContainer';
 import { useOnlineGameSync } from '@/shared/hooks/useOnlineGameSync';
 import { useNFTTraitLoader } from '@/shared/hooks/useNFTTraitLoader';
 
@@ -39,6 +40,7 @@ export function UIOverlay() {
       zIndex: 100,
       touchAction: 'manipulation',
     }}>
+      <ToastContainer />
       <EndGameVignette />
       <TurnIndicator />
 

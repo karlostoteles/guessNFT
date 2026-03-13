@@ -19,7 +19,10 @@ export function useWalletConnection() {
 
   const connect = useCallback(async (type?: 'cartridge' | 'discovery') => {
     const state = store.getState();
-    if (state.status === 'connecting' || state.status === 'ready') return;
+    if (state.status === 'connecting') return;
+    
+    // If already ready with the same type, skip
+    if (state.status === 'ready' && state.walletType === (type || 'cartridge')) return;
 
     state.setStatus('connecting');
     state.setError(null);
@@ -28,6 +31,7 @@ export function useWalletConnection() {
       const walletInfo = await connectWallet(type);
 
       state.setAddress(walletInfo.address);
+      state.setWalletType(walletInfo.type);
       state.setStatus('connected');
 
       if (walletInfo.username) {

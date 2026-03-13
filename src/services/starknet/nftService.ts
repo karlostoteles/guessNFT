@@ -293,6 +293,7 @@ function parseMetadata(raw: string): any {
 async function fetchDirectMetadata(tokenId: string): Promise<{
   imageUrl: string;
   name: string;
+  rawImageIpfs?: string;
   attributes: NFTAttribute[];
 } | null> {
   try {
@@ -306,9 +307,11 @@ async function fetchDirectMetadata(tokenId: string): Promise<{
       return null;
     }
     const data = JSON.parse(body);
+    const rawImage = data.image || data.image_url || '';
     return {
-      imageUrl: resolveUrl(data.image || data.image_url || ''),
+      imageUrl: resolveUrl(rawImage),
       name: data.name || `SCHIZODIO #${tokenId}`,
+      rawImageIpfs: rawImage.startsWith('ipfs://') ? rawImage : undefined,
       attributes: data.attributes ?? [],
     };
   } catch (err) {
@@ -326,6 +329,7 @@ async function fetchDirectMetadata(tokenId: string): Promise<{
 export async function fetchTokenMetadata(tokenId: string): Promise<{
   name: string;
   imageUrl: string;
+  rawImageIpfs?: string;
   attributes: NFTAttribute[];
 }> {
   // ── 1. Try direct asset server first (Schizodio official) ────────────────

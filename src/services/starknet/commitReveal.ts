@@ -165,7 +165,7 @@ export function clearCommitments(gameSessionId: string) {
 export function generateGameSessionId(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return '0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -213,6 +213,18 @@ export async function depositWagerOnChain(
 ): Promise<string> {
   const contract = getGameContract();
   return contract.depositWager(gameId, tokenId);
+}
+
+/**
+ * Atomic multicall: commit character and deposit wager in one transaction.
+ */
+export async function commitAndWagerOnChain(
+  gameId: string,
+  commitment: string,
+  tokenId?: string
+): Promise<string> {
+  const contract = getGameContract();
+  return contract.commitAndWagerMulticall(gameId, commitment, tokenId);
 }
 
 /**

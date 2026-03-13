@@ -18,6 +18,7 @@ export function OnlineWaitingScreen() {
   const playerNum = useOnlinePlayerNum();
   const txHash    = useOnChainCommitmentHash();
   const { cancelGameOnChain, resetGame } = useGameActions();
+  const onlineSubMode = useGameStore(s => s.onlineSubMode);
   const [copied, setCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -32,7 +33,12 @@ export function OnlineWaitingScreen() {
 
   const handleCancel = async () => {
     if (cancelling) return;
-    if (!confirm('Cancel this game and reclaim your NFT? (Requires signature)')) return;
+    
+    const confirmMsg = onlineSubMode === 'betting' 
+      ? 'Cancel this game and reclaim your NFT? (Requires signature)'
+      : 'Cancel this game and return to lobby?';
+      
+    if (!confirm(confirmMsg)) return;
     
     setCancelling(true);
     try {

@@ -40,7 +40,7 @@ export function WalletConnectOverlay({ isOpen, onClose, onSelect, isConnecting }
           onClick={(e) => e.stopPropagation()}
           style={{
             width: '100%',
-            maxWidht: 420,
+            maxWidth: 420,
             background: 'linear-gradient(165deg, #121225 0%, #0a0a14 100%)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: 24,

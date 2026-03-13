@@ -24,6 +24,7 @@ export interface WalletState {
   status: WalletConnectionStatus;
   address: string | null;
   username: string | null;
+  walletType: 'cartridge' | 'argent' | 'braavos' | 'discovery' | null;
   ownedNFTs: SchizodioNFT[];
   error: string | null;
 }
@@ -32,6 +33,7 @@ export interface WalletActions {
   setStatus: (status: WalletConnectionStatus) => void;
   setAddress: (address: string | null) => void;
   setUsername: (username: string | null) => void;
+  setWalletType: (type: 'cartridge' | 'argent' | 'braavos' | 'discovery' | null) => void;
   setOwnedNFTs: (nfts: SchizodioNFT[]) => void;
   setError: (error: string | null) => void;
   reset: () => void;

@@ -7,7 +7,7 @@ import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
-import { depositWagerOnChain, submitCommitmentOnChain, getCommitment } from '@/services/starknet/commitReveal';
+import { commitAndWagerOnChain, getCommitment } from '@/services/starknet/commitReveal';
 import { getGameContract } from '@/services/starknet/starkzapService';
 
 // Deterministic accent colour from character id
@@ -120,11 +120,16 @@ export function CharacterSelectScreen() {
             const gameState = await contract.getGame(session);
             const alreadyCommitted = player === 'player1' ? (gameState.p1Commitment !== '0' && gameState.p1Commitment !== '0x0') : (gameState.p2Commitment !== '0' && gameState.p2Commitment !== '0x0');
 
-            if (!alreadyCommitted) {
-              await submitCommitmentOnChain(myCommitment, session);
+            const subMode = useGameStore.getState().onlineSubMode;
+            const isBetting = subMode === 'betting';
+            const tokenIdToWager = isBetting ? finalTokenId : undefined;
+
+            if (!alreadyCommitted || (isBetting && !gameState.p1Wager && player === 'player1') || (isBetting && !gameState.p2Wager && player === 'player2')) {
+              console.log('[CharacterSelect] Executing multicall (Commit + Wager if betting...)');
+              await commitAndWagerOnChain(session, alreadyCommitted ? '0' : myCommitment, tokenIdToWager);
+            } else {
+              console.log('[CharacterSelect] Already committed and/or wagered, skipping.');
             }
-            
-            await depositWagerOnChain(session, finalTokenId);
           } catch (err: any) {
             if (err.message === 'YOUR_ACCOUNT_UPGRADE_REQUIRED') {
               if (confirm('Your account is too old for gasless play. Do you want to continue by paying gas for this transaction?')) {

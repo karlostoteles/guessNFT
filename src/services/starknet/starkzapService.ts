@@ -10,6 +10,12 @@ import { connect, disconnect, type StarknetWindowObject } from 'get-starknet';
 import { Account, RpcProvider, type Call } from 'starknet';
 import { GAME_CONTRACT_NORMAL, GAME_CONTRACT_SCHIZO, SESSION_POLICIES, RPC_URL } from './config';
 import { useGameStore } from '@/core/store/gameStore';
+import { useToastStore } from '@/core/store/toastStore';
+
+// Expose for user debugging as requested
+(window as any).GAME_CONTRACT = GAME_CONTRACT_NORMAL;
+console.log('[StarkZap] Environment - isSecureContext:', window.isSecureContext);
+console.log('[StarkZap] Environment - protocol:', window.location.protocol);
 
 // Singleton instances
 let sdk: StarkZap | null = null;
@@ -29,6 +35,7 @@ function getSDK(): StarkZap {
     sdk = new StarkZap({
       network: 'mainnet',
       rpcUrl: RPC_URL,
+      chainId: ChainId.MAINNET,
     });
   }
   return sdk;
@@ -39,7 +46,7 @@ function getSDK(): StarkZap {
  * into the WalletInterface expected by StarkZap-based code.
  */
 class DiscoveryWalletShim implements WalletInterface {
-  readonly address: string;
+  readonly address: any;
   private account: Account;
   private provider: RpcProvider;
   private windowObject: StarknetWindowObject;
@@ -107,7 +114,7 @@ class DiscoveryWalletShim implements WalletInterface {
   }
 
   async estimateFee(calls: Call[]): Promise<any> {
-    return await this.account.estimateFee(calls);
+    return await (this.account as any).estimateFee(calls);
   }
 
   async disconnect(): Promise<void> {
@@ -140,6 +147,20 @@ export async function connectWallet(
   type: 'cartridge' | 'discovery' = 'cartridge',
   policies?: Array<{ target: string; method: string }>
 ): Promise<ConnectedWalletInfo> {
+  // Always disconnect previous before starting a new connection flow to avoid singletons clobbering each other
+  if (wallet) {
+    try { 
+      // Add a 3s timeout to disconnect to prevent hanging the whole flow if the iframe is dead
+      await Promise.race([
+        wallet.disconnect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Disconnect timeout')), 3000))
+      ]);
+    } catch (e) { 
+      console.warn('[Wallet] Disconnect failed or timed out:', e); 
+    }
+    wallet = null;
+  }
+
   if (type === 'discovery') {
     const windowObject = await connect({
       modalMode: 'alwaysAsk',
@@ -151,9 +172,12 @@ export async function connectWallet(
     }
 
     wallet = new DiscoveryWalletShim(windowObject) as any;
+    const finalType = (windowObject.id as any) === 'argentX' ? 'argent' : 
+                      (windowObject.id as any) === 'braavos' ? 'braavos' : 'discovery';
+
     return {
       address: wallet!.address.toString(),
-      type: (windowObject.id as any) || 'discovery',
+      type: finalType as any,
     };
   }
 
@@ -179,19 +203,55 @@ export async function connectWallet(
 
   try {
     const initialMode = (useSessions && !forceUserPays) ? 'sponsored' : 'user_pays';
+    console.log('[StarkZap] Attempting initial connection...', { initialMode, useSessions });
     wallet = await getWalletWithMode(initialMode);
-    
+
     // Ensure account is ready (deploy if needed)
     console.log('[StarkZap] Ensuring account is ready...');
     await wallet.ensureReady({ deploy: 'if_needed' });
   } catch (err: any) {
-    const isSnip9Error = err.message?.includes('SNIP-9') || err.message?.includes('ISRC9');
+    console.error('[StarkZap] connectWallet initial attempt failed:', err);
+    // Normalize: starkzap WASM may reject with a plain string, not an Error object
+    const errMsg: string = typeof err === 'string' ? err : (err?.message ?? '');
+
+    const isSnip9Error = errMsg.includes('SNIP-9') || errMsg.includes('ISRC9');
     if (isSnip9Error && !forceUserPays) {
       console.warn('[StarkZap] SNIP-9 error detected. Falling back to user_pays mode...');
-      // Re-connect in user_pays mode
       wallet = await getWalletWithMode('user_pays');
-      await wallet.ensureReady({ deploy: 'if_needed' });
+      try {
+        await wallet.ensureReady({ deploy: 'if_needed' });
+      } catch (readyErr: any) {
+        sdk = null;
+        throw readyErr;
+      }
+    } else if (errMsg.includes('failed to initialize') && useSessions) {
+      console.warn('[StarkZap] Controller failed to initialize with policies. Retrying WITHOUT policies...');
+      // Note: We don't reset sdk = null here unless the fallback also fails, 
+      // as the SDK instance might still be valid for non-policy connection.
+      try {
+        wallet = await starkzap.connectCartridge({
+          policies: undefined,
+          feeMode: 'user_pays',
+        });
+        await wallet.ensureReady({ deploy: 'if_needed' });
+      } catch (retryErr: any) {
+        sdk = null;
+        const retryMsg = typeof retryErr === 'string' ? retryErr : (retryErr?.message ?? '');
+        throw new Error(`Fallback failed: ${retryMsg}`);
+      }
     } else {
+      const isSecurityError = errMsg.includes('NotAllowedError') || errMsg.includes('WebAuthn') || errMsg.includes('TLS');
+      if (isSecurityError) {
+        // DO NOT reset sdk = null here if it's just a browser security block;
+        // resetting the SDK causes the entire iframe/session to be lost on retry.
+        const contextMsg = window.isSecureContext ? "Secure Context: YES" : "Secure Context: NO";
+        throw new Error(`Controller blocked by browser (WebAuthn/TLS error). ${contextMsg}. Protocol: ${window.location.protocol}. Dev: run on http://localhost:5173 (plain HTTP). Production: ensure valid HTTPS cert.`);
+      }
+
+      if (errMsg.includes('failed to initialize')) {
+        console.error('[StarkZap] Controller initialization failed. Full Error:', err);
+        sdk = null; // This IS a fatal initialization error, so we reset.
+      }
       throw err;
     }
   }
@@ -261,6 +321,7 @@ export interface GameContractCalls {
   depositWager: (gameId: string, tokenId: string) => Promise<string>;
   opponentWon: (gameId: string) => Promise<string>;
   getGame: (gameId: string) => Promise<any>;
+  commitAndWagerMulticall: (gameId: string, commitment: string, tokenId?: string) => Promise<string>;
 }
 
 /**
@@ -289,15 +350,35 @@ export function getGameContract(): GameContractCalls {
     return subMode === 'betting' ? GAME_CONTRACT_SCHIZO : GAME_CONTRACT_NORMAL;
   };
 
-  const wrapExecute = async (fn: (target: string) => Promise<any>) => {
+  const wrapExecute = async (fn: (target: string) => Promise<any>, actionLabel = 'Transaction') => {
     const target = getTargetContract();
+    const { addToast, removeToast } = useToastStore.getState();
+    const toastId = addToast({ message: `${actionLabel} in progress...`, type: 'loading', duration: Infinity });
+
     try {
-      return await fn(target);
+      const result = await fn(target);
+      const txHash = typeof result === 'string' ? result : (result?.hash || result?.transaction_hash);
+      
+      removeToast(toastId);
+      addToast({ 
+        message: `${actionLabel} successful!`, 
+        type: 'success', 
+        txHash: txHash 
+      });
+      
+      return result;
     } catch (err: any) {
+      removeToast(toastId);
       const isSnip9Error = err.message?.includes('SNIP-9') || err.message?.includes('ISRC9');
+      
       if (isSnip9Error) {
         throw new Error('YOUR_ACCOUNT_UPGRADE_REQUIRED');
       }
+
+      addToast({ 
+        message: `${actionLabel} failed: ${err.message || 'Unknown error'}`, 
+        type: 'error' 
+      });
       throw err;
     }
   };
@@ -305,7 +386,7 @@ export function getGameContract(): GameContractCalls {
   return {
     async createGame(gameId: string, player2Address?: string): Promise<string> {
       return await wrapExecute(async (target) => {
-        const w = _getWallet();
+        const w = getWallet();
         const p2 = player2Address || '0x0';
         const tx = await w.execute([
           {
@@ -316,7 +397,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Create Game');
     },
 
     async joinGame(gameId: string): Promise<string> {
@@ -331,7 +412,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Join Game');
     },
 
     async commitCharacter(game_id: string, commitment: string): Promise<string> {
@@ -346,7 +427,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Commit Character');
     },
 
     async revealCharacter(gameId: string, characterId: string, salt: string): Promise<string> {
@@ -361,7 +442,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Reveal Character');
     },
 
     async submitMove(gameId: string): Promise<string> {
@@ -376,7 +457,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Submit Move');
     },
 
     async claimTimeoutWin(gameId: string): Promise<string> {
@@ -391,7 +472,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Claim Timeout Win');
     },
 
     async cancelGame(gameId: string): Promise<string> {
@@ -406,7 +487,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Cancel Game');
     },
 
     async getGame(gameId: string) {
@@ -447,7 +528,7 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Wager NFT');
     },
 
     async opponentWon(gameId: string): Promise<string> {
@@ -462,7 +543,32 @@ export function getGameContract(): GameContractCalls {
         ]);
         await tx.wait();
         return tx.hash;
-      });
+      }, 'Confirm Win');
+    },
+
+    async commitAndWagerMulticall(gameId: string, commitment: string, tokenId?: string): Promise<string> {
+      return await wrapExecute(async (target) => {
+        const w = getWallet();
+        const calls = [
+          {
+            contractAddress: target,
+            entrypoint: 'commit_character',
+            calldata: [gameId, commitment],
+          },
+        ];
+
+        if (tokenId) {
+          calls.push({
+            contractAddress: target,
+            entrypoint: 'deposit_wager',
+            calldata: [gameId, tokenId, '0'],
+          });
+        }
+
+        const tx = await w.execute(calls);
+        await tx.wait();
+        return tx.hash;
+    }, tokenId ? 'Lock In & Wager' : 'Commit Character');
     },
   };
 }

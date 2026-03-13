@@ -6,6 +6,7 @@ const initialState: WalletState = {
   status: 'disconnected',
   address: null,
   username: null,
+  walletType: null,
   ownedNFTs: [],
   error: null,
 };
@@ -27,6 +28,11 @@ export const useWalletStore = create<WalletState & WalletActions>()(
     setUsername: (username) =>
       set((s) => {
         s.username = username;
+      }),
+
+    setWalletType: (walletType) =>
+      set((s) => {
+        s.walletType = walletType;
       }),
 
     setOwnedNFTs: (nfts) =>

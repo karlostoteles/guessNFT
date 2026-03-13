@@ -154,8 +154,8 @@ export function MenuScreen() {
 
   // Compute which sub-view to show within the 'menu' view
   const mainSubView =
-    walletStatus === 'ready' ? 'mode-select' :
-      (walletStatus === 'connecting' || walletStatus === 'connected' || walletStatus === 'loading_nfts') ? 'connecting' :
+    (walletStatus === 'connecting' || walletStatus === 'connected' || walletStatus === 'loading_nfts' || walletStatus === 'error') ? 'connecting' :
+      walletStatus === 'ready' ? 'mode-select' :
         'landing';
 
   // AnimatePresence key — drives transitions for all views
@@ -505,10 +505,14 @@ function LandingView({ onFreePlay, onLeaderboard, onLogin }: LandingViewProps) {
 // ─── Connecting view — shown while wallet is connecting / loading NFTs ─────────
 
 function ConnectingView({ walletStatus }: { walletStatus: string }) {
+  const error = useWalletStore((s) => s.error);
+  const { connectWallet } = useWalletConnection();
+
   const statusText =
-    walletStatus === 'loading_nfts' ? 'Loading NFTs...' :
-      walletStatus === 'connected' ? 'Checking NFTs...' :
-        'Connecting...';
+    walletStatus === 'error' ? 'Connection Failed' :
+      walletStatus === 'loading_nfts' ? 'Loading NFTs...' :
+        walletStatus === 'connected' ? 'Checking NFTs...' :
+          'Connecting...';
 
   return (
     <motion.div
@@ -540,11 +544,49 @@ function ConnectingView({ walletStatus }: { walletStatus: string }) {
           marginTop: 20,
           fontFamily: "'Space Grotesk', sans-serif",
           fontSize: 16, fontWeight: 600,
-          color: 'rgba(255,255,254,0.6)',
+          color: walletStatus === 'error' ? '#FCA5A5' : 'rgba(255,255,254,0.6)',
+          textAlign: 'center',
+          maxWidth: '80%',
         }}
       >
         {statusText}
+        {walletStatus === 'error' && error && (
+          <div style={{ 
+            marginTop: 12, 
+            fontSize: 13, 
+            fontWeight: 400, 
+            color: 'rgba(255,255,255,0.5)',
+            lineHeight: 1.5,
+            background: 'rgba(255,255,255,0.05)',
+            padding: '12px 16px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            {error}
+          </div>
+        )}
       </motion.div>
+
+      {walletStatus === 'error' && (
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => { sfx.click(); connectWallet('cartridge'); }}
+          style={{
+            marginTop: 24,
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 12,
+            padding: '10px 24px',
+            color: '#FFF',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Try Again
+        </motion.button>
+      )}
     </motion.div>
   );
 }
