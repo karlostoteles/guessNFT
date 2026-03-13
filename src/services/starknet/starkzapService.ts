@@ -60,17 +60,31 @@ export async function connectWallet(policies?: Array<{ target: string; method: s
   console.log('[StarkZap] Connecting. Use Sessions:', useSessions, 'Force User Pays:', forceUserPays);
   console.log('[StarkZap] Policies contract target:', GAME_CONTRACT);
 
-  wallet = await starkzap.connectCartridge({
-    // If sessions fail with SNIP-9, we pass undefined to force manual approval mode
-    policies: useSessions ? defaultPolicies : undefined,
-    // Default to 'user_pays' for maximum compatibility (avoids SNIP-9 / ISRC9 requirement)
-    // Users can still use sponsored by adding ?sponsored=true to the URL
-    feeMode: (useSessions && window.location.search.includes('sponsored')) ? 'sponsored' : 'user_pays',
-  });
+  const getWalletWithMode = async (mode: 'sponsored' | 'user_pays') => {
+    return await starkzap.connectCartridge({
+      policies: useSessions ? defaultPolicies : undefined,
+      feeMode: mode,
+    });
+  };
 
-  // Ensure account is ready (deploy if needed)
-  console.log('[StarkZap] Ensuring account is ready...');
-  await wallet.ensureReady({ deploy: 'if_needed' });
+  try {
+    const initialMode = (useSessions && !forceUserPays) ? 'sponsored' : 'user_pays';
+    wallet = await getWalletWithMode(initialMode);
+    
+    // Ensure account is ready (deploy if needed)
+    console.log('[StarkZap] Ensuring account is ready...');
+    await wallet.ensureReady({ deploy: 'if_needed' });
+  } catch (err: any) {
+    const isSnip9Error = err.message?.includes('SNIP-9') || err.message?.includes('ISRC9');
+    if (isSnip9Error && !forceUserPays) {
+      console.warn('[StarkZap] SNIP-9 error detected. Falling back to user_pays mode...');
+      // Re-connect in user_pays mode
+      wallet = await getWalletWithMode('user_pays');
+      await wallet.ensureReady({ deploy: 'if_needed' });
+    } else {
+      throw err;
+    }
+  }
 
   // Debug deployment status
   try {
@@ -143,100 +157,126 @@ export interface GameContractCalls {
  */
 export function getGameContract(): GameContractCalls {
   const _getWallet = () => {
-    return getWallet(); // This already handles connection check and returns WalletInterface
+    return getWallet();
+  };
+
+  const wrapExecute = async (fn: () => Promise<any>) => {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const isSnip9Error = err.message?.includes('SNIP-9') || err.message?.includes('ISRC9');
+      if (isSnip9Error) {
+        throw new Error('YOUR_ACCOUNT_UPGRADE_REQUIRED');
+      }
+      throw err;
+    }
   };
 
   return {
     async createGame(gameId: string, player2Address?: string): Promise<string> {
-      const w = _getWallet();
-      const p2 = player2Address || '0x0';
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'create_game',
-          calldata: [gameId, p2],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = _getWallet();
+        const p2 = player2Address || '0x0';
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'create_game',
+            calldata: [gameId, p2],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async joinGame(gameId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'join_game',
-          calldata: [gameId],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'join_game',
+            calldata: [gameId],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async commitCharacter(game_id: string, commitment: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'commit_character',
-          calldata: [game_id, commitment],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'commit_character',
+            calldata: [game_id, commitment],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async revealCharacter(gameId: string, characterId: string, salt: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'reveal_character',
-          calldata: [gameId, characterId, salt],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'reveal_character',
+            calldata: [gameId, characterId, salt],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async submitMove(gameId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'submit_move',
-          calldata: [gameId],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'submit_move',
+            calldata: [gameId],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async claimTimeoutWin(gameId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'claim_timeout_win',
-          calldata: [gameId],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'claim_timeout_win',
+            calldata: [gameId],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async cancelGame(gameId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'cancel_game',
-          calldata: [gameId],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'cancel_game',
+            calldata: [gameId],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async getGame(gameId: string) {
@@ -271,29 +311,33 @@ export function getGameContract(): GameContractCalls {
     },
 
     async depositWager(gameId: string, tokenId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'deposit_wager',
-          calldata: [gameId, tokenId, '0'],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'deposit_wager',
+            calldata: [gameId, tokenId, '0'],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
 
     async opponentWon(gameId: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'opponent_won',
-          calldata: [gameId],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
+      return await wrapExecute(async () => {
+        const w = getWallet();
+        const tx = await w.execute([
+          {
+            contractAddress: GAME_CONTRACT,
+            entrypoint: 'opponent_won',
+            calldata: [gameId],
+          },
+        ]);
+        await tx.wait();
+        return tx.hash;
+      });
     },
   };
 }

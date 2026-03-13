@@ -202,6 +202,12 @@ export function OnlineLobbyScreen({ onBack }: Props) {
       try {
         await getGameContract().createGame(gameIdFelt);
       } catch (chainErr: any) {
+        if (chainErr.message === 'YOUR_ACCOUNT_UPGRADE_REQUIRED') {
+          if (confirm('Your account is too old for gasless play. Continue by paying gas yourself?')) {
+            window.location.search += (window.location.search ? '&' : '?') + 'user_pays=true';
+            return;
+          }
+        }
         throw new Error(`Blockchain creation failed: ${chainErr.message || 'Check your wallet'}`);
       }
 

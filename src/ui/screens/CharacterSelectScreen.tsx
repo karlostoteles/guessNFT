@@ -8,6 +8,7 @@ import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
 import { depositWagerOnChain, submitCommitmentOnChain, getCommitment } from '@/services/starknet/commitReveal';
+import { getGameContract } from '@/services/starknet/starkzapService';
 
 // Deterministic accent colour from character id
 function idToColor(id: string): string {
@@ -113,8 +114,27 @@ export function CharacterSelectScreen() {
         const myCommitment = getCommitment(player, session)?.commitment;
 
         if (myCommitment) {
-          await submitCommitmentOnChain(myCommitment, session);
-          await depositWagerOnChain(session, finalTokenId);
+          try {
+            // Check if already committed on-chain to avoid "Already committed" error
+            const contract = getGameContract();
+            const gameState = await contract.getGame(session);
+            const alreadyCommitted = player === 'player1' ? (gameState.p1Commitment !== '0' && gameState.p1Commitment !== '0x0') : (gameState.p2Commitment !== '0' && gameState.p2Commitment !== '0x0');
+
+            if (!alreadyCommitted) {
+              await submitCommitmentOnChain(myCommitment, session);
+            }
+            
+            await depositWagerOnChain(session, finalTokenId);
+          } catch (err: any) {
+            if (err.message === 'YOUR_ACCOUNT_UPGRADE_REQUIRED') {
+              if (confirm('Your account is too old for gasless play. Do you want to continue by paying gas for this transaction?')) {
+                // Re-run the selection flow but forcing user pays
+                window.location.search += (window.location.search ? '&' : '?') + 'user_pays=true';
+                return;
+              }
+            }
+            throw err;
+          }
         }
       }
 
