@@ -8,6 +8,9 @@ import { StarkZap } from 'starkzap';
 import type { WalletInterface } from 'starkzap';
 import { GAME_CONTRACT } from './config';
 
+// Immediate log to catch the contract address on load
+console.log('[DEBUG] StarkNet Config Loaded. GAME_CONTRACT:', GAME_CONTRACT);
+
 // Singleton instances
 let sdk: StarkZap | null = null;
 let wallet: WalletInterface | null = null;
