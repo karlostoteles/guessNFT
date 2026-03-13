@@ -8,6 +8,7 @@ import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { createCommitment, generateGameSessionId, clearCommitments, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
 import { enrichCharacters } from '@/core/data/nftCharacterAdapter';
+import { getGameContract } from '@/services/starknet/starkzapService';
 
 function getOpponent(player: PlayerId): PlayerId {
   return player === 'player1' ? 'player2' : 'player1';
@@ -63,6 +64,12 @@ const initialState: GameState = {
   onlineGameId: null,
   onlineRoomCode: null,
   onlinePlayerNum: null,
+  onChainState: {
+    lastMoveTimestamp: null,
+    activePlayer: null,
+    status: null,
+    winner: null,
+  },
   soundEnabled: true,
   dangerZoneEnabled: true,
 };
@@ -653,5 +660,63 @@ export const useGameStore = create<GameState & GameActions>()(
       set((state) => {
         state.onChainCommitmentHash = hash;
       }),
+
+    syncOnChainState: async () => {
+      const { onlineGameId } = useGameStore.getState();
+      if (!onlineGameId) return;
+      try {
+        const contract = getGameContract();
+        const game = await contract.getGame(onlineGameId);
+        set((state) => {
+          state.onChainState = {
+            lastMoveTimestamp: game.lastMoveTimestamp,
+            activePlayer: game.activePlayer,
+            status: game.status,
+            winner: game.winner,
+          };
+        });
+      } catch (err) {
+        console.error('[gameStore] Failed to sync on-chain state:', err);
+      }
+    },
+
+    submitMoveOnChain: async () => {
+      const { onlineGameId } = useGameStore.getState();
+      if (!onlineGameId) return;
+      try {
+        const contract = getGameContract();
+        await contract.submitMove(onlineGameId);
+        await useGameStore.getState().syncOnChainState();
+      } catch (err) {
+        console.error('[gameStore] Failed to submit move on-chain:', err);
+        throw err;
+      }
+    },
+
+    claimTimeoutOnChain: async () => {
+      const { onlineGameId } = useGameStore.getState();
+      if (!onlineGameId) return;
+      try {
+        const contract = getGameContract();
+        await contract.claimTimeoutWin(onlineGameId);
+        await useGameStore.getState().syncOnChainState();
+      } catch (err) {
+        console.error('[gameStore] Failed to claim timeout:', err);
+        throw err;
+      }
+    },
+
+    cancelGameOnChain: async () => {
+      const { onlineGameId } = useGameStore.getState();
+      if (!onlineGameId) return;
+      try {
+        const contract = getGameContract();
+        await contract.cancelGame(onlineGameId);
+        await useGameStore.getState().syncOnChainState();
+      } catch (err) {
+        console.error('[gameStore] Failed to cancel game:', err);
+        throw err;
+      }
+    },
   }))
 );

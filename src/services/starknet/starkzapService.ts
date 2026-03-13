@@ -125,75 +125,61 @@ export function getWalletAddress(): string | null {
 // ============================================================
 
 export interface GameContractCalls {
-  /**
-   * Create a new game on-chain.
-   */
-  createGame: (gameId: string, player2Address: string) => Promise<string>;
-
-  /**
-   * Commit a character choice (commitment = pedersen(char, salt)).
-   */
+  createGame: (gameId: string, player2Address?: string) => Promise<string>;
+  joinGame: (gameId: string) => Promise<string>;
   commitCharacter: (gameId: string, commitment: string) => Promise<string>;
-
-  /**
-   * Reveal the character choice.
-   */
   revealCharacter: (gameId: string, characterId: string, salt: string) => Promise<string>;
-
-  /**
-   * Get a player's commitment.
-   */
-  getCommitment: (gameId: string, playerAddress: string) => Promise<string>;
-
-  /**
-   * Get game state.
-   */
-  getGame: (gameId: string) => Promise<{
-    player1: string;
-    player2: string;
-    p1_commitment: string;
-    p2_commitment: string;
-    p1_revealed_char: string;
-    p2_revealed_char: string;
-    winner: string;
-  }>;
-
-  /**
-   * Deposit wager NFT on-chain.
-   */
+  submitMove: (gameId: string) => Promise<string>;
+  claimTimeoutWin: (gameId: string) => Promise<string>;
+  cancelGame: (gameId: string) => Promise<string>;
   depositWager: (gameId: string, tokenId: string) => Promise<string>;
-
-  /**
-   * Concede game on-chain (sends both wagers to opponent).
-   */
   opponentWon: (gameId: string) => Promise<string>;
+  getGame: (gameId: string) => Promise<any>;
 }
 
 /**
  * Create game contract call functions using the connected wallet.
  */
 export function getGameContract(): GameContractCalls {
+  const _getWallet = () => {
+    return getWallet(); // This already handles connection check and returns WalletInterface
+  };
+
   return {
-    async createGame(gameId: string, player2Address: string): Promise<string> {
-      const w = getWallet();
+    async createGame(gameId: string, player2Address?: string): Promise<string> {
+      const w = _getWallet();
+      const p2 = player2Address || '0x0';
       const tx = await w.execute([
         {
           contractAddress: GAME_CONTRACT,
           entrypoint: 'create_game',
-          calldata: [gameId, player2Address],
+          calldata: [gameId, p2],
         },
       ]);
       await tx.wait();
       return tx.hash;
     },
 
-    async commitCharacter(gameId: string, commitment: string): Promise<string> {
+    async joinGame(gameId: string): Promise<string> {
+      const w = getWallet();
+      const tx = await w.execute([
+        {
+          contractAddress: GAME_CONTRACT,
+          entrypoint: 'join_game',
+          calldata: [gameId],
+        },
+      ]);
+      await tx.wait();
+      return tx.hash;
+    },
+
+    async commitCharacter(game_id: string, commitment: string): Promise<string> {
       const w = getWallet();
       const tx = await w.execute([
         {
           contractAddress: GAME_CONTRACT,
           entrypoint: 'commit_character',
-          calldata: [gameId, commitment],
+          calldata: [game_id, commitment],
         },
       ]);
       await tx.wait();
@@ -213,14 +199,43 @@ export function getGameContract(): GameContractCalls {
       return tx.hash;
     },
 
-    async getCommitment(gameId: string, playerAddress: string): Promise<string> {
+    async submitMove(gameId: string): Promise<string> {
       const w = getWallet();
-      const result = await w.callContract({
-        contractAddress: GAME_CONTRACT,
-        entrypoint: 'get_commitment',
-        calldata: [gameId, playerAddress],
-      });
-      return result[0];
+      const tx = await w.execute([
+        {
+          contractAddress: GAME_CONTRACT,
+          entrypoint: 'submit_move',
+          calldata: [gameId],
+        },
+      ]);
+      await tx.wait();
+      return tx.hash;
+    },
+
+    async claimTimeoutWin(gameId: string): Promise<string> {
+      const w = getWallet();
+      const tx = await w.execute([
+        {
+          contractAddress: GAME_CONTRACT,
+          entrypoint: 'claim_timeout_win',
+          calldata: [gameId],
+        },
+      ]);
+      await tx.wait();
+      return tx.hash;
+    },
+
+    async cancelGame(gameId: string): Promise<string> {
+      const w = getWallet();
+      const tx = await w.execute([
+        {
+          contractAddress: GAME_CONTRACT,
+          entrypoint: 'cancel_game',
+          calldata: [gameId],
+        },
+      ]);
+      await tx.wait();
+      return tx.hash;
     },
 
     async getGame(gameId: string) {
@@ -231,15 +246,26 @@ export function getGameContract(): GameContractCalls {
         calldata: [gameId],
       });
 
-      // Parse the response - Game struct fields
+      // Parse the response - Game struct fields (14 felts total)
+      // Index mapping:
+      // 0: player1, 1: player2
+      // 2: p1_commitment, 3: p2_commitment
+      // 4: p1_revealed_char, 5: p2_revealed_char
+      // 6,7: p1_wager (u256), 8,9: p2_wager (u256)
+      // 10: winner, 11: last_move_timestamp, 12: active_player, 13: status
       return {
         player1: result[0],
         player2: result[1],
-        p1_commitment: result[2],
-        p2_commitment: result[3],
-        p1_revealed_char: result[4],
-        p2_revealed_char: result[5],
-        winner: result[8], // After p1_wager (u256 = 2 slots) and p2_wager (u256 = 2 slots)
+        p1Commitment: result[2],
+        p2Commitment: result[3],
+        p1RevealedChar: result[4],
+        p2RevealedChar: result[5],
+        p1Wager: result[6], 
+        p2Wager: result[8],
+        winner: result[10],
+        lastMoveTimestamp: result[11] ? Number(BigInt(result[11])) : 0,
+        activePlayer: result[12] ? Number(BigInt(result[12])) : 1,
+        status: result[13],
       };
     },
 
@@ -249,7 +275,6 @@ export function getGameContract(): GameContractCalls {
         {
           contractAddress: GAME_CONTRACT,
           entrypoint: 'deposit_wager',
-          // Uint256 is split into low and high segments (tokenId, 0)
           calldata: [gameId, tokenId, '0'],
         },
       ]);

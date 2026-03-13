@@ -14,8 +14,9 @@ import { useOwnedNFTs, useWalletAddress, useWalletStore } from '@/services/stark
 import { useGameStore } from '@/core/store/gameStore';
 import { TraitMetaEngine } from './landing/TraitMetaEngine';
 
-import { getActiveGamesForAddress } from '@/services/supabase/gameService';
+import { getActiveGamesForAddress, deleteGame, cleanupOldGames } from '@/services/supabase/gameService';
 import type { SupabaseGame } from '@/services/supabase/types';
+import { getGameContract } from '@/services/starknet/starkzapService';
 
 type View = 'menu' | 'free-pick' | 'real-pick' | 'online' | 'leaderboard';
 
@@ -93,11 +94,43 @@ export function MenuScreen() {
 
     // Also look for active games in DB when wallet is ready
     if (walletStatus === 'ready' && walletAddress) {
-      getActiveGamesForAddress(walletAddress).then(games => {
+      // Run cleanup once per login to keep DB fresh
+      cleanupOldGames().then(count => {
+        if (count > 0) console.log(`[Cleanup] Removed ${count} stale games.`);
+        return getActiveGamesForAddress(walletAddress);
+      }).then(games => {
         setRecoverableGames(games);
       });
     }
   }, [walletStatus, walletAddress, recoverOnlineGame]);
+
+  const handleDeleteGame = async (gameId: string) => {
+    try {
+      // 1. Attempt on-chain cancellation if wallet is connected
+      if (walletAddress) {
+        const gameIdFelt = '0x' + gameId.replace(/-/g, '');
+        try {
+          const contract = getGameContract();
+          // We can't use cancelGameOnChain from selectors easily here without setting it as active
+          // so we call the contract directly via starkzapService
+          await contract.cancelGame(gameIdFelt);
+          console.log(`[MenuScreen] On-chain cancellation successful for ${gameIdFelt}`);
+        } catch (chainErr) {
+          console.warn(`[MenuScreen] On-chain cancellation skipped or failed:`, chainErr);
+          if (!confirm('On-chain cancellation failed. Delete from menu anyway? (Escrow might remain locked)')) {
+            return;
+          }
+        }
+      }
+
+      // 2. Delete from Supabase
+      await deleteGame(gameId);
+      setRecoverableGames(prev => prev.filter(g => g.id !== gameId));
+      sfx.click();
+    } catch (err) {
+      console.error('Failed to delete game:', err);
+    }
+  };
 
   const handleResumeGame = async (game: SupabaseGame) => {
     setLoading(true);
@@ -161,6 +194,7 @@ export function MenuScreen() {
             onLeaderboard={() => setView('leaderboard')}
             recoverableGames={recoverableGames}
             onResumeGame={handleResumeGame}
+            onDeleteGame={handleDeleteGame}
           />
         )}
         {animKey === 'free-pick' && (
@@ -496,13 +530,15 @@ function ModeSelectView({
   onOnline,
   onLeaderboard,
   recoverableGames = [],
-  onResumeGame
+  onResumeGame,
+  onDeleteGame
 }: {
   onLocal: () => void;
   onOnline: () => void;
   onLeaderboard: () => void;
   recoverableGames?: SupabaseGame[];
   onResumeGame: (game: SupabaseGame) => void;
+  onDeleteGame: (gameId: string) => void;
 }) {
   return (
     <motion.div
@@ -572,20 +608,37 @@ function ModeSelectView({
                     Last move {new Date(game.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.05, background: '#E8A444', color: '#0F0E17' }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => onResumeGame(game)}
-                  style={{
-                    background: 'rgba(232,164,68,0.15)',
-                    border: '1px solid rgba(232,164,68,0.4)',
-                    borderRadius: 8, padding: '6px 14px',
-                    fontSize: 12, fontWeight: 700, color: '#E8A444',
-                    cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
-                  }}
-                >
-                  Resume
-                </motion.button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <motion.button
+                    whileHover={{ scale: 1.05, opacity: 1, color: '#FCA5A5' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => onDeleteGame(game.id)}
+                    style={{
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.2)',
+                      borderRadius: 8, padding: '6px 10px',
+                      fontSize: 12, color: 'rgba(252,165,165,0.6)',
+                      cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
+                    }}
+                    title="Delete Room"
+                  >
+                    ✕
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05, background: '#E8A444', color: '#0F0E17' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => onResumeGame(game)}
+                    style={{
+                      background: 'rgba(232,164,68,0.15)',
+                      border: '1px solid rgba(232,164,68,0.4)',
+                      borderRadius: 8, padding: '6px 14px',
+                      fontSize: 12, fontWeight: 700, color: '#E8A444',
+                      cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
+                    }}
+                  >
+                    Resume
+                  </motion.button>
+                </div>
               </div>
             ))}
           </div>

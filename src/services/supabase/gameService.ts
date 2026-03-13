@@ -234,3 +234,39 @@ export async function getActiveGamesForAddress(
   if (error) return [];
   return (data ?? []) as SupabaseGame[];
 }
+
+export async function deleteGame(gameId: string): Promise<void> {
+  // Delete game events first (on delete cascade should be off by default usually)
+  await supabase.from('game_events').delete().eq('game_id', gameId);
+  const { error } = await supabase.from('games').delete().eq('id', gameId);
+  if (error) throw new Error(`Failed to delete game: ${error.message}`);
+}
+
+export async function cleanupOldGames(): Promise<number> {
+  const ONE_HOUR_AGO = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  
+  // Find old games to cleanup events too
+  const { data: oldGames } = await supabase
+    .from('games')
+    .select('id')
+    .lt('updated_at', ONE_HOUR_AGO);
+  
+  if (!oldGames || oldGames.length === 0) return 0;
+  
+  const ids = oldGames.map(g => g.id);
+  
+  // Cleanup events first
+  await supabase.from('game_events').delete().in('game_id', ids);
+  
+  // Cleanup games
+  const { error, count } = await supabase
+    .from('games')
+    .delete({ count: 'exact' })
+    .in('id', ids);
+    
+  if (error) {
+    console.error('Cleanup failed:', error);
+    return 0;
+  }
+  return count || 0;
+}

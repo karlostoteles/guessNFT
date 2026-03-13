@@ -14,6 +14,8 @@ import { createGame, joinGame } from '@/services/supabase/gameService';
 import { isSupabaseConfigured } from '@/services/supabase/client';
 import { useGameActions } from '@/core/store/selectors';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
+import { useGameStore } from '@/core/store/gameStore';
+import { getGameContract } from '@/services/starknet/starkzapService';
 
 interface Props {
   onBack: () => void;
@@ -192,10 +194,23 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     try {
       const characters = await generateAllCollectionCharacters();
       const { game, playerNum } = await createGame(walletAddress, characters);
+      
+      // Align on-chain game ID with Supabase UUID (converted to felt)
+      const gameIdFelt = '0x' + game.id.replace(/-/g, '');
+      
+      // 1. Create game on-chain
+      try {
+        await getGameContract().createGame(gameIdFelt);
+      } catch (chainErr: any) {
+        throw new Error(`Blockchain creation failed: ${chainErr.message || 'Check your wallet'}`);
+      }
+
       setGameMode('online', characters);
       setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
-      // Both P1 and P2 go through character select immediately.
-      // Room code is prominently shown in OnlineWaitingScreen after selection.
+      
+      // Update the local gameSessionId to match the on-chain ID
+      useGameStore.setState({ gameSessionId: gameIdFelt });
+
       startSetup();
     } catch (err: any) {
       setError(err.message ?? 'Failed to create game');
@@ -215,6 +230,11 @@ export function OnlineLobbyScreen({ onBack }: Props) {
       const { game, playerNum } = await joinGame(roomCodeInput, walletAddress);
       // Always use the deterministic 999-token collection (same as creator)
       const characters = await generateAllCollectionCharacters();
+      
+      // Align on-chain game ID with Supabase UUID (converted to felt)
+      const gameIdFelt = '0x' + game.id.replace(/-/g, '');
+      useGameStore.setState({ gameSessionId: gameIdFelt });
+
       setGameMode('online', characters);
       setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
       startSetup();

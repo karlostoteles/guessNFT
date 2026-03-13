@@ -9,14 +9,17 @@
  */
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOnlineRoomCode, useOnlinePlayerNum, useOnChainCommitmentHash } from '@/core/store/selectors';
+import { useOnlineRoomCode, useOnlinePlayerNum, useOnChainCommitmentHash, useGameActions } from '@/core/store/selectors';
 import { getExplorerLink } from '@/services/starknet/commitReveal';
+import { useGameStore } from '@/core/store/gameStore';
 
 export function OnlineWaitingScreen() {
   const roomCode  = useOnlineRoomCode();
   const playerNum = useOnlinePlayerNum();
   const txHash    = useOnChainCommitmentHash();
+  const { cancelGameOnChain, resetGame } = useGameActions();
   const [copied, setCopied] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const handleCopy = () => {
     if (!roomCode) return;
@@ -26,6 +29,22 @@ export function OnlineWaitingScreen() {
   };
 
   const isCreator = playerNum === 1;
+
+  const handleCancel = async () => {
+    if (cancelling) return;
+    if (!confirm('Cancel this game and reclaim your NFT? (Requires signature)')) return;
+    
+    setCancelling(true);
+    try {
+      await cancelGameOnChain();
+      resetGame();
+    } catch (err: any) {
+      console.error('Failed to cancel:', err);
+      alert('Cancel failed: ' + (err.message || 'Check wallet'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <motion.div
@@ -178,6 +197,32 @@ export function OnlineWaitingScreen() {
           Share this code with your opponent · tap to copy
         </div>
       )}
+
+      {/* Leave/Cancel button */}
+      <motion.button
+        onClick={handleCancel}
+        disabled={cancelling}
+        whileHover={{ scale: 1.05, color: '#FCA5A5' }}
+        whileTap={{ scale: 0.95 }}
+        style={{
+          marginTop: 12,
+          background: 'rgba(239,68,68,0.1)',
+          border: '1px solid rgba(239,68,68,0.2)',
+          borderRadius: 12,
+          padding: '8px 20px',
+          color: 'rgba(252,165,165,0.6)',
+          fontSize: 12,
+          fontWeight: 700,
+          fontFamily: "'Space Grotesk', sans-serif",
+          cursor: 'pointer',
+          outline: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {cancelling ? 'Cancelling on-chain...' : '❌ Leave & Cancel Game'}
+      </motion.button>
     </motion.div>
   );
 }

@@ -64,6 +64,13 @@ export interface GameState {
   onlineGameId: string | null;
   onlineRoomCode: string | null;
   onlinePlayerNum: 1 | 2 | null;
+  // On-chain sync state
+  onChainState: {
+    lastMoveTimestamp: number | null;
+    activePlayer: number | null;
+    status: string | null;
+    winner: string | null;
+  };
   // Global client settings
   soundEnabled: boolean;
   dangerZoneEnabled: boolean;
@@ -98,4 +105,9 @@ export interface GameActions {
   setSoundEnabled: (enabled: boolean) => void;
   setDangerZoneEnabled: (enabled: boolean) => void;
   setCommitmentHash: (hash: string) => void;
+  // Sync and on-chain moves
+  syncOnChainState: () => Promise<void>;
+  submitMoveOnChain: () => Promise<void>;
+  claimTimeoutOnChain: () => Promise<void>;
+  cancelGameOnChain: () => Promise<void>;
 }

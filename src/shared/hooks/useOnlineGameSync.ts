@@ -179,6 +179,11 @@ export function useOnlineGameSync() {
       { character_id: guessedCharacterId }
     ).catch(console.error);
 
+    // Also record move on-chain
+    useGameStore.getState().submitMoveOnChain().catch(err => {
+      console.warn('[sync] On-chain move submission failed:', err);
+    });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guessedCharacterId, phase]);
 
@@ -241,6 +246,11 @@ export function useOnlineGameSync() {
 
         // Update local state: show the question + answer as if I received it
         state.receiveOpponentQuestion(question_id, answer);
+
+        // Also record my answer move on-chain
+        state.submitMoveOnChain().catch(err => {
+          console.warn('[sync] On-chain answer submission failed:', err);
+        });
         break;
       }
 

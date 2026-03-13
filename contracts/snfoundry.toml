@@ -8,4 +8,5 @@ network = "sepolia"
 [sncast.mainnet]
 account = "native_mainnet"
 url = "https://api.cartridge.gg/x/starknet/mainnet"
+accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 

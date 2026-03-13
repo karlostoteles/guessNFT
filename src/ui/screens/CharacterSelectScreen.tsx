@@ -23,8 +23,9 @@ export function CharacterSelectScreen() {
   const phase = usePhase();
   const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
-  const { selectSecretCharacter, resetGame, goBackToSetupP1 } = useGameActions();
+  const { selectSecretCharacter, resetGame, goBackToSetupP1, cancelGameOnChain } = useGameActions();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // All game characters (full 999-stub board for nft/online, meme chars for free)
   const allCharacters = useGameCharacters();
@@ -229,11 +230,30 @@ export function CharacterSelectScreen() {
         <div style={{ position: 'relative', textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>
           {/* Back button */}
           <motion.button
-            onClick={() => {
-              if (phase === GamePhase.SETUP_P2) goBackToSetupP1();
-              else resetGame();
+            onClick={async () => {
+              if (mode === 'online') {
+                if (cancelling) return;
+                if (!confirm('Leave this lobby and cancel the game on Starknet?')) return;
+                setCancelling(true);
+                try {
+                  await cancelGameOnChain();
+                  resetGame();
+                } catch (err: any) {
+                  console.error('Failed to cancel lobby:', err);
+                  // Allow reset anyway if the user insists, but MVP can just alert
+                  if (confirm('On-chain cancel failed. Leave anyway?')) {
+                    resetGame();
+                  }
+                } finally {
+                  setCancelling(false);
+                }
+              } else {
+                if (phase === GamePhase.SETUP_P2) goBackToSetupP1();
+                else resetGame();
+              }
             }}
-            whileHover={{ scale: 1.06, background: 'rgba(255,255,255,0.1)' }}
+            disabled={!!lockingIn || cancelling}
+            whileHover={{ scale: 1.06, background: 'rgba(255,255,254,0.1)' }}
             whileTap={{ scale: 0.94 }}
             style={{
               position: 'absolute',
@@ -241,14 +261,15 @@ export function CharacterSelectScreen() {
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 10, padding: '6px 14px',
-              cursor: 'pointer', outline: 'none',
+              cursor: (lockingIn || cancelling) ? 'wait' : 'pointer',
+              outline: 'none',
               color: 'rgba(255,255,254,0.55)',
               fontFamily: "'Space Grotesk', sans-serif",
               fontSize: 12, fontWeight: 600,
               display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
-            ← Back
+            {cancelling ? 'Cancelling...' : '← Back'}
           </motion.button>
 
           <div style={{

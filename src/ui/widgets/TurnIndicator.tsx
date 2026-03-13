@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePhase, useTurnNumber, useGameMode, useEliminatedIds, useGameCharacters, useActivePlayer } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
+import { useGameStore } from '@/core/store/gameStore';
+import { useState, useEffect } from 'react';
 
 /**
  * TurnIndicator — shows only turn number and tiles remaining.
@@ -123,8 +125,92 @@ export function TurnIndicator() {
               tiles left
             </span>
           </div>
+
+          <TimerSection />
         </div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function TimerSection() {
+  const mode = useGameStore(s => s.mode);
+  const onChainState = useGameStore(s => s.onChainState);
+  const onlinePlayerNum = useGameStore(s => s.onlinePlayerNum);
+  const claimTimeout = useGameStore(s => s.claimTimeoutOnChain);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'online' || !onChainState.lastMoveTimestamp) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const update = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const diff = now - onChainState.lastMoveTimestamp!;
+      const remaining = Math.max(0, 30 - diff);
+      setTimeLeft(remaining);
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [mode, onChainState.lastMoveTimestamp]);
+
+  if (timeLeft === null) return null;
+
+  const isMyTurnOnChain = onChainState.activePlayer === onlinePlayerNum;
+  const canClaim = timeLeft === 0 && !isMyTurnOnChain && onChainState.status === 'in_progress';
+
+  const handleClaim = async () => {
+    setIsClaiming(true);
+    try {
+      await claimTimeout();
+    } catch (err) {
+      console.error('Claim failed:', err);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
+  return (
+    <>
+      <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 800,
+          fontSize: 14,
+          color: timeLeft <= 5 ? '#FF4D4D' : '#E8A444',
+          minWidth: 24,
+          textAlign: 'center'
+        }}>
+          {timeLeft}s
+        </div>
+        {canClaim && (
+          <motion.button
+            whileHover={{ scale: 1.05, background: '#FF4D4D' }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleClaim}
+            disabled={isClaiming}
+            style={{
+              background: '#D94343',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              padding: '4px 10px',
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: 'pointer',
+              textTransform: 'uppercase'
+            }}
+          >
+            {isClaiming ? 'Claiming...' : 'Claim Win'}
+          </motion.button>
+        )}
+      </div>
+    </>
   );
 }

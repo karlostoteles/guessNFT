@@ -53,6 +53,10 @@ const actions = {
   get goBackToSetupP1() { return useGameStore.getState().goBackToSetupP1; },
   get enrichNFTCharacters() { return useGameStore.getState().enrichNFTCharacters; },
   get setCommitmentHash() { return useGameStore.getState().setCommitmentHash; },
+  get syncOnChainState() { return useGameStore.getState().syncOnChainState; },
+  get submitMoveOnChain() { return useGameStore.getState().submitMoveOnChain; },
+  get claimTimeoutOnChain() { return useGameStore.getState().claimTimeoutOnChain; },
+  get cancelGameOnChain() { return useGameStore.getState().cancelGameOnChain; },
 };
 
 export const useGameActions = () => actions;
