@@ -64,6 +64,8 @@ export interface GameState {
   onlineGameId: string | null;
   onlineRoomCode: string | null;
   onlinePlayerNum: 1 | 2 | null;
+  /** Sub-mode for online play: 'normal' vs 'betting' (Schizo mode) */
+  onlineSubMode: 'normal' | 'betting' | null;
   // On-chain sync state
   onChainState: {
     lastMoveTimestamp: number | null;
@@ -92,7 +94,7 @@ export interface GameActions {
   resetGame: () => void;
   goBackToSetupP1: () => void;
   // Online-specific actions (called by useOnlineGameSync hook)
-  setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2, playerAddress: string) => void;
+  setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2, playerAddress: string, subMode: 'normal' | 'betting') => void;
   recoverOnlineGame: (characters: Character[], currentAddress?: string) => void;
   advanceToGameStart: () => void;
   receiveOpponentQuestion: (questionId: string, answer: boolean) => void;

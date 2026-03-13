@@ -17,7 +17,7 @@ import { fetchAllOwnedNFTs } from './nftService';
 export function useWalletConnection() {
   const store = useWalletStore;
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (type?: 'cartridge' | 'discovery') => {
     const state = store.getState();
     if (state.status === 'connecting' || state.status === 'ready') return;
 
@@ -25,7 +25,7 @@ export function useWalletConnection() {
     state.setError(null);
 
     try {
-      const walletInfo = await connectWallet();
+      const walletInfo = await connectWallet(type);
 
       state.setAddress(walletInfo.address);
       state.setStatus('connected');

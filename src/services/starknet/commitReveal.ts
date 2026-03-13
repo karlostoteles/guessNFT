@@ -20,7 +20,6 @@
  */
 import { hash } from 'starknet';
 import { getGameContract } from './starkzapService';
-import { GAME_CONTRACT } from './config';
 
 const STORAGE_KEY = 'guessnft_commitments';
 

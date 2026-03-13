@@ -64,6 +64,7 @@ const initialState: GameState = {
   onlineGameId: null,
   onlineRoomCode: null,
   onlinePlayerNum: null,
+  onlineSubMode: null,
   onChainState: {
     lastMoveTimestamp: null,
     activePlayer: null,
@@ -557,11 +558,12 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       }),
 
-    setOnlineGame: (gameId, roomCode, playerNum, playerAddress) =>
+    setOnlineGame: (gameId, roomCode, playerNum, playerAddress, subMode) =>
       set((state) => {
         state.onlineGameId = gameId;
         state.onlineRoomCode = roomCode;
         state.onlinePlayerNum = playerNum;
+        state.onlineSubMode = subMode;
 
         // Save session so we can recover on refresh
         localStorage.setItem('guessnft_online_session', JSON.stringify({
@@ -569,6 +571,7 @@ export const useGameStore = create<GameState & GameActions>()(
           roomCode,
           playerNum,
           playerAddress,
+          subMode,
           timestamp: Date.now()
         }));
       }),

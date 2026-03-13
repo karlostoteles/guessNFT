@@ -8,6 +8,7 @@ import { sfx } from '@/shared/audio/sfx';
 import { useWalletStatus, useWalletUsername, useWalletAddress, useOwnedNFTs } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet';
 import { IPFS_GATEWAYS, resolveUrl } from '@/services/starknet/nftService';
+import { upgradeWallet } from '@/services/starknet/starkzapService';
 import type { SchizodioNFT } from '@/services/starknet/types';
 
 /**
@@ -291,7 +292,7 @@ export function HeaderMenu() {
                                     <div style={{
                                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                         background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                                        borderRadius: 10, padding: '10px 14px',
+                                        borderRadius: 10, padding: '10px 14px', marginBottom: 20,
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#FFF', fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600 }}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={dangerZoneEnabled ? '#EF4444' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -299,7 +300,7 @@ export function HeaderMenu() {
                                                 <line x1="12" y1="9" x2="12" y2="13"></line>
                                                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                             </svg>
-                                            Danger Zone (Endgame Vignettes)
+                                            Danger Zone
                                         </div>
                                         <motion.div
                                             onClick={toggleDangerZone}
@@ -313,6 +314,43 @@ export function HeaderMenu() {
                                             <motion.div layout style={{ width: 16, height: 16, borderRadius: '50%', background: '#FFF' }} />
                                         </motion.div>
                                     </div>
+
+                                    {/* Social Links */}
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <motion.a
+                                            href="https://x.com/GuessmyNft"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            whileHover={{ background: 'rgba(255,255,255,0.1)' }}
+                                            style={{
+                                                flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                                                borderRadius: 10, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                gap: 8, color: '#FFF', textDecoration: 'none', fontSize: 12, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif"
+                                            }}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z" />
+                                            </svg>
+                                            Twitter
+                                        </motion.a>
+                                        <motion.a
+                                            href="https://t.me/+D_k0EFqWF1ozY2Qx"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            whileHover={{ background: 'rgba(255,255,255,0.1)' }}
+                                            style={{
+                                                flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                                                borderRadius: 10, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                gap: 8, color: '#FFF', textDecoration: 'none', fontSize: 12, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif"
+                                            }}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                            </svg>
+                                            Telegram
+                                        </motion.a>
+                                    </div>
                                 </div>
 
                                 {/* ── Wallet Info ── */}
@@ -325,29 +363,46 @@ export function HeaderMenu() {
                                             Account Details
                                         </div>
                                         <div style={{
-                                            display: 'flex', alignItems: 'flex-start', gap: 8,
+                                            display: 'flex', flexDirection: 'column', gap: 8,
                                             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                                            borderRadius: 10, padding: '9px 11px',
+                                            borderRadius: 10, padding: '11px',
                                         }}>
-                                            <span style={{
-                                                fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,254,0.55)',
-                                                flex: 1, wordBreak: 'break-all', lineHeight: 1.55,
-                                            }}>
-                                                {address}
-                                            </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{
+                                                    fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,254,0.55)',
+                                                    flex: 1, wordBreak: 'break-all', lineHeight: 1.55,
+                                                }}>
+                                                    {address}
+                                                </span>
+                                                <motion.button
+                                                    onClick={() => { sfx.click(); handleCopy(); }}
+                                                    whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                                                    style={{
+                                                        background: copied ? 'rgba(76,175,80,0.18)' : 'rgba(124,58,237,0.18)',
+                                                        border: `1px solid ${copied ? 'rgba(76,175,80,0.4)' : 'rgba(124,58,237,0.4)'}`,
+                                                        borderRadius: 7, color: copied ? '#81C784' : '#A78BFA',
+                                                        fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                                                        padding: '4px 9px', cursor: 'pointer', outline: 'none', whiteSpace: 'nowrap',
+                                                        flexShrink: 0, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
+                                                    }}
+                                                >
+                                                    {copied ? '✓' : 'Copy'}
+                                                </motion.button>
+                                            </div>
+                                            
+                                            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
+                                            
                                             <motion.button
-                                                onClick={() => { sfx.click(); handleCopy(); }}
-                                                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                                                onClick={() => { sfx.click(); upgradeWallet(); }}
+                                                whileHover={{ background: 'rgba(167, 139, 250, 0.1)', borderColor: 'rgba(167, 139, 250, 0.4)' }}
                                                 style={{
-                                                    background: copied ? 'rgba(76,175,80,0.18)' : 'rgba(124,58,237,0.18)',
-                                                    border: `1px solid ${copied ? 'rgba(76,175,80,0.4)' : 'rgba(124,58,237,0.4)'}`,
-                                                    borderRadius: 7, color: copied ? '#81C784' : '#A78BFA',
-                                                    fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                                                    padding: '4px 9px', cursor: 'pointer', outline: 'none', whiteSpace: 'nowrap',
-                                                    flexShrink: 0, marginTop: 1, transition: 'background 0.18s, border-color 0.18s, color 0.18s',
+                                                    width: '100%', background: 'none', border: '1px dashed rgba(167, 139, 250, 0.3)',
+                                                    borderRadius: 8, padding: '8px', color: '#A78BFA', fontSize: 11, fontWeight: 700,
+                                                    fontFamily: "'Space Grotesk', sans-serif", cursor: 'pointer', outline: 'none',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                                                 }}
                                             >
-                                                {copied ? '✓ Copied' : 'Copy'}
+                                                ✨ Upgrade for Gasless Play
                                             </motion.button>
                                         </div>
                                     </div>

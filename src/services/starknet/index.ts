@@ -12,7 +12,7 @@ export {
   opponentWonOnChain,
 } from './commitReveal';
 export type { Commitment } from './commitReveal';
-export { SCHIZODIO_CONTRACT, RPC_URL, SN_MAIN_CHAIN_ID, GAME_CONTRACT, SESSION_POLICIES } from './config';
+export { SCHIZODIO_CONTRACT, RPC_URL, SN_MAIN_CHAIN_ID, SESSION_POLICIES, GAME_CONTRACT_NORMAL, GAME_CONTRACT_SCHIZO } from './config';
 export { useWalletConnection } from './starkzapHooks';
 export { 
   connectWallet as connectCartridgeWallet, 

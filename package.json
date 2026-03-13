@@ -15,6 +15,7 @@
     "@react-three/fiber": "^9.5.0",
     "@supabase/supabase-js": "^2.98.0",
     "framer-motion": "^12.34.3",
+    "get-starknet": "^3.3.3",
     "i18next": "^25.8.14",
     "i18next-browser-languagedetector": "^8.2.1",
     "immer": "^11.1.4",

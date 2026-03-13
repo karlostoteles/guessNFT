@@ -13,6 +13,7 @@ import { LeaderboardScreen } from './LeaderboardScreen';
 import { useOwnedNFTs, useWalletAddress, useWalletStore } from '@/services/starknet/walletStore';
 import { useGameStore } from '@/core/store/gameStore';
 import { TraitMetaEngine } from './landing/TraitMetaEngine';
+import { WalletConnectOverlay } from '../widgets/WalletConnectOverlay';
 
 import { getActiveGamesForAddress, deleteGame, cleanupOldGames } from '@/services/supabase/gameService';
 import type { SupabaseGame } from '@/services/supabase/types';
@@ -26,6 +27,7 @@ export function MenuScreen() {
   const [nftStatus, setNftStatus] = useState<string>('');
   const [recoverableGames, setRecoverableGames] = useState<SupabaseGame[]>([]);
   const [showWIP, setShowWIP] = useState(false);
+  const [showWalletOverlay, setShowWalletOverlay] = useState(false);
   const { startSetup, setGameMode, recoverOnlineGame, setOnlineGame } = useGameActions();
   const walletStatus = useWalletStatus();
   const walletAddress = useWalletAddress();
@@ -139,7 +141,8 @@ export function MenuScreen() {
       const allChars = await generateAllCollectionCharacters();
       const playerNum = game.player1_address === walletAddress ? 1 : 2;
       setGameMode('online', allChars);
-      setOnlineGame(game.id, game.room_code, playerNum as 1 | 2, walletAddress!);
+      const subMode = (game as any).is_betting ? 'betting' : 'normal';
+      setOnlineGame(game.id, game.room_code, playerNum as 1 | 2, walletAddress!, subMode);
       setView('online');
     } catch (err) {
       console.error('Failed to resume game:', err);
@@ -157,6 +160,16 @@ export function MenuScreen() {
 
   // AnimatePresence key — drives transitions for all views
   const animKey = view === 'menu' ? mainSubView : view;
+
+  const handleOpenWalletSelector = () => {
+    sfx.click();
+    setShowWalletOverlay(true);
+  };
+
+  const handleWalletSelect = (type: 'cartridge' | 'discovery') => {
+    setShowWalletOverlay(false);
+    connectWallet(type);
+  };
 
   return (
     <motion.div
@@ -178,6 +191,7 @@ export function MenuScreen() {
             key="landing"
             onFreePlay={() => setView('free-pick')}
             onLeaderboard={() => setView('leaderboard')}
+            onLogin={handleOpenWalletSelector}
           />
         )}
         {animKey === 'connecting' && (
@@ -221,7 +235,7 @@ export function MenuScreen() {
                 setNftStatus('');
               }
             }}
-            onLogin={connectWallet}
+            onLogin={handleOpenWalletSelector}
             loading={loading}
             nftStatus={nftStatus}
           />
@@ -253,6 +267,13 @@ export function MenuScreen() {
           localStorage.setItem('guessnft_wip_seen', 'true');
           setShowWIP(false);
         }} 
+      />
+
+      <WalletConnectOverlay 
+        isOpen={showWalletOverlay}
+        onClose={() => setShowWalletOverlay(false)}
+        onSelect={handleWalletSelect}
+        isConnecting={walletStatus === 'connecting'}
       />
 
       <LoadingOverlay loading={loading} status={nftStatus} />
@@ -394,10 +415,15 @@ function LogoAndTitle({ delayBase = 0.15 }: { delayBase?: number }) {
   );
 }
 
-// ─── Landing view — shown when wallet is disconnected / error ─────────────────
+interface LandingViewProps {
+  onFreePlay: () => void;
+  onLeaderboard: () => void;
+  onLogin?: () => void;
+}
 
-function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; onLeaderboard: () => void }) {
+function LandingView({ onFreePlay, onLeaderboard, onLogin }: LandingViewProps) {
   const { connectWallet } = useWalletConnection();
+  const handleLogin = onLogin || (() => { sfx.click(); connectWallet(); });
 
   return (
     <motion.div
@@ -434,7 +460,7 @@ function LandingView({ onFreePlay, onLeaderboard }: { onFreePlay: () => void; on
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, position: 'relative', zIndex: 2, marginBottom: '10vh' }}
       >
         <motion.button
-          onClick={() => { sfx.click(); connectWallet(); }}
+          onClick={handleLogin}
           whileHover={{ scale: 1.05, boxShadow: '0 0 48px rgba(232,164,68,0.5), 0 8px 32px rgba(0,0,0,0.5)' }}
           whileTap={{ scale: 0.97 }}
           style={{

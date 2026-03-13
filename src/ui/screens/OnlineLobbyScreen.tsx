@@ -10,12 +10,14 @@ import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useWalletAddress, useWalletStatus, useOwnedNFTs, useWalletStore } from '@/services/starknet/walletStore';
 import { useWalletConnection } from '@/services/starknet';
+import { sfx } from '@/shared/audio/sfx';
 import { createGame, joinGame } from '@/services/supabase/gameService';
 import { isSupabaseConfigured } from '@/services/supabase/client';
 import { useGameActions } from '@/core/store/selectors';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
 import { useGameStore } from '@/core/store/gameStore';
 import { getGameContract } from '@/services/starknet/starkzapService';
+import { WalletConnectOverlay } from '../widgets/WalletConnectOverlay';
 
 interface Props {
   onBack: () => void;
@@ -28,6 +30,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showWalletOverlay, setShowWalletOverlay] = useState(false);
 
   const walletAddress = useWalletAddress();
   const walletStatus = useWalletStatus();
@@ -67,7 +70,7 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             Powered by Cartridge Controller — free, no gas needed
           </div>
           <motion.button
-            onClick={connectWallet}
+            onClick={() => { sfx.click(); setShowWalletOverlay(true); }}
             disabled={isConnecting}
             whileHover={isConnecting ? {} : { scale: 1.04, filter: 'brightness(1.1)' }}
             whileTap={isConnecting ? {} : { scale: 0.97 }}
@@ -188,16 +191,19 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     );
   }
 
-  const handleCreate = async () => {
+  const handleCreate = async (subMode: 'normal' | 'betting') => {
     setError('');
     setLoading(true);
     try {
       const characters = await generateAllCollectionCharacters();
       const { game, playerNum } = await createGame(walletAddress, characters);
       
-      // Align on-chain game ID with Supabase UUID (converted to felt)
       const gameIdFelt = '0x' + game.id.replace(/-/g, '');
       
+      // Update store IMMEDIATELY with subMode so getGameContract() knows which address to use
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode);
+      useGameStore.setState({ gameSessionId: gameIdFelt });
+
       // 1. Create game on-chain
       try {
         await getGameContract().createGame(gameIdFelt);
@@ -212,11 +218,6 @@ export function OnlineLobbyScreen({ onBack }: Props) {
       }
 
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
-      
-      // Update the local gameSessionId to match the on-chain ID
-      useGameStore.setState({ gameSessionId: gameIdFelt });
-
       startSetup();
     } catch (err: any) {
       setError(err.message ?? 'Failed to create game');
@@ -234,15 +235,19 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     setLoading(true);
     try {
       const { game, playerNum } = await joinGame(roomCodeInput, walletAddress);
-      // Always use the deterministic 999-token collection (same as creator)
       const characters = await generateAllCollectionCharacters();
       
-      // Align on-chain game ID with Supabase UUID (converted to felt)
       const gameIdFelt = '0x' + game.id.replace(/-/g, '');
+      
+      // For joining, we don't strictly know if it's betting/normal until we poll game state,
+      // but usually the room code implies it. For now default to normal or betting based on metadata if available.
+      // Assuming Supabase 'game' might eventually have a mode flag.
+      const subMode = (game as any).is_betting ? 'betting' : 'normal';
+
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode);
       useGameStore.setState({ gameSessionId: gameIdFelt });
 
       setGameMode('online', characters);
-      setOnlineGame(game.id, game.room_code, playerNum, walletAddress);
       startSetup();
     } catch (err: any) {
       setError(err.message ?? 'Failed to join game');
@@ -260,6 +265,12 @@ export function OnlineLobbyScreen({ onBack }: Props) {
 
   return (
     <LobbyWrapper onBack={handleBack} title={view === 'collection_select' ? 'Choose collection' : 'Select Mode'}>
+      <WalletConnectOverlay 
+        isOpen={showWalletOverlay}
+        onClose={() => setShowWalletOverlay(false)}
+        onSelect={(type) => { setShowWalletOverlay(false); connectWallet(type); }}
+        isConnecting={isConnecting}
+      />
       <AnimatePresence mode="wait">
 
         {view === 'collection_select' && (
@@ -318,125 +329,77 @@ export function OnlineLobbyScreen({ onBack }: Props) {
             style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              gap: 20,
+              gap: 32,
               width: '100%',
-              maxWidth: 500,
+              maxWidth: 600,
               margin: '0 auto'
             }}
           >
-            <ModeButton
-              title="Normal"
-              subtitle="Classic 1v1 — each player picks their SCHIZODIO"
-              tag="ONLINE"
-              icon="⚔️"
-              accentRgb="232,164,68"
-              onClick={() => setView('choice')}
-            />
+            <div style={{ display: 'flex', gap: 20 }}>
+              <ModeButton
+                title="Normal"
+                subtitle="Pure Strategy PvP"
+                tag="FAST"
+                icon="⚔️"
+                accentRgb="232,164,68"
+                onClick={() => handleCreate('normal')}
+                disabled={loading}
+              />
 
-            <ModeButton
-              title="SCHIZO Mode"
-              subtitle="Bet your SCHIZODIO against your opponent's"
-              tag="SOON"
-              icon="🔥"
-              accentRgb="239,68,68"
-              disabled
-            />
-          </motion.div>
-        )}
-
-        {view === 'choice' && (
-          <motion.div
-            key="choice"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-          >
-            <Button variant="accent" size="lg" onClick={() => setView('create')} style={{ width: '100%' }}>
-              Create Room
-            </Button>
-            <button
-              onClick={() => setView('join')}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 12,
-                padding: '14px 24px',
-                color: '#FFFFFE',
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                width: '100%',
-              }}
-            >
-              Join Room
-            </button>
-          </motion.div>
-        )}
-
-        {view === 'create' && (
-          <motion.div
-            key="create"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
-          >
-            <div style={{ fontSize: 13, color: 'rgba(255,255,254,0.5)', textAlign: 'center', lineHeight: 1.6 }}>
-              You'll select your SCHIZODIO first. Your room code will be shown on the next screen to share with your opponent.
+              <ModeButton
+                title="SCHIZO"
+                subtitle="Bet your SCHIZODIO"
+                tag="HARDCORE"
+                icon="🔥"
+                accentRgb="239,68,68"
+                onClick={() => handleCreate('betting')}
+                disabled={loading}
+              />
             </div>
-            {error && <ErrorMsg>{error}</ErrorMsg>}
-            <Button variant="accent" size="lg" onClick={handleCreate} disabled={loading} style={{ width: '100%' }}>
-              {loading ? 'Creating…' : 'Create Room & Select Character →'}
-            </Button>
-          </motion.div>
-        )}
 
-        {view === 'join' && (
-          <motion.div
-            key="join"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
-          >
-            <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.5)', textAlign: 'center' }}>
-              Enter the 6-character room code from your opponent.
+            <div style={{ 
+              height: 1, 
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
+              width: '100%' 
+            }} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,254,0.4)', fontWeight: 600, letterSpacing: '0.1em' }}>
+                OR JOIN EXISTING ROOM
+              </div>
+              <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+                <input
+                  value={roomCodeInput}
+                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                  maxLength={6}
+                  placeholder="CODE"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 12,
+                    padding: '12px 20px',
+                    color: '#FFFFFE',
+                    fontFamily: "'Space Grotesk', monospace",
+                    fontSize: 20,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    flex: 1,
+                    outline: 'none',
+                  }}
+                />
+                <Button
+                  variant="accent"
+                  size="lg"
+                  onClick={handleJoin}
+                  disabled={loading || roomCodeInput.length < 4}
+                  style={{ minWidth: 140 }}
+                >
+                  {loading ? 'Joining…' : 'Join Game'}
+                </Button>
+              </div>
+              {error && <ErrorMsg>{error}</ErrorMsg>}
             </div>
-            <input
-              value={roomCodeInput}
-              onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-              maxLength={6}
-              placeholder="XXXXXX"
-              autoFocus
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: '2px solid rgba(255,255,255,0.15)',
-                borderRadius: 10,
-                padding: '14px 20px',
-                color: '#FFFFFE',
-                fontFamily: "'Space Grotesk', monospace",
-                fontSize: 28,
-                fontWeight: 700,
-                letterSpacing: '0.2em',
-                textAlign: 'center',
-                width: '100%',
-                outline: 'none',
-                textTransform: 'uppercase',
-              }}
-            />
-            {error && <ErrorMsg>{error}</ErrorMsg>}
-            <Button
-              variant="accent"
-              size="lg"
-              onClick={handleJoin}
-              disabled={loading || roomCodeInput.length < 4}
-              style={{ width: '100%' }}
-            >
-              {loading ? 'Joining…' : 'Join Game'}
-            </Button>
           </motion.div>
         )}
       </AnimatePresence>
