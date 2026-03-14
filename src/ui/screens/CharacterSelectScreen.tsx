@@ -7,10 +7,8 @@ import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
-import { commitAndWagerOnChain, getCommitment } from '@/services/starknet/commitReveal';
-import { getGameContract } from '@/services/starknet/starkzapService';
-import { submitCommitment } from '@/services/supabase/gameService';
-import { useWalletStore } from '@/services/starknet/walletStore';
+import { ensureZKCommitment } from '@/services/starknet/commitReveal';
+import { getWalletAddress } from '@/services/starknet/starkzapService';
 import { useIsOnChainSyncing } from '@/core/store/selectors';
 
 // Deterministic accent colour from character id
@@ -28,14 +26,11 @@ export function CharacterSelectScreen() {
   const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
   const isOnChainSyncing = useIsOnChainSyncing();
-  const { 
-    selectSecretCharacter, 
-    resetGame, 
-    goBackToSetupP1, 
+  const {
+    selectSecretCharacter,
+    resetGame,
+    goBackToSetupP1,
     cancelGameOnChain,
-    setIsOnChainSyncing,
-    setCommitmentHash,
-    advancePhase
   } = useGameActions();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -118,60 +113,31 @@ export function CharacterSelectScreen() {
 
       const session = useGameStore.getState().gameSessionId;
 
-      // Handle on-chain wager if needed
+      // Online mode: compute ZK commitment locally and wait.
+      // useOnlineGameSync.triggerCommitment() is the canonical on-chain executor —
+      // it fires when the contract moves to COMMIT_PHASE, so we don't submit here.
       if (isNFTMode && mode !== 'nft-free') {
-        // TokenId fallback: if charId is "nft_123", it becomes "123"
-        const finalTokenId = tokenId || charId.replace('nft_', '');
+        const address = getWalletAddress();
+        if (!address) throw new Error('Wallet not connected');
 
-        const myCommitment = getCommitment(player, session)?.commitment;
+        // Compute Poseidon2 ZK commitment and persist it to localStorage.
+        // The sync hook reads it from there when submitting commit_character on-chain.
+        // Defensively normalise starknetGameId: old localStorage sessions may contain
+        // raw Supabase UUIDs (with dashes) which BigInt() cannot parse.
+        const rawId = useGameStore.getState().starknetGameId || '';
+        const safeGameId = rawId.startsWith('0x')
+          ? rawId
+          : rawId
+          ? '0x' + rawId.replace(/-/g, '')
+          : '0';
+        await ensureZKCommitment(
+          player,
+          session,
+          BigInt(safeGameId),
+          BigInt(address)
+        );
 
-            if (myCommitment) {
-          try {
-            console.log('[CharacterSelect] STEP 1: Fetching game state from contract...', session);
-            const contract = getGameContract();
-            const gameState = await contract.getGame(session);
-            console.log('[CharacterSelect] STEP 2: Game state received:', gameState);
-            
-            const alreadyCommitted = player === 'player1' ? (gameState.p1Commitment !== '0' && gameState.p1Commitment !== '0x0') : (gameState.p2Commitment !== '0' && gameState.p2Commitment !== '0x0');
-
-            const subMode = useGameStore.getState().onlineSubMode;
-            const isBetting = subMode === 'betting';
-            const tokenIdToWager = isBetting ? finalTokenId : undefined;
-
-            if (!alreadyCommitted || (isBetting && !gameState.p1Wager && player === 'player1') || (isBetting && !gameState.p2Wager && player === 'player2')) {
-              console.log('[CharacterSelect] STEP 3: Executing multicall (Commit + Wager if betting...)');
-              setIsOnChainSyncing(true);
-              const hash = await commitAndWagerOnChain(session, alreadyCommitted ? '0' : myCommitment, tokenIdToWager);
-              setCommitmentHash(hash);
-              console.log('[CharacterSelect] STEP 4: Transaction submitted:', hash);
-            } else {
-              console.log('[CharacterSelect] STEP 3: Already committed and/or wagered, skipping.');
-            }
-
-            // In the fully on-chain model, we don't notify Supabase.
-            // The sync hook will pick up the transition to the Setup/InProgress phases 
-            // by polling getGame on the contract.
-            console.log('[CharacterSelect] STEP 5: Advancing phase locally to WAITING...');
-            
-            useGameStore.setState(s => {
-              s.phase = GamePhase.ONLINE_WAITING;
-            });
-
-          } catch (err: any) {
-            if (err.message === 'YOUR_ACCOUNT_UPGRADE_REQUIRED') {
-              if (confirm('Your account is too old for gasless play. Do you want to continue by paying gas for this transaction?')) {
-                // Re-run the selection flow but forcing user pays
-                const url = new URL(window.location.href);
-                url.searchParams.set('user_pays', 'true');
-                window.location.href = url.toString();
-                return;
-              }
-            }
-            throw err;
-          } finally {
-            setIsOnChainSyncing(false);
-          }
-        }
+        useGameStore.setState(s => { s.phase = GamePhase.ONLINE_WAITING; });
       } else {
         // Non-online or non-NFT mode: just advance phase normally
         if (player === 'player1') {
@@ -196,8 +162,8 @@ export function CharacterSelectScreen() {
 
     } catch (err: any) {
       console.error(err);
-      alert('Failed to lock in character: ' + err.message);
-      // Revert phase on failure if necessary, but MVP can just alert
+      const msg = err.message || (typeof err === 'string' ? err : 'Unknown blockchain error');
+      alert('Failed to lock in character: ' + msg);
     } finally {
       // The phase advances globally so this component unmounts,
       // but clear anyway if it failed.

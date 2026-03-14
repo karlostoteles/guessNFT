@@ -16,7 +16,7 @@ import { isSupabaseConfigured } from '@/services/supabase/client';
 import { useGameActions } from '@/core/store/selectors';
 import { generateAllCollectionCharacters } from '@/services/starknet/collectionService';
 import { useGameStore } from '@/core/store/gameStore';
-import { getGameContract } from '@/services/starknet/starkzapService';
+import { createGameOnChain, joinGameOnChain } from '@/zk/useZKAnswer';
 import { WalletConnectOverlay } from '../widgets/WalletConnectOverlay';
 
 interface Props {
@@ -196,17 +196,11 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     setLoading(true);
     try {
       const characters = await generateAllCollectionCharacters();
-      const { game, playerNum } = await createGame(walletAddress, characters);
-      
-      const gameIdFelt = '0x' + game.id.replace(/-/g, '');
-      
-      // Update store IMMEDIATELY with subMode so getGameContract() knows which address to use
-      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode);
-      useGameStore.setState({ gameSessionId: gameIdFelt });
 
-      // 1. Create game on-chain
+      // 1. Create game on-chain using Gian's ZK engine (correct event extraction)
+      let gameIdFelt: string;
       try {
-        await getGameContract().createGame(gameIdFelt);
+        gameIdFelt = await createGameOnChain();
       } catch (chainErr: any) {
         if (chainErr.message === 'YOUR_ACCOUNT_UPGRADE_REQUIRED') {
           if (confirm('Your account is too old for gasless play. Continue by paying gas yourself?')) {
@@ -216,6 +210,15 @@ export function OnlineLobbyScreen({ onBack }: Props) {
         }
         throw new Error(`Blockchain creation failed: ${chainErr.message || 'Check your wallet'}`);
       }
+
+      // 2. Sync with Supabase
+      const { game, playerNum } = await createGame(walletAddress, characters, gameIdFelt);
+      
+      // setOnlineGame stores both the Supabase UUID (onlineGameId) and the felt ID
+      // (starknetGameId). gameSessionId is set to the felt so localStorage commitments
+      // are keyed by the on-chain game ID.
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode, gameIdFelt);
+      useGameStore.setState({ gameSessionId: gameIdFelt });
 
       setGameMode('online', characters);
       startSetup();
@@ -236,15 +239,17 @@ export function OnlineLobbyScreen({ onBack }: Props) {
     try {
       const { game, playerNum } = await joinGame(roomCodeInput, walletAddress);
       const characters = await generateAllCollectionCharacters();
-      
-      const gameIdFelt = '0x' + game.id.replace(/-/g, '');
-      
-      // For joining, we don't strictly know if it's betting/normal until we poll game state,
-      // but usually the room code implies it. For now default to normal or betting based on metadata if available.
-      // Assuming Supabase 'game' might eventually have a mode flag.
+
+      // Use the onchain_id stored in Supabase (if available), fallback to UUID formatting if legacy
+      const gameIdFelt = game.onchain_id || ('0x' + game.id.replace(/-/g, ''));
+
+      // Join on-chain — this transitions the contract from WAITING_FOR_PLAYER2 → COMMIT_PHASE.
+      // Torii will detect COMMIT_PHASE and trigger commitment for both players.
+      await joinGameOnChain(gameIdFelt);
+
       const subMode = (game as any).is_betting ? 'betting' : 'normal';
 
-      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode);
+      setOnlineGame(game.id, game.room_code, playerNum, walletAddress, subMode, gameIdFelt);
       useGameStore.setState({ gameSessionId: gameIdFelt });
 
       setGameMode('online', characters);
