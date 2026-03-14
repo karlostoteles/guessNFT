@@ -11,14 +11,26 @@
  *   - prewarmProver() / terminateProver(): worker lifecycle
  */
 import { useCallback } from 'react';
+import { RpcProvider } from 'starknet';
 import {
   loadCollectionData,
   getCharacterBitmap,
   getCharacterMerklePath,
 } from './collectionData';
 import { GamePhase } from '@/core/store/types';
-import { TRAITS_ROOT, GAME_CONTRACT } from './config';
+import { TRAITS_ROOT, GAME_CONTRACT, KATANA_RPC } from './config';
 import { getStarknetAccount, toFeltHex, toDecimalField, splitU256, toBigInt } from './zkSdk';
+
+// Use our own RPC provider so waitForTransaction never touches BlastAPI (CORS blocked from localhost)
+let _rpcProvider: RpcProvider | null = null;
+function getRpcProvider(): RpcProvider {
+  if (!_rpcProvider) _rpcProvider = new RpcProvider({ nodeUrl: KATANA_RPC });
+  return _rpcProvider;
+}
+
+async function waitForTx(txHash: string): Promise<any> {
+  return getRpcProvider().waitForTransaction(txHash);
+}
 import type {
   ProveRequest,
   ProveResult,
@@ -90,7 +102,7 @@ export async function createGameOnChain(playerNum?: 1 | 2): Promise<string> {
     entrypoint: 'create_game',
     calldata: [rootLow, rootHigh, '0'],
   }]);
-  const receipt = await account.waitForTransaction(tx.transaction_hash);
+  const receipt = await waitForTx(tx.transaction_hash);
   return extractGameIdFromReceipt(receipt);
 }
 
@@ -101,7 +113,7 @@ export async function joinGameOnChain(gameId: string, playerNum?: 1 | 2): Promis
     entrypoint: 'join_game',
     calldata: [toFeltHex(gameId)],
   }]);
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
 }
 
 export async function commitCharacterOnChain(
@@ -117,7 +129,7 @@ export async function commitCharacterOnChain(
     entrypoint: 'commit_character',
     calldata: [toFeltHex(gameId), toFeltHex(commitmentHash), zkLow, zkHigh],
   }]);
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
 }
 
 // ─── Standalone proof generation + on-chain submission ────────────────────────
@@ -231,7 +243,7 @@ export async function generateAndSubmitProof(opts: ZKAnswerOpts): Promise<ProveR
       ],
     }]);
 
-    await account.waitForTransaction(tx.transaction_hash);
+    await waitForTx(tx.transaction_hash);
 
     // 3. Mark verified
     getStoreCallbacks().setVerifiedAnswer(Boolean(result.answerBit));
@@ -274,7 +286,7 @@ export async function askQuestionOnChain(
     calldata: [toFeltHex(gameId), String(questionId)],
   }]);
 
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
   console.log('[zk] ask_question confirmed:', tx.transaction_hash);
 }
 
@@ -294,7 +306,7 @@ export async function eliminateCharactersOnChain(
     calldata: [toFeltHex(gameId), toFeltHex(eliminatedBitmap)],
   }]);
 
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
   console.log('[zk] eliminate_characters confirmed:', tx.transaction_hash);
 }
 
@@ -314,7 +326,7 @@ export async function makeGuessOnChain(
     calldata: [toFeltHex(gameId), toFeltHex(characterIdFelt)],
   }]);
 
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
   console.log('[zk] make_guess confirmed:', tx.transaction_hash);
 }
 
@@ -335,7 +347,7 @@ export async function revealCharacterOnChain(
     calldata: [toFeltHex(gameId), toFeltHex(characterIdFelt), toFeltHex(salt)],
   }]);
 
-  await account.waitForTransaction(tx.transaction_hash);
+  await waitForTx(tx.transaction_hash);
   console.log('[zk] reveal_character confirmed:', tx.transaction_hash);
 }
 
