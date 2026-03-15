@@ -4,11 +4,11 @@ import { Card } from '../common/Card';
 import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
 import { GamePhase, PlayerId } from '@/core/store/types';
-import { useOwnedNFTs } from '@/services/starknet/walletStore';
+import { useOwnedNFTs, useWalletStore } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
 import { ensureZKCommitment } from '@/services/starknet/commitReveal';
-import { getWalletAddress } from '@/services/starknet/starkzapService';
+import { useWalletConnection } from '@/services/starknet';
 import { useIsOnChainSyncing } from '@/core/store/selectors';
 
 // Deterministic accent colour from character id
@@ -34,14 +34,23 @@ export function CharacterSelectScreen() {
   } = useGameActions();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const { refreshNFTs } = useWalletConnection();
 
   // All game characters (full 999-stub board for nft/online, meme chars for free)
   const allCharacters = useGameCharacters();
   // Owned NFTs from wallet — these have real imageUrls
   const ownedNFTs = useOwnedNFTs();
-  const bypassActive = useMemo(() => localStorage.getItem('whoiswho_bypass') === '1', []);
+  const bypassActive = useMemo(() => localStorage.getItem('guessnft_bypass') === '1', []);
 
   const isNFTMode = mode === 'online' || mode === 'nft' || mode === 'nft-free';
+
+  // Refresh NFTs if empty on mount (covers HMR reset or re-mount without re-connecting)
+  useEffect(() => {
+    if (isNFTMode && ownedNFTs.length === 0 && useWalletStore.getState().address) {
+      refreshNFTs();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The player this screen is selecting for
   const player: PlayerId =
@@ -117,7 +126,7 @@ export function CharacterSelectScreen() {
       // useOnlineGameSync.triggerCommitment() is the canonical on-chain executor —
       // it fires when the contract moves to COMMIT_PHASE, so we don't submit here.
       if (isNFTMode && mode !== 'nft-free') {
-        const address = getWalletAddress();
+        const address = useWalletStore.getState().address;
         if (!address) throw new Error('Wallet not connected');
 
         // Compute Poseidon2 ZK commitment and persist it to localStorage.

@@ -5,11 +5,11 @@
  * to subscribe to on-chain Game/Commitment/Board/Turn model updates.
  */
 import { ToriiClient, type ClientConfig, type Subscription } from '@dojoengine/torii-client';
-import { KATANA_RPC } from './config';
 
 // World address from manifest_mainnet.json (Starknet Mainnet)
+// World address from onchain/manifest_mainnet.json (deployed 2026-03-15)
 export const WORLD_ADDRESS =
-  import.meta.env.VITE_WORLD_ADDRESS ?? '0x052ea305f2bd6fe7340fe08ef9664cd72596024bf0bb6d44761bc0e6731cc428';
+  import.meta.env.VITE_WORLD_ADDRESS ?? '0x06c320e0058a34ee61ca91e1731388f4554d77ecfbd3a7d6a651c6f5e5f73b53';
 
 // Torii indexer URL — in dev, use same-origin (Vite proxies /world.World/* to Torii).
 // In production, falls back to the deployed Cartridge Torii endpoint.

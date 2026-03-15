@@ -21,6 +21,7 @@ export function TurnIndicator() {
   // Only show during active gameplay
   const isGameplay =
     phase === GamePhase.QUESTION_SELECT ||
+    phase === GamePhase.SIMULTANEOUS_ROUND ||
     phase === GamePhase.HANDOFF_TO_OPPONENT ||
     phase === GamePhase.ANSWER_PENDING ||
     phase === GamePhase.ANSWER_REVEALED ||

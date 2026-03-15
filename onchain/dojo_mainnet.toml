@@ -1,0 +1,14 @@
+[world]
+name = "guessNFT"
+seed = "guessnft-mainnet"
+
+[env]
+rpc_url = "https://api.cartridge.gg/x/starknet/mainnet"
+account_address = "0x4d03bae72dd5fb55902919a6843d188e9d09917b48b8d9a0edf62ae239df296"
+# private_key — set via DOJO_PRIVATE_KEY env var or fill locally, never commit
+
+[namespace]
+default = "guessnft"
+
+[writers]
+"guessnft" = ["guessnft-game_actions"]

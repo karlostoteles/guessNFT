@@ -1,0 +1,15 @@
+[world]
+name = "guessNFT"
+seed = "guessnft"
+
+[env]
+rpc_url = "http://localhost:5050/"
+# Fill in your Katana dev account:
+# account_address = "0x..."
+# private_key = "0x..."
+
+[namespace]
+default = "guessnft"
+
+[writers]
+"guessnft" = ["guessnft-game_actions"]

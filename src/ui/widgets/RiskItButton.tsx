@@ -12,6 +12,7 @@ import { sfx } from '@/shared/audio/sfx';
 
 const VISIBLE_PHASES = new Set([
     GamePhase.QUESTION_SELECT,
+    GamePhase.SIMULTANEOUS_ROUND,
     GamePhase.ANSWER_PENDING,
     GamePhase.ANSWER_REVEALED,
     GamePhase.AUTO_ELIMINATING,
@@ -39,8 +40,8 @@ export function RiskItButton() {
         (activePlayer === 'player2' && onlinePlayerNum === 2)
     );
 
-    // Only show during QUESTION_SELECT (when player can actually act)
-    const canAct = phase === GamePhase.QUESTION_SELECT && isMyTurn;
+    // Only show during question selection (when player can actually act)
+    const canAct = (phase === GamePhase.QUESTION_SELECT || phase === GamePhase.SIMULTANEOUS_ROUND) && isMyTurn;
 
     const isDangerous = opponentRemaining <= 8;
     const isCritical = opponentRemaining <= 3;

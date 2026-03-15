@@ -16,6 +16,7 @@ import { sfx } from '@/shared/audio/sfx';
 
 const GAMEPLAY_PHASES = new Set([
     GamePhase.QUESTION_SELECT,
+    GamePhase.SIMULTANEOUS_ROUND,
     GamePhase.ANSWER_PENDING,
     GamePhase.ANSWER_REVEALED,
     GamePhase.AUTO_ELIMINATING,

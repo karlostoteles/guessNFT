@@ -17,6 +17,7 @@ import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 
 const GAMEPLAY_PHASES = new Set([
   GamePhase.QUESTION_SELECT,
+  GamePhase.SIMULTANEOUS_ROUND,
   GamePhase.HANDOFF_TO_OPPONENT,
   GamePhase.ANSWER_PENDING,
   GamePhase.ANSWER_REVEALED,

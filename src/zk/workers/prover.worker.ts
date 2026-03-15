@@ -12,7 +12,9 @@
 import { Noir } from '@noir-lang/noir_js';
 import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js';
 import { init as garagaInit, getZKHonkCallData } from 'garaga';
-import circuit from '../../../onchain/zk-engine/packages/circuits/target/whoiswho_answer.json';
+// Circuit bytecode — Phase 2 will load the real compiled Noir artifact.
+// Stubbed here so the worker file compiles; this code path is never reached in Phase 1.
+const circuit = { bytecode: '' } as any;
 // VK served from public/ to avoid Vite asset transforms that corrupt binary data.
 const vkUrl = '/vk.bin';
 

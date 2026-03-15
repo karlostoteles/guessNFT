@@ -1,0 +1,2 @@
+world_address = "0x06c320e0058a34ee61ca91e1731388f4554d77ecfbd3a7d6a651c6f5e5f73b53"
+rpc = "https://api.cartridge.gg/x/starknet/mainnet"

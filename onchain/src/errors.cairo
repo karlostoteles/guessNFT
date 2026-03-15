@@ -1,0 +1,13 @@
+pub const ERR_GAME_NOT_FOUND:      felt252 = 'Game not found';
+pub const ERR_WRONG_PHASE:         felt252 = 'Wrong game phase';
+pub const ERR_NOT_A_PLAYER:        felt252 = 'Not a player in this game';
+pub const ERR_ALREADY_JOINED:      felt252 = 'Game already has two players';
+pub const ERR_ALREADY_COMMITTED:   felt252 = 'Already committed';
+pub const ERR_INVALID_COMMITMENT:  felt252 = 'Commitment hash is zero';
+pub const ERR_ALREADY_REVEALED:    felt252 = 'Already revealed';
+pub const ERR_HASH_MISMATCH:       felt252 = 'Hash does not match commitment';
+pub const ERR_INVALID_SALT:        felt252 = 'Salt must be non-zero';
+pub const ERR_GAME_ALREADY_ACTIVE: felt252 = 'Cannot join active game';
+pub const ERR_SELF_JOIN:           felt252 = 'Cannot join your own game';
+pub const ERR_NOT_WINNER:          felt252 = 'Only winner can record result';
+pub const ERR_NO_WINNER:           felt252 = 'Winner address is zero';

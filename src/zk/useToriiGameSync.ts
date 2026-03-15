@@ -1,21 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { getToriiClient, WORLD_ADDRESS } from './toriiClient';
 import type { Clause, Subscription, Ty, Model } from './toriiClient';
-import { getStarknetAccount, toFeltHex } from './zkSdk';
+import { getStarknetAccount } from './zkSdk';
 import {
-  generateAndSubmitProof,
-  askQuestionOnChain,
   commitCharacterOnChain,
-  makeGuessOnChain,
   revealCharacterOnChain,
-  prewarmProver,
-  terminateProver,
-  setZKStoreCallbacks,
 } from './useZKAnswer';
-import { characterIdToCircuitId } from './zkCommitment';
 import { useGameStore } from '@/core/store/gameStore';
 import { GamePhase, type PlayerId } from '@/core/store/types';
 import { characterIdToFelt, ensureZKCommitment, getCommitment } from '@/services/starknet/commitReveal';
+import { supabase } from '@/services/supabase/client';
 
 // ─── Helpers: extract typed values from Torii Ty fields ────────────────────
 
@@ -79,46 +73,6 @@ const PHASE = {
   COMPLETED: 4,
 } as const;
 
-// ─── Turn query helper ──────────────────────────────────────────────────────
-
-async function queryTurnAnswer(
-  gameId: string,
-  turnNumber: number,
-): Promise<boolean | null> {
-  try {
-    const client = await getToriiClient();
-    const result = await client.getEntities({
-      world_addresses: [WORLD_ADDRESS],
-      pagination: { limit: 1, cursor: undefined, direction: 'Forward', order_by: [] },
-      clause: {
-        Keys: {
-          keys: [gameId, `0x${turnNumber.toString(16)}`],
-          pattern_matching: 'FixedLen',
-          models: ['whoiswho-Turn'],
-        },
-      },
-      no_hashed_keys: false,
-      models: ['whoiswho-Turn'],
-      historical: false,
-    });
-
-    const items: any[] = (result as any).items ?? Object.values(result);
-    if (!items.length) return null;
-    const turnModel = items[0]?.models?.['whoiswho-Turn'];
-    if (!turnModel) return null;
-
-    const answeredBy = tyToHex(turnModel.answered_by);
-    if (!answeredBy || answeredBy === '0x0') {
-      return null;
-    }
-
-    return tyToBool(turnModel.answer);
-  } catch (err) {
-    console.error('[sync] queryTurnAnswer failed:', err);
-    return null;
-  }
-}
-
 // ─── Main hook ───────────────────────────────────────────────────────────────
 
 /**
@@ -132,13 +86,9 @@ export function useToriiGameSync() {
   const subscriptionRef = useRef<Subscription | null>(null);
   const lastProcessedKeyRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const eliminateInFlightRef = useRef(false);
   const revealInFlightRef = useRef(false);
-  const proofInFlightRef = useRef(false);
   const commitInFlightRef = useRef(false);
   const committedForSessionRef = useRef<string | null>(null);
-  const sentQuestionRef = useRef<number | null>(null);
-  const sentGuessRef = useRef<string | null>(null);
 
   const mode = store.mode;
   // Use starknetGameId (on-chain felt), not onlineGameId (Supabase UUID).
@@ -156,67 +106,8 @@ export function useToriiGameSync() {
     return account ? String(account.address) : '0x0';
   };
 
-  // Wire ZK store callbacks
-  useEffect(() => {
-    setZKStoreCallbacks({
-      setZkPhase: store.setZkPhase,
-      clearProofError: store.clearProofError,
-      setVerifiedAnswer: store.setVerifiedAnswer,
-      setProofError: store.setProofError,
-    });
-  }, [store]);
-
-  // Pre-warm / terminate worker lifecycle
-  useEffect(() => {
-    if (mode !== 'online') return;
-    prewarmProver();
-    return () => terminateProver();
-  }, [mode]);
-
   // NOTE: Commitment is triggered by handleGameUpdate() when Torii reports
-  // COMMIT_PHASE — NOT eagerly on ONLINE_WAITING. The on-chain game must reach
-  // COMMIT_PHASE (after player 2 joins) before commit_character is valid.
-
-  // Send ask_question on-chain when I ask a question
-  useEffect(() => {
-    if (mode !== 'online' || !starknetGameId || !onlinePlayerNum) return;
-    if (store.phase !== GamePhase.ANSWER_PENDING) return;
-
-    const currentQuestion = store.currentQuestion;
-    if (!currentQuestion) return;
-
-    const myKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
-    if (currentQuestion.askedBy !== myKey) return;
-    if (sentQuestionRef.current === Number(currentQuestion.questionId)) return;
-
-    // Convert questionId to number for on-chain (stripping zkq_ prefix if necessary)
-    let qIdNum = Number(currentQuestion.questionId);
-    if (isNaN(qIdNum) && currentQuestion.questionId.startsWith('zkq_')) {
-      qIdNum = Number(currentQuestion.questionId.slice(4));
-    }
-
-    sentQuestionRef.current = qIdNum;
-
-    askQuestionOnChain(starknetGameId, qIdNum, onlinePlayerNum as 1 | 2)
-      .catch(console.error);
-  }, [store.phase, starknetGameId]);
-
-  // Send make_guess on-chain when I make a guess
-  useEffect(() => {
-    if (mode !== 'online' || !starknetGameId || !onlinePlayerNum) return;
-    if (store.phase !== GamePhase.ANSWER_PENDING) return;
-
-    const guessedCharacterId = store.guessedCharacterId;
-    if (!guessedCharacterId) return;
-    if (store.currentQuestion) return;
-    if (sentGuessRef.current === guessedCharacterId) return;
-
-    sentGuessRef.current = guessedCharacterId;
-
-    const charIdFelt = characterIdToFelt(guessedCharacterId);
-    makeGuessOnChain(starknetGameId, charIdFelt, onlinePlayerNum as 1 | 2)
-      .catch(console.error);
-  }, [store.guessedCharacterId, store.phase, starknetGameId]);
+  // COMMIT_PHASE. Q&A/guesses are handled by useOnlineGameSync (Supabase).
 
   // Subscribe to Game entity via Torii
   useEffect(() => {
@@ -237,11 +128,11 @@ export function useToriiGameSync() {
             Keys: {
               keys: [gameId],
               pattern_matching: 'FixedLen',
-              models: ['whoiswho-Game'],
+              models: ['guessnft-Game'],
             },
           },
           no_hashed_keys: false,
-          models: ['whoiswho-Game'],
+          models: ['guessnft-Game'],
           historical: false,
         });
 
@@ -249,7 +140,7 @@ export function useToriiGameSync() {
 
         const items: any[] = (initialEntity as any).items ?? Object.values(initialEntity);
         if (items.length > 0) {
-          const gameModel = items[0].models?.['whoiswho-Game'];
+          const gameModel = items[0].models?.['guessnft-Game'];
           if (gameModel) {
             handleGameUpdate(parseGameModel(gameModel), gameId, playerNum);
           }
@@ -259,7 +150,7 @@ export function useToriiGameSync() {
           Keys: {
             keys: [gameId],
             pattern_matching: 'VariableLen',
-            models: ['whoiswho-Game'],
+            models: ['guessnft-Game'],
           },
         };
 
@@ -273,14 +164,14 @@ export function useToriiGameSync() {
 
             if (typeof args[0] === 'string' && args[1] && typeof args[1] === 'object') {
               const models = args[1] as Record<string, Model>;
-              gameModel = models['whoiswho-Game'];
+              gameModel = models['guessnft-Game'];
             } else if (args[0] && typeof args[0] === 'object' && 'models' in (args[0] as object)) {
               const entity = args[0] as { models: Record<string, Model> };
-              gameModel = entity.models?.['whoiswho-Game'];
+              gameModel = entity.models?.['guessnft-Game'];
             } else if (Array.isArray(args[0])) {
               const entities = args[0] as Array<{ models: Record<string, Model> }>;
               if (entities.length > 0) {
-                gameModel = entities[0].models?.['whoiswho-Game'];
+                gameModel = entities[0].models?.['guessnft-Game'];
               }
             }
 
@@ -316,16 +207,16 @@ export function useToriiGameSync() {
             Keys: {
               keys: [gameId],
               pattern_matching: 'FixedLen',
-              models: ['whoiswho-Game'],
+              models: ['guessnft-Game'],
             },
           },
           no_hashed_keys: false,
-          models: ['whoiswho-Game'],
+          models: ['guessnft-Game'],
           historical: false,
         });
         const items: any[] = (result as any).items ?? Object.values(result);
         if (items.length > 0) {
-          const gameModel = items[0].models?.['whoiswho-Game'];
+          const gameModel = items[0].models?.['guessnft-Game'];
           if (gameModel) {
             handleGameUpdate(parseGameModel(gameModel), gameId, playerNum);
           }
@@ -346,33 +237,10 @@ export function useToriiGameSync() {
         subscriptionRef.current = null;
       }
       lastProcessedKeyRef.current = null;
-      proofInFlightRef.current = false;
       commitInFlightRef.current = false;
-      eliminateInFlightRef.current = false;
       revealInFlightRef.current = false;
     };
   }, [mode, starknetGameId, onlinePlayerNum]);
-
-  // ─── Retrieve opponent's answer from Turn model ────────────────────────
-  async function applyOpponentAnswerFromTurn(
-    gameId: string,
-    turnCount: number,
-  ): Promise<void> {
-    let answer = await queryTurnAnswer(gameId, turnCount);
-
-    if (answer === null) {
-      await new Promise(r => setTimeout(r, 300));
-      answer = await queryTurnAnswer(gameId, turnCount);
-    }
-
-    if (answer === null) {
-      console.warn('[sync] Turn answer not available for turn', turnCount);
-      lastProcessedKeyRef.current = null;
-      return;
-    }
-
-    store.applyOpponentAnswer(answer);
-  }
 
   // ─── Submit commitment on-chain ─────────────────────────────────────────
   async function triggerCommitment(gameId: string, playerNum: 1 | 2) {
@@ -448,36 +316,25 @@ export function useToriiGameSync() {
       }
 
       case PHASE.PLAYING: {
-        if (!game.awaiting_answer) {
-          if (game.turn_count === 0) {
-            s.advanceToGameStart();
-          }
+        // Advance both players to the game board when the contract first reaches PLAYING.
+        // Q&A/guesses are handled by useOnlineGameSync (Supabase Realtime) from here.
+        if (
+          game.turn_count === 0 &&
+          (s.phase === GamePhase.ONLINE_WAITING ||
+           s.phase === GamePhase.SETUP_P1 ||
+           s.phase === GamePhase.SETUP_P2)
+        ) {
+          s.advanceToGameStart();
 
-          s.setActivePlayer(game.current_turn === 1 ? 'player1' : 'player2');
-
-          if (game.turn_count > 0 && game.current_turn !== myPlayerNum) {
-            await applyOpponentAnswerFromTurn(gameId, game.turn_count);
-          }
-
-          if (game.current_turn === myPlayerNum) {
-            s.setZkPhase(GamePhase.QUESTION_SELECT);
-          } else {
-            s.setZkPhase(GamePhase.ONLINE_WAITING);
-          }
-
-        } else {
-          const iAmAnswerer = game.current_turn !== myPlayerNum;
-
-          if (iAmAnswerer) {
-            const alreadyProcessed = s.processedTurnIds.has(game.turn_count);
-            if (!proofInFlightRef.current && !alreadyProcessed) {
-              proofInFlightRef.current = true;
-              s.setActivePlayer(game.current_turn === 1 ? 'player1' : 'player2');
-              s.receiveOpponentQuestion(game.last_question_id, null);
-              triggerProofGeneration(gameId, game, myPlayerNum);
-            }
-          } else {
-            s.setZkPhase(GamePhase.ANSWER_PENDING);
+          // Sync Supabase status so the backup path in useOnlineGameSync works
+          if (s.onlineGameId) {
+            Promise.resolve(
+              supabase.from('games')
+                .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+                .eq('id', s.onlineGameId)
+            )
+              .then(() => console.log('[torii-sync] Supabase status → in_progress'))
+              .catch(console.error);
           }
         }
         break;
@@ -503,53 +360,6 @@ export function useToriiGameSync() {
       default:
         console.warn(`[torii-sync] Unknown contract phase: ${game.phase}`);
         break;
-    }
-  }
-
-  // ─── Async side effects ────────────────────────────────────────────────
-  async function triggerProofGeneration(gameId: string, game: OnChainGame, playerNum: 1 | 2) {
-    const myKey: PlayerId = playerNum === 1 ? 'player1' : 'player2';
-    const mySecretId = store.players[myKey].secretCharacterId;
-    if (!mySecretId) {
-      proofInFlightRef.current = false;
-      return;
-    }
-
-    const commitment = getCommitment(myKey, store.gameSessionId);
-    if (!commitment) {
-      console.warn('[torii-sync] No commitment found — cannot generate proof');
-      proofInFlightRef.current = false;
-      return;
-    }
-
-    const numericCharId = mySecretId.startsWith('nft_')
-      ? parseInt(mySecretId.slice(4), 10) - 1
-      : parseInt(mySecretId, 10);
-
-    if (isNaN(numericCharId) || numericCharId < 0) {
-      console.warn('[torii-sync] Invalid character ID for proof:', mySecretId);
-      proofInFlightRef.current = false;
-      return;
-    }
-
-    try {
-      const result = await generateAndSubmitProof({
-        gameId,
-        turnId: String(game.turn_count),
-        commitment: commitment.zkCommitment ?? commitment.commitment,
-        questionId: game.last_question_id,
-        characterId: numericCharId,
-        salt: commitment.salt,
-        playerNum,
-      });
-
-      const answer = Boolean(result.answerBit);
-      console.log('[torii-sync] Proof submitted, answer:', answer);
-    } catch (err) {
-      console.error('[torii-sync] Proof generation/submission failed:', err);
-      lastProcessedKeyRef.current = null;
-    } finally {
-      proofInFlightRef.current = false;
     }
   }
 

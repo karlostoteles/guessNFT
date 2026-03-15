@@ -18,13 +18,13 @@ import {
   getCharacterMerklePath,
 } from './collectionData';
 import { GamePhase } from '@/core/store/types';
-import { TRAITS_ROOT, GAME_CONTRACT, KATANA_RPC } from './config';
+import { TRAITS_ROOT, GAME_CONTRACT, STARKNET_RPC } from './config';
 import { getStarknetAccount, toFeltHex, toDecimalField, splitU256, toBigInt } from './zkSdk';
 
 // Use our own RPC provider so waitForTransaction never touches BlastAPI (CORS blocked from localhost)
 let _rpcProvider: RpcProvider | null = null;
 function getRpcProvider(): RpcProvider {
-  if (!_rpcProvider) _rpcProvider = new RpcProvider({ nodeUrl: KATANA_RPC });
+  if (!_rpcProvider) _rpcProvider = new RpcProvider({ nodeUrl: STARKNET_RPC });
   return _rpcProvider;
 }
 
