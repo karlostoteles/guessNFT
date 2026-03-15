@@ -67,6 +67,12 @@ export function terminateProver(): void {
 // World contract address for the guessnft deployment (2026-03-15)
 const WORLD_ADDR = '0x06c320e0058a34ee61ca91e1731388f4554d77ecfbd3a7d6a651c6f5e5f73b53';
 
+// From onchain/manifest_mainnet.json
+// StoreSetRecord for Game model: keys[1] = this selector, data = [1, game_id, ...]
+const GAME_MODEL_SELECTOR   = '0x3e82c21ea0c7330d12d7d8872da6d5c07fcc3a38dac1a99157d93085fd1ce72';
+// EventEmitted for GameCreated: keys[1] = this selector, data = [1, game_id, ...]
+const GAME_CREATED_SELECTOR = '0x4fb5dfb0b3699a65f5e70068bd2a7eb784a41ea9748c85d1ed794c9a7df7b24';
+
 function getExecAccount(playerNum?: 1 | 2) {
   const account = getStarknetAccount(playerNum);
   if (!account) {
@@ -78,10 +84,12 @@ function getExecAccount(playerNum?: 1 | 2) {
 /**
  * Extract game_id from a create_game receipt.
  *
- * Dojo 1.8 emits EventEmitted from the World contract:
- *   keys = [EventEmitted_selector, event_tag_selector, ...#[key] fields]
- *   data = [...non-key fields]
- * For GameCreated: game_id is the only #[key], so it's at keys[2].
+ * Dojo 1.8 World event layout:
+ *   StoreSetRecord:  keys=[StoreSetRecord_sel, model_sel, entity_hash], data=[key_count, ...keys, val_count, ...vals]
+ *   EventEmitted:    keys=[EventEmitted_sel, event_sel, system_addr],   data=[key_count, ...keys, val_count, ...vals]
+ *
+ * For both the Game StoreSetRecord and the GameCreated EventEmitted,
+ * data[0] = 0x1 (one key) and data[1] = game_id (uuid counter).
  */
 function extractGameIdFromReceipt(receipt: any): string {
   const events: any[] = receipt?.events ?? [];
@@ -90,31 +98,38 @@ function extractGameIdFromReceipt(receipt: any): string {
     null, 2,
   ));
 
-  // Compare as BigInt to handle leading-zero padding differences (0x06c3... vs 0x6c3...)
   const worldBigInt = BigInt(WORLD_ADDR);
-
-  // Strategy 1: Dojo EventEmitted from World — keys[2] = game_id (#[key] field)
   const worldEvents = events.filter((e: any) => {
     try { return BigInt(e.from_address) === worldBigInt; } catch { return false; }
   });
+
+  // Primary: find the StoreSetRecord for the Game model or EventEmitted for GameCreated
+  // keys[1] matches one of the known selectors → data[1] is game_id
   for (const we of worldEvents) {
-    if (Array.isArray(we.keys) && we.keys.length >= 3 && we.keys[2] !== '0x0') {
-      console.log('[createGame] game_id via keys[2]:', we.keys[2]);
-      return we.keys[2];
+    if (!Array.isArray(we.keys) || !Array.isArray(we.data)) continue;
+    const k1 = we.keys[1]?.toLowerCase();
+    if (k1 === GAME_MODEL_SELECTOR || k1 === GAME_CREATED_SELECTOR) {
+      const gameId = we.data[1];
+      if (gameId && gameId !== '0x0') {
+        console.log('[createGame] game_id via data[1] (selector match):', gameId);
+        return gameId;
+      }
     }
   }
 
-  // Strategy 2: Some Dojo versions put entity key in data[2] (num_keys=1 at data[1])
+  // Fallback: any world event with data[0]=0x1 (one key) and a non-zero data[1]
   for (const we of worldEvents) {
-    if (Array.isArray(we.data) && we.data.length >= 3 && we.data[1] === '0x1') {
-      console.log('[createGame] game_id via data[2]:', we.data[2]);
-      return we.data[2];
+    if (!Array.isArray(we.data) || we.data.length < 2) continue;
+    if (we.data[0] === '0x1' && we.data[1] && we.data[1] !== '0x0') {
+      console.log('[createGame] game_id via data[1] fallback:', we.data[1]);
+      return we.data[1];
     }
   }
 
   throw new Error(
-    `Unable to extract game_id from receipt. Events: ${JSON.stringify(
-      events.map((e: any) => ({ from: e.from_address, keys: e.keys })),
+    `Unable to extract game_id from receipt.\nEvents: ${JSON.stringify(
+      events.map((e: any) => ({ from: e.from_address, keys: e.keys, data: e.data })),
+      null, 2,
     )}`,
   );
 }
