@@ -47,14 +47,28 @@ export function ResultScreen() {
   useEffect(() => {
     if (mode !== 'nft' && mode !== 'online') return;
 
-    // Client-side verification for both players
-    if (p1State.secretCharacterId) {
-      const c = getCommitment('player1', gameSessionId);
-      if (c) setP1Verified(verifyReveal('player1', p1State.secretCharacterId, c.salt, gameSessionId));
-    }
-    if (p2State.secretCharacterId) {
-      const c = getCommitment('player2', gameSessionId);
-      if (c) setP2Verified(verifyReveal('player2', p2State.secretCharacterId, c.salt, gameSessionId));
+    // Client-side verification — in online mode only verify local player
+    // (each client only stores their own commitment in localStorage)
+    if (mode === 'online') {
+      const mySecret = myPlayer === 'player1' ? p1State.secretCharacterId : p2State.secretCharacterId;
+      if (mySecret) {
+        const c = getCommitment(myPlayer, gameSessionId);
+        if (c) {
+          const verified = verifyReveal(myPlayer, mySecret, c.salt, gameSessionId);
+          if (myPlayer === 'player1') setP1Verified(verified);
+          else setP2Verified(verified);
+        }
+      }
+    } else {
+      // NFT local mode: verify both players
+      if (p1State.secretCharacterId) {
+        const c = getCommitment('player1', gameSessionId);
+        if (c) setP1Verified(verifyReveal('player1', p1State.secretCharacterId, c.salt, gameSessionId));
+      }
+      if (p2State.secretCharacterId) {
+        const c = getCommitment('player2', gameSessionId);
+        if (c) setP2Verified(verifyReveal('player2', p2State.secretCharacterId, c.salt, gameSessionId));
+      }
     }
 
     // On-chain reveal for local player
@@ -90,7 +104,7 @@ export function ResultScreen() {
   const p1Secret = characters.find((c) => c.id === p1State.secretCharacterId);
   const p2Secret = characters.find((c) => c.id === p2State.secretCharacterId);
   const guessedChar = characters.find((c) => c.id === guessedId);
-  const showCommitProof = mode === 'nft' && (p1Verified !== null || p2Verified !== null);
+  const showCommitProof = (mode === 'nft' || mode === 'online') && (p1Verified !== null || p2Verified !== null);
 
   return (
     <motion.div
@@ -227,43 +241,55 @@ export function ResultScreen() {
             ))}
           </div>
 
-          {/* Commit-reveal integrity badge (NFT mode only) */}
-          {showCommitProof && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                marginBottom: 20,
-                padding: '8px 16px',
-                background: p1Verified && p2Verified
-                  ? 'rgba(76, 175, 80, 0.12)'
-                  : 'rgba(224, 85, 85, 0.12)',
-                border: `1px solid ${p1Verified && p2Verified ? 'rgba(76,175,80,0.3)' : 'rgba(224,85,85,0.3)'}`,
-                borderRadius: 10,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>
-                {p1Verified && p2Verified ? '✅' : '⚠️'}
-              </span>
-              <span style={{
-                fontSize: 11,
-                color: p1Verified && p2Verified
-                  ? 'rgba(76,175,80,0.9)'
-                  : 'rgba(224,85,85,0.9)',
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-              }}>
-                {p1Verified && p2Verified
-                  ? 'Commit-reveal verified — fair play confirmed'
-                  : 'Commitment mismatch detected!'}
-              </span>
-            </motion.div>
-          )}
+          {/* Commit-reveal integrity badge */}
+          {showCommitProof && (() => {
+            // In online mode we can only verify our own commitment
+            const myVerified = myPlayer === 'player1' ? p1Verified : p2Verified;
+            const allVerified = mode === 'online' ? myVerified === true : (p1Verified === true && p2Verified === true);
+            const anyFailed = mode === 'online' ? myVerified === false : (p1Verified === false || p2Verified === false);
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginBottom: 20,
+                  padding: '8px 16px',
+                  background: allVerified
+                    ? 'rgba(76, 175, 80, 0.12)'
+                    : anyFailed
+                      ? 'rgba(224, 85, 85, 0.12)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${allVerified ? 'rgba(76,175,80,0.3)' : anyFailed ? 'rgba(224,85,85,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: 10,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>
+                  {allVerified ? '✅' : anyFailed ? '⚠️' : '🔒'}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  color: allVerified
+                    ? 'rgba(76,175,80,0.9)'
+                    : anyFailed
+                      ? 'rgba(224,85,85,0.9)'
+                      : 'rgba(255,255,254,0.5)',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                }}>
+                  {allVerified
+                    ? mode === 'online' ? 'Your commitment verified on-chain' : 'Commit-reveal verified — fair play confirmed'
+                    : anyFailed
+                      ? 'Commitment mismatch detected!'
+                      : 'Verifying commitment...'}
+                </span>
+              </motion.div>
+            );
+          })()}
 
           {/* On-chain reveal status */}
           {(mode === 'nft' || mode === 'online') && (

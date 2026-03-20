@@ -57,10 +57,10 @@ export function QuestionPanel() {
   );
 
   // Characters still on the board (not eliminated by this player)
-  const remaining = useMemo(
-    () => characters.filter((c) => !playerState.eliminatedCharacterIds.includes(c.id)),
-    [characters, playerState.eliminatedCharacterIds],
-  );
+  const remaining = useMemo(() => {
+    const elimSet = new Set(playerState.eliminatedCharacterIds);
+    return characters.filter((c) => !elimSet.has(c.id));
+  }, [characters, playerState.eliminatedCharacterIds]);
 
   // Calculate impact for each question: how many characters would be eliminated
   const questionImpact = useMemo(() => {

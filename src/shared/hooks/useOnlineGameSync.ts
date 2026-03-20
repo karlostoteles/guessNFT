@@ -8,10 +8,13 @@
  *
  * Must be mounted for the duration of an online game.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/core/store/gameStore';
 import { GamePhase } from '@/core/store/types';
 import type { PlayerId, QuestionRecord } from '@/core/store/types';
+
+/** Seconds without opponent presence before showing disconnect warning. */
+const DISCONNECT_TIMEOUT_S = 45;
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { QUESTIONS } from '@/core/data/questions';
 import {
@@ -28,7 +31,7 @@ import type { SupabaseGame, SupabaseGameEvent } from '@/services/supabase/types'
 import { supabase } from '@/services/supabase/client';
 import { getCommitment } from '@/services/starknet/commitReveal';
 
-export function useOnlineGameSync() {
+export function useOnlineGameSync(): { opponentDisconnected: boolean } {
   const phase = useGameStore((s) => s.phase);
   const mode = useGameStore((s) => s.mode);
   const onlineGameId = useGameStore((s) => s.onlineGameId);
@@ -44,6 +47,8 @@ export function useOnlineGameSync() {
   const sentAnswerForRef = useRef<string | null>(null); // question_id we already answered
   const lastPushedTurnRef = useRef<number>(0); // last turn_number written to DB
   const processedEventIds = useRef<Set<string>>(new Set()); // dedup incoming events
+  const myGuessTimestampRef = useRef<number>(0); // timestamp of my last guess (for tiebreaker)
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
 
   const myAddress = () => {
     try {
@@ -88,6 +93,58 @@ export function useOnlineGameSync() {
       supabase.removeChannel(eventSub);
     };
   }, [mode, onlineGameId, onlinePlayerNum]);
+
+  // ─── Presence heartbeat: detect opponent disconnect ─────────────────────
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+
+    const isGameplay =
+      phase !== GamePhase.MENU &&
+      phase !== GamePhase.SETUP_P1 &&
+      phase !== GamePhase.SETUP_P2 &&
+      phase !== GamePhase.GAME_OVER;
+    if (!isGameplay) return;
+
+    const channelName = `presence:${onlineGameId}`;
+    const presenceChannel = supabase.channel(channelName);
+
+    let opponentLastSeen = Date.now();
+    setOpponentDisconnected(false);
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = presenceChannel.presenceState();
+        // Check if opponent is present
+        const allPresences = Object.values(presenceState).flat() as unknown as { player_num: number }[];
+        const opponentPresent = allPresences.some(
+          (p) => p.player_num !== onlinePlayerNum
+        );
+        if (opponentPresent) {
+          opponentLastSeen = Date.now();
+          setOpponentDisconnected(false);
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ player_num: onlinePlayerNum });
+        }
+      });
+
+    // Poll for staleness
+    const checkInterval = setInterval(() => {
+      const elapsed = (Date.now() - opponentLastSeen) / 1000;
+      if (elapsed > DISCONNECT_TIMEOUT_S) {
+        setOpponentDisconnected(true);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(checkInterval);
+      presenceChannel.untrack();
+      supabase.removeChannel(presenceChannel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, onlineGameId, onlinePlayerNum, phase]);
 
   // ─── Push commitment to Supabase when character is selected (ONLINE_WAITING) ─
   useEffect(() => {
@@ -353,6 +410,7 @@ export function useOnlineGameSync() {
     if (currentQuestion) return; // It's a question, not a guess
 
     sentGuessRef.current = guessedCharacterId;
+    myGuessTimestampRef.current = Date.now();
 
     const idemKey = `g_${onlineGameId}_${onlinePlayerNum}_${guessedCharacterId}_t${turnNumber}`;
     sendEvent(
@@ -361,7 +419,7 @@ export function useOnlineGameSync() {
       onlinePlayerNum,
       myAddress(),
       turnNumber,
-      { character_id: guessedCharacterId },
+      { character_id: guessedCharacterId, timestamp: myGuessTimestampRef.current },
       idemKey
     ).catch(console.error);
 
@@ -450,7 +508,10 @@ export function useOnlineGameSync() {
       }
 
       case 'GUESS_MADE': {
-        const { character_id } = event.payload as { character_id: string };
+        const { character_id, timestamp: opponentTimestamp } = event.payload as {
+          character_id: string;
+          timestamp?: number;
+        };
 
         // Evaluate whether opponent guessed my character correctly
         const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
@@ -458,7 +519,23 @@ export function useOnlineGameSync() {
         const isCorrect = character_id === mySecretId;
 
         const opponentPlayerNum = (event.player_num as 1 | 2);
-        const winnerPlayerNum: 1 | 2 | null = isCorrect ? opponentPlayerNum : null;
+
+        // Handle simultaneous correct guesses: if I also guessed correctly,
+        // use timestamp tiebreaker — earliest guess wins. If tied, lower player_num wins.
+        let winnerPlayerNum: 1 | 2 | null = isCorrect ? opponentPlayerNum : null;
+
+        if (isCorrect && state.phase === GamePhase.GUESS_RESULT && state.winner === myPlayerKey) {
+          // Both guessed correctly at the same time — tiebreaker
+          const myTs = myGuessTimestampRef.current || 0;
+          const oppTs = opponentTimestamp || 0;
+          if (myTs && oppTs) {
+            winnerPlayerNum = myTs <= oppTs ? (onlinePlayerNum as 1 | 2) : opponentPlayerNum;
+          } else {
+            // No timestamps — lower player_num wins (deterministic tiebreaker)
+            winnerPlayerNum = 1;
+          }
+          console.log(`[sync] Simultaneous correct guesses — tiebreaker: P${winnerPlayerNum} wins (my=${myTs}, opp=${oppTs})`);
+        }
 
         // Tell opponent the result
         const guessResultIdemKey = `gr_${state.onlineGameId}_${onlinePlayerNum}_${character_id}_t${event.turn_number}`;
@@ -473,7 +550,7 @@ export function useOnlineGameSync() {
         ).catch(console.error);
 
         if (isCorrect) {
-          finishGame(state.onlineGameId!, opponentPlayerNum as 1 | 2).catch(console.error);
+          finishGame(state.onlineGameId!, winnerPlayerNum!).catch(console.error);
         }
 
         // Apply to my local state
@@ -504,4 +581,6 @@ export function useOnlineGameSync() {
         break;
     }
   }
+
+  return { opponentDisconnected };
 }

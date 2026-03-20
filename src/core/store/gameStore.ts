@@ -174,8 +174,9 @@ export const useGameStore = create<GameState & GameActions>()(
               const eliminated = state.players[state.activePlayer].eliminatedCharacterIds;
               const fullQuestion = QUESTIONS.find((qn) => qn.id === q.questionId);
               if (fullQuestion) {
+                const elimSet = new Set(eliminated);
                 for (const char of state.characters) {
-                  if (eliminated.includes(char.id)) continue;
+                  if (elimSet.has(char.id)) continue;
                   const matchesQuestion = evaluateQuestion(fullQuestion, char);
                   const shouldEliminate = q.answer ? !matchesQuestion : matchesQuestion;
                   if (shouldEliminate) {
@@ -190,8 +191,9 @@ export const useGameStore = create<GameState & GameActions>()(
               const cpuEliminated = state.players.player2.eliminatedCharacterIds;
               const fullCpuQ = QUESTIONS.find((qn) => qn.id === cpuQ.questionId);
               if (fullCpuQ) {
+                const cpuElimSet = new Set(cpuEliminated);
                 for (const char of state.characters) {
-                  if (cpuEliminated.includes(char.id)) continue;
+                  if (cpuElimSet.has(char.id)) continue;
                   const matchesQuestion = evaluateQuestion(fullCpuQ, char);
                   const shouldEliminate = cpuQ.answer ? !matchesQuestion : matchesQuestion;
                   if (shouldEliminate) {
@@ -201,8 +203,9 @@ export const useGameStore = create<GameState & GameActions>()(
               }
 
               // CPU auto-win: if down to 1 remaining, auto-guess
+              const cpuElimSetFinal = new Set(cpuEliminated);
               const cpuRemaining = state.characters.filter(
-                (c) => !cpuEliminated.includes(c.id)
+                (c) => !cpuElimSetFinal.has(c.id)
               );
               if (cpuRemaining.length === 1) {
                 state.guessedCharacterId = cpuRemaining[0].id;
@@ -251,7 +254,8 @@ export const useGameStore = create<GameState & GameActions>()(
               if (state.mode === 'free' || state.mode === 'nft-free') {
                 // Opponent (CPU) gets a free question because player risked it and failed!
                 const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-                const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+                const cpuElimSet = new Set(cpuEliminated);
+                const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
                 const cpuAskedIds = new Set(
                   state.questionHistory
                     .filter((r) => r.askedBy === 'player2')
@@ -328,7 +332,8 @@ export const useGameStore = create<GameState & GameActions>()(
         // Free/nft-free mode: CPU simultaneously picks and answers its own question
         if (state.mode === 'free' || state.mode === 'nft-free') {
           const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          const cpuElimSet = new Set(cpuEliminated);
+          const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
           const cpuAskedIds = new Set(
             state.questionHistory
               .filter((r) => r.askedBy === 'player2')
@@ -437,7 +442,8 @@ export const useGameStore = create<GameState & GameActions>()(
         if (state.mode === 'free' || state.mode === 'nft-free') {
           // Check if CPU simultaneously wants to risk it this round
           const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          const cpuElimSet = new Set(cpuEliminated);
+          const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
           let cpuRiskTarget: string | null = null;
           if (cpuRemaining.length === 1) {
             cpuRiskTarget = cpuRemaining[0].id;
