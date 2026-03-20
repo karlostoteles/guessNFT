@@ -7,7 +7,7 @@ import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
 import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { useGameStore } from '@/core/store/gameStore';
-import { depositWagerOnChain, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
+import { getCommitment, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
 // Deterministic accent colour from character id
 function idToColor(id: string): string {
@@ -104,19 +104,11 @@ export function CharacterSelectScreen() {
 
       const session = useGameStore.getState().gameSessionId;
 
-      // Handle on-chain wager if needed
+      // Submit commitment on-chain (no wager for MVP)
       if (isNFTMode && mode !== 'nft-free') {
-        // TokenId fallback: if charId is "nft_123", it becomes "123"
-        const finalTokenId = tokenId || charId.replace('nft_', '');
-
-        const commitmentsStr = localStorage.getItem('whoiswho_commitments') || '{}';
-        const cMap = JSON.parse(commitmentsStr);
-        const myCommitment = cMap[session]?.[player]?.commitment;
-
-        if (myCommitment) {
-          await submitCommitmentOnChain(myCommitment, session);
-
-          await depositWagerOnChain(session, finalTokenId);
+        const stored = getCommitment(player, session);
+        if (stored) {
+          await submitCommitmentOnChain(stored.commitment, session);
         }
       }
 

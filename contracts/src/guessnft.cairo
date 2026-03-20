@@ -1,209 +1,56 @@
-use starknet::ContractAddress;
+/// Minimal commit-reveal trust anchor for guessNFT.
+/// Gameplay lives in Supabase — this contract only stores and verifies commitments.
 
 #[starknet::interface]
-pub trait IERC721<TContractState> {
-    fn transfer_from(ref self: TContractState, from: ContractAddress, to: ContractAddress, token_id: u256);
-}
-
-#[starknet::interface]
-pub trait IGuessNFT<TContractState> {
-    fn create_game(ref self: TContractState, game_id: felt252, p2: ContractAddress);
-    fn commit_character(ref self: TContractState, game_id: felt252, commitment: felt252);
-    fn reveal_character(ref self: TContractState, game_id: felt252, character_id: felt252, salt: felt252);
-    fn deposit_wager(ref self: TContractState, game_id: felt252, token_id: u256);
-    fn opponent_won(ref self: TContractState, game_id: felt252);
-    fn get_game(self: @TContractState, game_id: felt252) -> GuessNFT::Game;
-    fn get_commitment(self: @TContractState, game_id: felt252, player: ContractAddress) -> felt252;
+pub trait ICommitReveal<TContractState> {
+    fn commit(ref self: TContractState, game_id: felt252, commitment: felt252);
+    fn reveal(ref self: TContractState, game_id: felt252, character_id: felt252, salt: felt252);
+    fn get_commitment(self: @TContractState, game_id: felt252, player: starknet::ContractAddress) -> felt252;
 }
 
 #[starknet::contract]
-pub mod GuessNFT {
-    use super::{IGuessNFT, IERC721Dispatcher, IERC721DispatcherTrait};
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
-
-    #[derive(Copy, Drop, Serde, starknet::Store)]
-    pub struct Game {
-        player1: ContractAddress,
-        player2: ContractAddress,
-        p1_commitment: felt252,
-        p2_commitment: felt252,
-        p1_revealed_char: felt252,
-        p2_revealed_char: felt252,
-        p1_wager: u256,
-        p2_wager: u256,
-        winner: ContractAddress,
-    }
+mod CommitReveal {
+    use starknet::{ContractAddress, get_caller_address};
+    use starknet::storage::{StorageMapReadAccess, StorageMapWriteAccess};
 
     #[storage]
     struct Storage {
-        nft_contract: ContractAddress,
-        games: starknet::storage::Map<felt252, Game>,
+        /// (game_id, player) → pedersen(character_id, salt)
+        commitments: starknet::storage::Map<(felt252, ContractAddress), felt252>,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
-        GameCreated: GameCreated,
-        CharacterCommitted: CharacterCommitted,
-        CharacterRevealed: CharacterRevealed,
-        WagerDeposited: WagerDeposited,
-        GameWon: GameWon,
+        Committed: Committed,
+        Revealed: Revealed,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct GameCreated { game_id: felt252, player1: ContractAddress, player2: ContractAddress }
+    struct Committed { game_id: felt252, player: ContractAddress, hash: felt252 }
     #[derive(Drop, starknet::Event)]
-    struct CharacterCommitted { game_id: felt252, player: ContractAddress, commitment: felt252 }
-    #[derive(Drop, starknet::Event)]
-    struct CharacterRevealed { game_id: felt252, player: ContractAddress, character_id: felt252, valid: bool }
-    #[derive(Drop, starknet::Event)]
-    struct WagerDeposited { game_id: felt252, player: ContractAddress, token_id: u256 }
-    #[derive(Drop, starknet::Event)]
-    struct GameWon { game_id: felt252, winner: ContractAddress, prize1: u256, prize2: u256 }
-
-    #[constructor]
-    fn constructor(ref self: ContractState, nft_contract: ContractAddress) {
-        self.nft_contract.write(nft_contract);
-    }
+    struct Revealed { game_id: felt252, player: ContractAddress, character_id: felt252 }
 
     #[abi(embed_v0)]
-    impl GuessNFTImpl of IGuessNFT<ContractState> {
-        fn create_game(ref self: ContractState, game_id: felt252, p2: ContractAddress) {
+    impl CommitRevealImpl of super::ICommitReveal<ContractState> {
+        fn commit(ref self: ContractState, game_id: felt252, commitment: felt252) {
+            assert(commitment != 0, 'empty commitment');
             let caller = get_caller_address();
-            let zero_address: ContractAddress = 0_felt252.try_into().unwrap();
-            let game = Game {
-                player1: caller,
-                player2: p2,
-                p1_commitment: 0,
-                p2_commitment: 0,
-                p1_revealed_char: 0,
-                p2_revealed_char: 0,
-                p1_wager: 0,
-                p2_wager: 0,
-                winner: zero_address,
-            };
-            self.games.write(game_id, game);
-            self.emit(Event::GameCreated(GameCreated { game_id, player1: caller, player2: p2 }));
+            assert(self.commitments.read((game_id, caller)) == 0, 'already committed');
+            self.commitments.write((game_id, caller), commitment);
+            self.emit(Event::Committed(Committed { game_id, player: caller, hash: commitment }));
         }
 
-        fn commit_character(ref self: ContractState, game_id: felt252, commitment: felt252) {
+        fn reveal(ref self: ContractState, game_id: felt252, character_id: felt252, salt: felt252) {
             let caller = get_caller_address();
-            let mut game = self.games.read(game_id);
-            assert(commitment != 0, 'Commitment zero');
-
-            if caller == game.player1 {
-                game.p1_commitment = commitment;
-            } else if caller == game.player2 {
-                game.p2_commitment = commitment;
-            } else {
-                panic!("Not a player");
-            }
-
-            self.games.write(game_id, game);
-            self.emit(Event::CharacterCommitted(CharacterCommitted { game_id, player: caller, commitment }));
-        }
-
-        fn reveal_character(ref self: ContractState, game_id: felt252, character_id: felt252, salt: felt252) {
-            let caller = get_caller_address();
-            let mut game = self.games.read(game_id);
-            
-            // Compute expected commitment from character_id and salt
-            let expected_commitment = core::pedersen_hash(character_id, salt);
-            
-            let stored_commitment = if caller == game.player1 {
-                game.p1_commitment
-            } else if caller == game.player2 {
-                game.p2_commitment
-            } else {
-                panic!("Not a player");
-            };
-            
-            let valid = expected_commitment == stored_commitment;
-            assert(valid, 'Invalid reveal');
-            
-            // Store revealed character
-            if caller == game.player1 {
-                game.p1_revealed_char = character_id;
-            } else {
-                game.p2_revealed_char = character_id;
-            }
-            
-            self.games.write(game_id, game);
-            self.emit(Event::CharacterRevealed(CharacterRevealed { game_id, player: caller, character_id, valid }));
-        }
-
-        fn deposit_wager(ref self: ContractState, game_id: felt252, token_id: u256) {
-            let caller = get_caller_address();
-            let this_contract = get_contract_address();
-            let mut game = self.games.read(game_id);
-
-            assert(token_id != 0_u256, 'Invalid token');
-
-            if caller == game.player1 {
-                game.p1_wager = token_id;
-            } else if caller == game.player2 {
-                game.p2_wager = token_id;
-            } else {
-                panic!("Not a player");
-            }
-
-            let nft = IERC721Dispatcher { contract_address: self.nft_contract.read() };
-            nft.transfer_from(caller, this_contract, token_id);
-
-            self.games.write(game_id, game);
-            self.emit(Event::WagerDeposited(WagerDeposited { game_id, player: caller, token_id }));
-        }
-
-        fn opponent_won(ref self: ContractState, game_id: felt252) {
-            let caller = get_caller_address();
-            let mut game = self.games.read(game_id);
-            
-            let zero_address: ContractAddress = 0_felt252.try_into().unwrap();
-            assert(game.winner == zero_address, 'Game finished');
-
-            let opponent = if caller == game.player1 {
-                game.player2
-            } else if caller == game.player2 {
-                game.player1
-            } else {
-                panic!("Not a player");
-            };
-
-            game.winner = opponent;
-            self.games.write(game_id, game);
-
-            let this_contract = get_contract_address();
-            let nft = IERC721Dispatcher { contract_address: self.nft_contract.read() };
-            
-            // Send both wagers to the opponent
-            if game.p1_wager != 0_u256 {
-                nft.transfer_from(this_contract, opponent, game.p1_wager);
-            }
-            if game.p2_wager != 0_u256 {
-                nft.transfer_from(this_contract, opponent, game.p2_wager);
-            }
-
-            self.emit(Event::GameWon(GameWon { 
-                game_id, 
-                winner: opponent, 
-                prize1: game.p1_wager, 
-                prize2: game.p2_wager 
-            }));
-        }
-
-        fn get_game(self: @ContractState, game_id: felt252) -> Game {
-            self.games.read(game_id)
+            let stored = self.commitments.read((game_id, caller));
+            assert(stored != 0, 'no commitment');
+            assert(core::pedersen::pedersen(character_id, salt) == stored, 'hash mismatch');
+            self.emit(Event::Revealed(Revealed { game_id, player: caller, character_id }));
         }
 
         fn get_commitment(self: @ContractState, game_id: felt252, player: ContractAddress) -> felt252 {
-            let game = self.games.read(game_id);
-            if player == game.player1 {
-                game.p1_commitment
-            } else if player == game.player2 {
-                game.p2_commitment
-            } else {
-                0
-            }
+            self.commitments.read((game_id, player))
         }
     }
 }

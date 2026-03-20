@@ -8,8 +8,6 @@ export {
   generateGameSessionId,
   submitCommitmentOnChain,
   revealCharacterOnChain,
-  depositWagerOnChain,
-  opponentWonOnChain,
 } from './commitReveal';
 export type { Commitment } from './commitReveal';
 export { SCHIZODIO_CONTRACT, RPC_URL, SN_MAIN_CHAIN_ID, GAME_CONTRACT, SESSION_POLICIES } from './config';

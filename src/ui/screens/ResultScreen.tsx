@@ -7,7 +7,7 @@ import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 import { sfx } from '@/shared/audio/sfx';
-import { getCommitment, verifyReveal, opponentWonOnChain } from '@/services/starknet/commitReveal';
+import { getCommitment, verifyReveal, revealCharacterOnChain } from '@/services/starknet/commitReveal';
 import { useOnlinePlayerNum } from '@/core/store/selectors';
 
 export function ResultScreen() {
@@ -39,11 +39,15 @@ export function ResultScreen() {
   const [p1Verified, setP1Verified] = useState<boolean | null>(null);
   const [p2Verified, setP2Verified] = useState<boolean | null>(null);
 
-  const [conceding, setConceding] = useState(false);
-  const [conceded, setConceded] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [revealTxHash, setRevealTxHash] = useState<string | null>(null);
+  const [revealError, setRevealError] = useState<string | null>(null);
 
+  // Verify commitments client-side + submit on-chain reveal
   useEffect(() => {
-    if (mode !== 'nft') return;
+    if (mode !== 'nft' && mode !== 'online') return;
+
+    // Client-side verification for both players
     if (p1State.secretCharacterId) {
       const c = getCommitment('player1', gameSessionId);
       if (c) setP1Verified(verifyReveal('player1', p1State.secretCharacterId, c.salt, gameSessionId));
@@ -52,7 +56,27 @@ export function ResultScreen() {
       const c = getCommitment('player2', gameSessionId);
       if (c) setP2Verified(verifyReveal('player2', p2State.secretCharacterId, c.salt, gameSessionId));
     }
-  }, [mode, gameSessionId, p1State.secretCharacterId, p2State.secretCharacterId]);
+
+    // On-chain reveal for local player
+    const mySecret = myPlayer === 'player1' ? p1State.secretCharacterId : p2State.secretCharacterId;
+    if (!mySecret) return;
+
+    const stored = getCommitment(myPlayer, gameSessionId);
+    if (!stored) return;
+
+    // Fire on-chain reveal (non-blocking — game result shows immediately)
+    setRevealing(true);
+    revealCharacterOnChain(stored.characterId, stored.salt, gameSessionId)
+      .then((txHash) => {
+        setRevealTxHash(txHash);
+        console.log('[commitReveal] On-chain reveal tx:', txHash);
+      })
+      .catch((err) => {
+        console.error('[commitReveal] On-chain reveal failed:', err);
+        setRevealError(err.message || 'Reveal failed');
+      })
+      .finally(() => setRevealing(false));
+  }, [mode, gameSessionId, p1State.secretCharacterId, p2State.secretCharacterId, myPlayer]);
 
   // Only render in final phases
   const isFinalPhase = phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER;
@@ -241,31 +265,46 @@ export function ResultScreen() {
             </motion.div>
           )}
 
-          {(mode === 'nft' || mode === 'online') && !isDraw && winner !== myPlayer && !conceded && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} style={{ marginBottom: 20 }}>
-              <Button
-                variant={conceding ? 'secondary' : 'primary'}
-                size="lg"
-                disabled={conceding}
-                style={{ backgroundColor: conceding ? undefined : '#E05555', color: '#fff' }}
-                onClick={async () => {
-                  try {
-                    setConceding(true);
-                    await opponentWonOnChain(gameSessionId);
-                    setConceded(true);
-                  } catch (err) {
-                    console.error(err);
-                    alert('Failed to surrender NFT. Check console.');
-                  } finally {
-                    setConceding(false);
-                  }
-                }}
-              >
-                {conceding ? 'Transferring NFT...' : 'I Lost (Surrender NFT)'}
-              </Button>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-                Requires Cartridge Session authorization.
-              </div>
+          {/* On-chain reveal status */}
+          {(mode === 'nft' || mode === 'online') && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 20,
+                padding: '6px 14px',
+                background: revealTxHash
+                  ? 'rgba(76, 175, 80, 0.08)'
+                  : revealError
+                    ? 'rgba(224, 85, 85, 0.08)'
+                    : 'rgba(255, 255, 255, 0.04)',
+                border: `1px solid ${revealTxHash ? 'rgba(76,175,80,0.2)' : revealError ? 'rgba(224,85,85,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8,
+              }}
+            >
+              <span style={{
+                fontSize: 11,
+                color: revealTxHash
+                  ? 'rgba(76,175,80,0.8)'
+                  : revealError
+                    ? 'rgba(224,85,85,0.8)'
+                    : 'rgba(255,255,254,0.4)',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}>
+                {revealing
+                  ? 'Revealing on-chain...'
+                  : revealTxHash
+                    ? 'On-chain reveal confirmed'
+                    : revealError
+                      ? `Reveal failed: ${revealError}`
+                      : 'Preparing on-chain reveal...'}
+              </span>
             </motion.div>
           )}
 
