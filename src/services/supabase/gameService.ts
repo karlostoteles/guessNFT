@@ -67,8 +67,11 @@ export async function sendEvent(
   playerNum: 1 | 2,
   playerAddress: string,
   turnNumber: number,
-  payload: Record<string, any> = {}
+  payload: Record<string, any> = {},
+  idempotencyKey?: string
 ): Promise<void> {
+  const key = idempotencyKey ?? crypto.randomUUID();
+
   const { error } = await supabase.from('game_events').insert({
     game_id: gameId,
     event_type: eventType,
@@ -76,9 +79,13 @@ export async function sendEvent(
     player_address: playerAddress,
     turn_number: turnNumber,
     payload,
+    idempotency_key: key,
   });
 
-  if (error) throw new Error(`Failed to send event ${eventType}: ${error.message}`);
+  // Unique constraint on idempotency_key → duplicate is safe to ignore
+  if (error && !error.message.includes('duplicate') && !error.code?.includes('23505')) {
+    throw new Error(`Failed to send event ${eventType}: ${error.message}`);
+  }
 }
 
 export async function submitCommitment(

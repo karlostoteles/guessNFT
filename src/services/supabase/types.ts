@@ -4,6 +4,7 @@ export type OnlineEventType =
   | 'CHARACTER_COMMITTED'
   | 'QUESTION_ASKED'
   | 'ANSWER_GIVEN'
+  | 'ELIMINATION_UPDATE'
   | 'GUESS_MADE'
   | 'GUESS_RESULT'
   | 'CHARACTER_REVEALED';
@@ -36,5 +37,6 @@ export interface SupabaseGameEvent {
   player_address: string;
   turn_number: number;
   payload: Record<string, any>;
+  idempotency_key?: string;
   created_at: string;
 }

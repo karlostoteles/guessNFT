@@ -555,6 +555,28 @@ export const useGameStore = create<GameState & GameActions>()(
         }));
       }),
 
+    restoreFromEvents: (turnNumber, questionHistory, myEliminatedIds, opponentEliminatedIds, mySecretCharacterId) =>
+      set((state) => {
+        const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
+        const opponentKey: PlayerId = state.onlinePlayerNum === 1 ? 'player2' : 'player1';
+
+        state.turnNumber = turnNumber;
+        state.questionHistory = questionHistory;
+        state.players[myPlayerKey].eliminatedCharacterIds = myEliminatedIds;
+        state.players[opponentKey].eliminatedCharacterIds = opponentEliminatedIds;
+
+        // Restore secret character from localStorage commitment if available
+        if (mySecretCharacterId) {
+          state.players[myPlayerKey].secretCharacterId = mySecretCharacterId;
+        }
+
+        state.commitmentStatus = 'both';
+        state.activePlayer = myPlayerKey;
+        state.boardRotation = state.onlinePlayerNum === 2 ? Math.PI : 0;
+        state.currentQuestion = null;
+        state.phase = GamePhase.QUESTION_SELECT;
+      }),
+
     advanceToGameStart: () =>
       set((state) => {
         // Called by sync hook when both players have committed — start the game
@@ -602,6 +624,19 @@ export const useGameStore = create<GameState & GameActions>()(
           state.phase = GamePhase.GUESS_RESULT;
         } else {
           // Opponent guessed wrong — ignore. It doesn't affect our local simultaneous turn.
+        }
+      }),
+
+    receiveOpponentElimination: (eliminatedIds) =>
+      set((state) => {
+        // Opponent broadcasts their eliminatedIds — merge into their player slot
+        const opponent: PlayerId = state.activePlayer === 'player1' ? 'player2' : 'player1';
+        const current = state.players[opponent].eliminatedCharacterIds;
+        const currentSet = new Set(current);
+        for (const id of eliminatedIds) {
+          if (!currentSet.has(id)) {
+            current.push(id);
+          }
         }
       }),
 

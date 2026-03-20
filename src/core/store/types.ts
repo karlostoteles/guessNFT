@@ -85,10 +85,18 @@ export interface GameActions {
   // Online-specific actions (called by useOnlineGameSync hook)
   setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2, playerAddress: string) => void;
   recoverOnlineGame: (characters: Character[], currentAddress?: string) => void;
+  restoreFromEvents: (
+    turnNumber: number,
+    questionHistory: QuestionRecord[],
+    myEliminatedIds: string[],
+    opponentEliminatedIds: string[],
+    mySecretCharacterId: string | null,
+  ) => void;
   advanceToGameStart: () => void;
   receiveOpponentQuestion: (questionId: string, answer: boolean) => void;
   applyOpponentAnswer: (answer: boolean) => void;
   receiveOpponentGuess: (characterId: string, isCorrect: boolean, winnerPlayerNum: 1 | 2 | null) => void;
+  receiveOpponentElimination: (eliminatedIds: string[]) => void;
   applyGuessResult: (isCorrect: boolean, winner: PlayerId | null) => void;
   /** Enrich stub NFT characters with real trait attributes from fetchTraitsBatch(). */
   enrichNFTCharacters: (traitMap: Map<string, NFTAttribute[]>) => void;
