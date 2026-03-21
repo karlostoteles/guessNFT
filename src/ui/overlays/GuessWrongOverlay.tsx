@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useGameActions, useGameCharacters, useGuessedCharacterId, useActivePlayer } from '@/core/store/selectors';
+import { useGameActions, useGameCharacters, useGuessedCharacterId, useActivePlayer, useOnlinePlayerNum, useGameMode } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 
 /**
@@ -13,7 +13,14 @@ export function GuessWrongOverlay() {
   const guessedId = useGuessedCharacterId();
   const guessedChar = characters.find((c) => c.id === guessedId);
   const activePlayer = useActivePlayer();
-  const isOpponent = activePlayer === 'player2';
+  const onlinePlayerNum = useOnlinePlayerNum();
+  const mode = useGameMode();
+
+  // In online mode, derive "opponent" from onlinePlayerNum (stable),
+  // not from activePlayer (which swaps each turn).
+  const isOpponent = mode === 'online'
+    ? (activePlayer !== (onlinePlayerNum === 1 ? 'player1' : 'player2'))
+    : activePlayer === 'player2';
 
   useEffect(() => {
     sfx.wrongGuess();

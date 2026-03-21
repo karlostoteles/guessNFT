@@ -8,7 +8,8 @@ import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 import { sfx } from '@/shared/audio/sfx';
 import { getCommitment, verifyReveal, revealCharacterOnChain } from '@/services/starknet/commitReveal';
-import { useOnlinePlayerNum } from '@/core/store/selectors';
+import { useOnlinePlayerNum, useOnlineGameId } from '@/core/store/selectors';
+import { revealCharacter as revealCharacterSupabase } from '@/services/supabase/gameService';
 
 export function ResultScreen() {
   const winner = useWinner();
@@ -19,6 +20,7 @@ export function ResultScreen() {
 
   // Identify local player (must be before isMyWin)
   const playerNum = useOnlinePlayerNum();
+  const onlineGameId = useOnlineGameId();
   const myPlayer = mode === 'online' ? (playerNum === 2 ? 'player2' : 'player1') : 'player1';
 
   const isDraw = winner === null;
@@ -78,9 +80,20 @@ export function ResultScreen() {
     const stored = getCommitment(myPlayer, gameSessionId);
     if (!stored) return;
 
+    // Also reveal to Supabase so opponent can verify
+    if (mode === 'online' && onlineGameId && playerNum) {
+      revealCharacterSupabase(
+        onlineGameId, playerNum, stored.characterId, stored.salt,
+        'local', // playerAddress not critical for reveal
+        0, // turnNumber not critical for reveal
+      ).catch((err) => console.error('[reveal] Supabase reveal failed:', err));
+    }
+
     // Fire on-chain reveal (non-blocking — game result shows immediately)
+    // Use the shared onlineGameId for on-chain reveal so it matches the commit.
+    const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : gameSessionId;
     setRevealing(true);
-    revealCharacterOnChain(stored.characterId, stored.salt, gameSessionId)
+    revealCharacterOnChain(stored.characterId, stored.salt, onChainGameId)
       .then((txHash) => {
         setRevealTxHash(txHash);
         console.log('[commitReveal] On-chain reveal tx:', txHash);
@@ -96,7 +109,11 @@ export function ResultScreen() {
   const isFinalPhase = phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER;
   if (!isFinalPhase) return null;
 
-  const winnerLabel = isDraw ? null : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
+  const winnerLabel = isDraw
+    ? null
+    : mode === 'online'
+      ? (winner === myPlayer ? 'You Win' : 'Opponent Wins')
+      : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
   const winnerColor = isDraw
     ? '#E8A444'
     : winner === 'player1' ? COLORS.player1.primary : COLORS.player2.primary;
@@ -201,8 +218,20 @@ export function ResultScreen() {
             marginBottom: 32,
           }}>
             {[
-              { label: "P1's Secret", secret: p1Secret, color: COLORS.player1.primary },
-              { label: "P2's Secret", secret: p2Secret, color: COLORS.player2.primary },
+              {
+                label: mode === 'online'
+                  ? (myPlayer === 'player1' ? 'Your Secret' : "Opponent's Secret")
+                  : "P1's Secret",
+                secret: p1Secret,
+                color: COLORS.player1.primary,
+              },
+              {
+                label: mode === 'online'
+                  ? (myPlayer === 'player2' ? 'Your Secret' : "Opponent's Secret")
+                  : "P2's Secret",
+                secret: p2Secret,
+                color: COLORS.player2.primary,
+              },
             ].map(({ label, secret, color }) => secret && (
               <motion.div
                 key={secret.id}

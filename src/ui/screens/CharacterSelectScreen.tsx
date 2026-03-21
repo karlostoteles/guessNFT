@@ -2,10 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../common/Card';
 import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
-import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum, useGameSessionId } from '@/core/store/selectors';
+import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum, useGameSessionId, useOnlineGameId } from '@/core/store/selectors';
 import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
-import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
 import { getCommitment, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
 // Deterministic accent colour from character id
@@ -24,6 +23,7 @@ export function CharacterSelectScreen() {
   const onlinePlayerNum = useOnlinePlayerNum();
   const { selectSecretCharacter, resetGame, goBackToSetupP1 } = useGameActions();
   const gameSessionId = useGameSessionId();
+  const onlineGameId = useOnlineGameId();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -44,15 +44,29 @@ export function CharacterSelectScreen() {
       ? 'Your Character'
       : player === 'player1' ? 'Player 1' : 'Player 2';
 
-  // Build the selectable character list for NFT modes
+  // Build the selectable character list for NFT modes.
+  // CRITICAL: Use the board's character objects (allCharacters) as the single source of
+  // truth for traits. Owned NFTs are only used to filter which characters can be selected
+  // and to provide imageUrl for display. This ensures the selected secret character has
+  // the exact same traits as its board counterpart (both derived from schizodio.json bitmap).
   const nftModeChars = useMemo(() => {
     if (!isNFTMode) return null;
-    if (ownedNFTs.length > 0) {
-      // Use owned NFTs with real imageUrls — IDs match the board stubs
-      return ownedNFTs.map(nft => nftToCharacter(nft));
-    }
-    return null;
-  }, [isNFTMode, ownedNFTs]);
+    if (ownedNFTs.length === 0) return null;
+
+    // Build a set of owned token IDs for fast lookup
+    const ownedIds = new Set(ownedNFTs.map(nft => `nft_${nft.tokenId}`));
+    // Build a map of tokenId → imageUrl from owned NFTs
+    const imageMap = new Map(ownedNFTs.map(nft => [`nft_${nft.tokenId}`, nft.imageUrl]));
+
+    // Filter board characters to only owned ones, enriching with imageUrl
+    return allCharacters
+      .filter(c => ownedIds.has(c.id))
+      .map(c => ({
+        ...c,
+        imageUrl: imageMap.get(c.id) || (c as any).imageUrl,
+        tokenId: c.id.replace('nft_', ''),
+      }));
+  }, [isNFTMode, ownedNFTs, allCharacters]);
 
   // For free mode: use allCharacters (meme chars) with canvas previews
   const freeModeChars = !isNFTMode ? allCharacters : null;
@@ -84,12 +98,15 @@ export function CharacterSelectScreen() {
       selectSecretCharacter(player, charId);
 
       const session = gameSessionId;
+      // For on-chain commit, use the shared Supabase game ID in online mode
+      // so both players' commitments are indexed by the same key.
+      const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : session;
 
       // Submit commitment on-chain (no wager for MVP)
       if (isNFTMode && mode !== 'nft-free') {
         const stored = getCommitment(player, session);
         if (stored) {
-          await submitCommitmentOnChain(stored.commitment, session);
+          await submitCommitmentOnChain(stored.commitment, onChainGameId);
           setShowSuccess(true);
           setTimeout(() => setShowSuccess(false), 2000);
         }

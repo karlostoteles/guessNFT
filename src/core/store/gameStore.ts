@@ -94,8 +94,10 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         if (state.mode === 'online') {
-          // Online mode: after selecting, wait for opponent to also commit
-          state.commitmentStatus = state.commitmentStatus === 'partial' ? 'both' : 'partial';
+          // Online mode: after selecting, wait for opponent to also commit.
+          // Always set to 'partial' — the DB trigger transitions to 'in_progress'
+          // (and advanceToGameStart sets 'both') when the opponent also commits.
+          state.commitmentStatus = 'partial';
           state.phase = GamePhase.ONLINE_WAITING;
           return;
         }
@@ -131,7 +133,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         if (state.mode === 'online') {
-          state.commitmentStatus = state.commitmentStatus === 'partial' ? 'both' : 'partial';
+          state.commitmentStatus = 'partial';
           state.phase = GamePhase.ONLINE_WAITING;
           return;
         }
@@ -416,7 +418,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
     cancelGuess: () =>
       set((state) => {
-        if (state.currentQuestion && state.mode !== 'free' && state.mode !== 'nft-free') {
+        if (state.mode === 'online') {
+          // Online mode: cancelling a guess just returns to question select.
+          // Never swap activePlayer or increment turn here — that would
+          // desynchronize from the authoritative DB turn state.
+          state.guessedCharacterId = null;
+          state.phase = GamePhase.QUESTION_SELECT;
+        } else if (state.currentQuestion && state.mode !== 'free' && state.mode !== 'nft-free') {
           // Non-free modes: cancelling after asking ends the turn
           const next = getOpponent(state.activePlayer);
           state.activePlayer = next;
@@ -641,14 +649,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
     receiveOpponentGuess: (characterId, isCorrect, winnerPlayerNum) =>
       set((state) => {
-        state.guessedCharacterId = characterId;
         if (isCorrect && winnerPlayerNum !== null) {
-          // If opponent guessed right, game over.
+          // If opponent guessed right, game over. Set guessedCharacterId for ResultScreen.
+          state.guessedCharacterId = characterId;
           state.winner = winnerPlayerNum === 1 ? 'player1' : 'player2';
           state.phase = GamePhase.GUESS_RESULT;
-        } else {
-          // Opponent guessed wrong — ignore. It doesn't affect our local simultaneous turn.
         }
+        // Opponent guessed wrong — don't set guessedCharacterId (would corrupt local state).
       }),
 
     receiveOpponentElimination: (eliminatedIds) =>

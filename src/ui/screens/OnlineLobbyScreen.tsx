@@ -19,10 +19,10 @@ interface Props {
   onBack: () => void;
 }
 
-type LobbyView = 'collection_select' | 'mode_select' | 'choice' | 'create' | 'join';
+type LobbyView = 'home' | 'join';
 
 export function OnlineLobbyScreen({ onBack }: Props) {
-  const [view, setView] = useState<LobbyView>('collection_select');
+  const [view, setView] = useState<LobbyView>('home');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -226,109 +226,41 @@ export function OnlineLobbyScreen({ onBack }: Props) {
   };
 
   const handleBack = () => {
-    if (view === 'collection_select') return onBack();
-    if (view === 'mode_select') return setView('collection_select');
-    if (view === 'choice') return setView('mode_select');
-    setView('choice');
+    if (view === 'home') return onBack();
+    setView('home');
   };
 
   return (
-    <LobbyWrapper onBack={handleBack} title={view === 'collection_select' ? 'Choose collection' : 'Select Mode'}>
+    <LobbyWrapper onBack={handleBack} title="Play Online">
       <AnimatePresence mode="wait">
 
-        {view === 'collection_select' && (
+        {view === 'home' && (
           <motion.div
-            key="collection_select"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            style={{ 
-              display: 'flex', 
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: 24,
-              width: '100%',
-              maxWidth: 1000
-            }}
-          >
-            <CollectionCard 
-              name="SCHIZODIO"
-              image="/vs_background.jpg"
-              count={999}
-              rarity="Extreme"
-              scarcity="1:100"
-              accentRgb="232,164,68"
-              onClick={() => setView('mode_select')}
-            />
-
-            <CollectionCard 
-              name="DUCKS"
-              image="/images/practice-bg.jpg"
-              count={500}
-              rarity="High"
-              scarcity="1:50"
-              disabled
-              accentRgb="251,191,36"
-            />
-            
-            <CollectionCard 
-              name="BLOBERT"
-              image="/ai_background.jpg"
-              count={10000}
-              rarity="Magical"
-              scarcity="1:1000"
-              disabled
-              accentRgb="167,139,250"
-            />
-          </motion.div>
-        )}
-
-        {view === 'mode_select' && (
-          <motion.div
-            key="mode_select"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 20,
-              width: '100%',
-              maxWidth: 500,
-              margin: '0 auto'
-            }}
-          >
-            <ModeButton
-              title="Normal"
-              subtitle="Classic 1v1 — each player picks their SCHIZODIO"
-              tag="ONLINE"
-              icon="⚔️"
-              accentRgb="232,164,68"
-              onClick={() => setView('choice')}
-            />
-
-            <ModeButton
-              title="SCHIZO Mode"
-              subtitle="Bet your SCHIZODIO against your opponent's"
-              tag="SOON"
-              icon="🔥"
-              accentRgb="239,68,68"
-              disabled
-            />
-          </motion.div>
-        )}
-
-        {view === 'choice' && (
-          <motion.div
-            key="choice"
+            key="home"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 420, margin: '0 auto', width: '100%' }}
           >
-            <Button variant="accent" size="lg" onClick={() => setView('create')} style={{ width: '100%' }}>
-              Create Room
+            <div style={{ fontSize: 13, color: 'rgba(255,255,254,0.4)', textAlign: 'center', lineHeight: 1.6, marginBottom: 8 }}>
+              SCHIZODIO Collection · 999 characters · Classic 1v1
+            </div>
+
+            {error && <ErrorMsg>{error}</ErrorMsg>}
+
+            <Button variant="accent" size="lg" onClick={handleCreate} disabled={loading} style={{ width: '100%' }}>
+              {loading ? 'Creating…' : 'Create Room'}
             </Button>
+
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              color: 'rgba(255,255,254,0.25)', fontSize: 12, fontWeight: 600,
+            }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+              OR
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+            </div>
+
             <button
               onClick={() => setView('join')}
               style={{
@@ -349,31 +281,13 @@ export function OnlineLobbyScreen({ onBack }: Props) {
           </motion.div>
         )}
 
-        {view === 'create' && (
-          <motion.div
-            key="create"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
-          >
-            <div style={{ fontSize: 13, color: 'rgba(255,255,254,0.5)', textAlign: 'center', lineHeight: 1.6 }}>
-              You'll select your SCHIZODIO first. Your room code will be shown on the next screen to share with your opponent.
-            </div>
-            {error && <ErrorMsg>{error}</ErrorMsg>}
-            <Button variant="accent" size="lg" onClick={handleCreate} disabled={loading} style={{ width: '100%' }}>
-              {loading ? 'Creating…' : 'Create Room & Select Character →'}
-            </Button>
-          </motion.div>
-        )}
-
         {view === 'join' && (
           <motion.div
             key="join"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', maxWidth: 420, margin: '0 auto', width: '100%' }}
           >
             <div style={{ fontSize: 14, color: 'rgba(255,255,254,0.5)', textAlign: 'center' }}>
               Enter the 6-character room code from your opponent.
@@ -513,183 +427,3 @@ function ErrorMsg({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
-
-function CollectionCard({ name, image, count, rarity, scarcity, onClick, disabled, accentRgb }: {
-  name: string;
-  image: string;
-  count: number;
-  rarity: string;
-  scarcity: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  accentRgb: string;
-}) {
-  return (
-    <motion.button
-      disabled={disabled}
-      onClick={onClick}
-      whileHover={disabled ? {} : { y: -8, scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      style={{
-        position: 'relative',
-        height: 420,
-        borderRadius: 32,
-        overflow: 'hidden',
-        border: `1px solid ${disabled ? 'rgba(255,255,255,0.05)' : `rgba(${accentRgb}, 0.2)`}`,
-        background: '#0F0E17',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        textAlign: 'left',
-        padding: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        opacity: disabled ? 0.5 : 1,
-        boxShadow: disabled ? 'none' : `0 20px 40px rgba(0,0,0,0.4), 0 0 40px rgba(${accentRgb}, 0.1)`,
-      }}
-    >
-      {/* Background Image */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: `url(${image})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        filter: disabled ? 'grayscale(1) brightness(0.2)' : 'brightness(0.6)',
-        zIndex: 0,
-        transition: 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
-      }} />
-
-      {/* Label Badge */}
-      <div style={{ 
-        position: 'absolute', top: 20, left: 20, zIndex: 3,
-        padding: '6px 14px', borderRadius: 12,
-        background: `rgba(${accentRgb}, 0.15)`,
-        border: `1px solid rgba(${accentRgb}, 0.3)`,
-        backdropFilter: 'blur(8px)',
-        color: `rgba(${accentRgb}, 1)`,
-        fontSize: 11, fontWeight: 800, letterSpacing: '0.05em',
-        textTransform: 'uppercase'
-      }}>
-        {name} COLLECTION
-      </div>
-      
-      {/* Gradient Overlay */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: `linear-gradient(180deg, transparent 0%, rgba(15,14,23,0.3) 50%, rgba(15,14,23,0.9) 100%)`,
-        zIndex: 1,
-      }} />
-
-      {/* Content */}
-      <div style={{ marginTop: 'auto', position: 'relative', zIndex: 2, padding: 32, width: '100%' }}>
-        <h3 style={{ 
-          fontSize: 32, fontWeight: 900, color: '#FFFFFE', 
-          fontFamily: "'Space Grotesk', sans-serif", margin: '0 0 20px 0',
-          letterSpacing: '-0.02em'
-        }}>
-          {name}
-        </h3>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-          <Stat label="Collection Size" value={count} />
-          <Stat label="Trait Scarcity" value={scarcity} />
-          <Stat label="Rarity Tier" value={rarity} />
-          {disabled ? (
-            <div style={{ 
-              background: 'rgba(255,255,255,0.05)', 
-              borderRadius: 8, padding: '4px 10px',
-              fontSize: 10, fontWeight: 800, color: 'rgba(255,255,254,0.3)',
-              alignSelf: 'center', textAlign: 'center'
-            }}>COMING SOON</div>
-          ) : (
-            <div style={{ 
-              background: `rgba(${accentRgb}, 0.1)`, 
-              borderRadius: 8, padding: '4px 10px',
-              fontSize: 10, fontWeight: 800, color: `rgba(${accentRgb}, 1)`,
-              alignSelf: 'center', textAlign: 'center',
-              border: `1px solid rgba(${accentRgb}, 0.2)`
-            }}>PLAYABLE</div>
-          )}
-        </div>
-      </div>
-    </motion.button>
-  );
-}
-
-function ModeButton({ title, subtitle, tag, icon, accentRgb, onClick, disabled }: {
-  title: string;
-  subtitle: string;
-  tag: string;
-  icon: string;
-  accentRgb: string;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <motion.button
-      disabled={disabled}
-      onClick={onClick}
-      whileHover={disabled ? {} : { scale: 1.02, background: `rgba(${accentRgb}, 0.1)` }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      style={{
-        background: `rgba(${accentRgb}, 0.05)`,
-        border: `1.5px solid rgba(${accentRgb}, 0.2)`,
-        borderRadius: 24,
-        padding: '24px 32px',
-        color: '#FFFFFE',
-        fontFamily: "'Space Grotesk', sans-serif",
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        outline: 'none',
-        textAlign: 'left',
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 24,
-        position: 'relative',
-        opacity: disabled ? 0.6 : 1,
-        transition: 'all 0.3s ease',
-        boxShadow: disabled ? 'none' : `0 0 30px rgba(${accentRgb}, 0.05)`
-      }}
-    >
-      <div style={{ 
-        width: 64, height: 64, borderRadius: 16, 
-        background: `rgba(${accentRgb}, 0.1)`, 
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 32, border: `1px solid rgba(${accentRgb}, 0.2)`
-      }}>
-        {icon}
-      </div>
-      
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <div style={{ fontWeight: 800, fontSize: 20 }}>{title}</div>
-          <div style={{ 
-            fontSize: 10, fontWeight: 800, 
-            background: tag === 'SOON' ? '#0F0E17' : `rgba(${accentRgb}, 0.2)`, 
-            color: tag === 'SOON' ? 'rgba(255,255,254,0.4)' : '#FFFFFE',
-            padding: '4px 10px', borderRadius: 8,
-            border: tag === 'SOON' ? '1px solid rgba(255,255,255,0.1)' : 'none',
-            letterSpacing: '0.05em'
-          }}>
-            {tag}
-          </div>
-        </div>
-        <div style={{ fontSize: 15, color: 'rgba(255,255,254,0.5)', lineHeight: 1.4 }}>
-          {subtitle}
-        </div>
-      </div>
-
-      {!disabled && (
-        <div style={{ fontSize: 20, opacity: 0.3 }}>→</div>
-      )}
-    </motion.button>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,254,0.3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: '#FFFFFE', fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
-    </div>
-  );
-}

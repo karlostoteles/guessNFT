@@ -95,15 +95,12 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
   }, [mode, onlineGameId, onlinePlayerNum]);
 
   // ─── Presence heartbeat: detect opponent disconnect ─────────────────────
+  // NOTE: This effect intentionally does NOT depend on `phase` — we want a
+  // single stable presence channel for the entire game, not one that tears
+  // down and re-subscribes on every phase transition (which resets
+  // opponentLastSeen and causes false disconnect warnings).
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
-
-    const isGameplay =
-      phase !== GamePhase.MENU &&
-      phase !== GamePhase.SETUP_P1 &&
-      phase !== GamePhase.SETUP_P2 &&
-      phase !== GamePhase.GAME_OVER;
-    if (!isGameplay) return;
 
     const channelName = `presence:${onlineGameId}`;
     const presenceChannel = supabase.channel(channelName);
@@ -145,7 +142,7 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
       supabase.removeChannel(presenceChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, onlineGameId, onlinePlayerNum, phase]);
+  }, [mode, onlineGameId, onlinePlayerNum]);
 
   // ─── Push commitment to Supabase when character is selected (ONLINE_WAITING) ─
   useEffect(() => {
@@ -209,7 +206,14 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
     (async () => {
       try {
         const game = await getGame(gameId);
-        if (!game || game.status !== 'in_progress') return; // not started yet, normal flow
+        if (!game) return;
+        // If game is finished, go straight to game over
+        if (game.status === 'finished') {
+          const winnerKey = game.winner_player_num === 1 ? 'player1' : game.winner_player_num === 2 ? 'player2' : null;
+          useGameStore.setState({ winner: winnerKey, phase: GamePhase.GAME_OVER });
+          return;
+        }
+        if (game.status !== 'in_progress') return; // not started yet, normal flow
 
         const events = await getPastEvents(gameId);
         const state = useGameStore.getState();
@@ -494,12 +498,13 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
         const answer = evaluateQuestion(q, myChar);
         const opponentPlayerNum = onlinePlayerNum === 1 ? 2 : 1;
 
-        // Send answer back
+        // Send answer back — use MY player_num so the opponent's isFromMe check
+        // correctly identifies this as "not from me" and processes it.
         const answerIdemKey = `a_${state.onlineGameId}_${onlinePlayerNum}_${question_id}`;
         sendEvent(
           state.onlineGameId!,
           'ANSWER_GIVEN',
-          opponentPlayerNum,
+          onlinePlayerNum!,
           myAddress(),
           event.turn_number,
           { answer, question_id },
@@ -553,12 +558,12 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
           console.log(`[sync] Simultaneous correct guesses — tiebreaker: P${winnerPlayerNum} wins (my=${myTs}, opp=${oppTs})`);
         }
 
-        // Tell opponent the result
+        // Tell opponent the result — use MY player_num so the opponent sees it
         const guessResultIdemKey = `gr_${state.onlineGameId}_${onlinePlayerNum}_${character_id}_t${event.turn_number}`;
         sendEvent(
           state.onlineGameId!,
           'GUESS_RESULT',
-          onlinePlayerNum === 1 ? 2 : 1,
+          onlinePlayerNum!,
           myAddress(),
           event.turn_number,
           { is_correct: isCorrect, winner_player_num: winnerPlayerNum },

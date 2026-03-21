@@ -46,6 +46,7 @@ export async function joinGame(
     throw new Error('You created this game — share the code with a friend!');
   }
 
+  // Guard: only update if still 'waiting' — prevents two simultaneous joins
   const { data, error } = await supabase
     .from('games')
     .update({
@@ -54,6 +55,7 @@ export async function joinGame(
       updated_at: new Date().toISOString(),
     })
     .eq('id', existing.id)
+    .eq('status', 'waiting')
     .select()
     .single();
 
@@ -97,10 +99,14 @@ export async function submitCommitment(
 ): Promise<void> {
   const field = playerNum === 1 ? 'player1_commitment' : 'player2_commitment';
 
-  await supabase
+  const { error } = await supabase
     .from('games')
     .update({ [field]: commitment, updated_at: new Date().toISOString() })
     .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] submitCommitment failed:', error.message);
+  }
 
   await sendEvent(gameId, 'CHARACTER_COMMITTED', playerNum, playerAddress, turnNumber, {
     commitment,
@@ -113,7 +119,7 @@ export async function updateTurn(
   activePlayerNum: 1 | 2,
   turnNumber: number
 ): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('games')
     .update({
       active_player_num: activePlayerNum,
@@ -121,20 +127,30 @@ export async function updateTurn(
       updated_at: new Date().toISOString(),
     })
     .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] updateTurn failed:', error.message);
+  }
 }
 
 export async function finishGame(
   gameId: string,
   winnerPlayerNum: 1 | 2
 ): Promise<void> {
-  await supabase
+  // Guard: only finish if still in_progress — prevents both players racing
+  const { error } = await supabase
     .from('games')
     .update({
       status: 'finished',
       winner_player_num: winnerPlayerNum,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', gameId);
+    .eq('id', gameId)
+    .eq('status', 'in_progress');
+
+  if (error) {
+    console.error('[gameService] finishGame failed:', error.message);
+  }
 }
 
 export async function revealCharacter(
