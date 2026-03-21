@@ -105,20 +105,7 @@ export async function submitCommitment(
   await sendEvent(gameId, 'CHARACTER_COMMITTED', playerNum, playerAddress, turnNumber, {
     commitment,
   });
-
-  // Check if both committed — if so, transition to in_progress
-  const { data: game } = await supabase
-    .from('games')
-    .select('player1_commitment, player2_commitment')
-    .eq('id', gameId)
-    .single();
-
-  if (game?.player1_commitment && game?.player2_commitment) {
-    await supabase
-      .from('games')
-      .update({ status: 'in_progress', updated_at: new Date().toISOString() })
-      .eq('id', gameId);
-  }
+  // Status transition to 'in_progress' handled by DB trigger when both commitments are set
 }
 
 export async function updateTurn(

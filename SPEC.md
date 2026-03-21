@@ -40,14 +40,15 @@ A browser-based 1v1 deduction game — "Guess Who?" for Starknet NFT collections
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Room persistence | ⚠️ Partial | Session recovery (1hr TTL), but no full game state replay |
-| Turn sync | ❌ Broken | `turn_number` and `active_player_num` never written to DB |
-| Event deduplication | ❌ None | No idempotency keys, duplicates possible |
-| On-chain commit | ⚠️ Stub | `submitCommitmentOnChain()` calls contract that exists but has unverified hash logic |
-| On-chain reveal | ⚠️ Stub | `revealCharacterOnChain()` same — Cairo contract has TODO |
+| Room persistence | ✅ Done (Beta) | Session recovery (1hr TTL) + full game state replay |
+| Turn sync | ✅ Done (Beta) | `turn_number` and `active_player_num` written to DB on every turn |
+| Event deduplication | ✅ Done (Beta) | Idempotency keys on all events, client-side dedup Set |
+| Shared elimination state | ✅ Done (Beta) | ELIMINATION_UPDATE broadcast after each question |
+| On-chain commit | ✅ Done (Beta) | CommitReveal contract deployed on mainnet, auto-commit on select |
+| On-chain reveal | ✅ Done (Beta) | Auto-reveal on result screen, Pedersen verification on-chain |
 | Answer verification | ⚠️ None | Opponent evaluates questions client-side — can lie freely |
-| Replay state on rejoin | ❌ Missing | Can't resume full game state from DB |
-| Simultaneous play | ❌ Broken | Design intent but never implemented |
+| Full state recovery | ✅ Done (Beta) | Replay past events to rebuild board state on rejoin |
+| Simultaneous play | ⚠️ Partial | Each player runs independently, no round gate yet |
 
 ---
 
@@ -114,125 +115,42 @@ A browser-based 1v1 deduction game — "Guess Who?" for Starknet NFT collections
 
 ## The Three-Layer Roadmap
 
-### Layer 1: Solid Online Gameplay Loop 🔴 PRIORITY
+### Layer 1: Solid Online Gameplay Loop ✅ COMPLETE
 
-> *Making turns sync correctly, events are idempotent, state persists and recovers.*
+> *Turns sync correctly, events are idempotent, state persists and recovers.*
 
-#### Problems
+#### Delivered (commits ae32993, 4080016)
 
-1. **Turn tracking never written to DB**
-   - `turn_number` and `active_player_num` are in DB schema but never updated
-   - Client-side only — no server authority
+1. **Turn tracking wired to DB** — `turn_number` and `active_player_num` written via `updateTurn()` on every turn switch
+2. **Event deduplication** — `idempotency_key` on all events, `processedEventIds` Set on client, `ON CONFLICT DO NOTHING` on server
+3. **Shared elimination state** — `ELIMINATION_UPDATE` broadcast after each question answer, opponent merges into their board
+4. **Full state recovery on rejoin** — `getPastEvents()` replays question history, elimination state, and turn number
+5. **Disconnect detection** — Supabase Presence heartbeat with 45s timeout, "Opponent disconnected" overlay
+6. **Simultaneous guess tiebreaker** — Timestamp comparison prevents inconsistent winners
 
-2. **No event deduplication**
-   - Supabase events can fire multiple times
-   - No idempotency keys
-   - Events processed twice, corrupting state
+#### Remaining (Layer 1 stretch)
 
-3. **No shared elimination state**
-   - Each client tracks their own eliminated chars
-   - No sync of what the other player eliminated
-
-4. **No full game state recovery on rejoin**
-   - Session recovers but not full board state
-   - Can't resume mid-game properly
-
-5. **No timeouts**
-   - Idle players can block forever
-   - No turn timer
-
-#### Fixes Required
-
-```typescript
-// 1. Write turn_number on every move
-supabase.rpc('update_turn', {
-  p_room_id: roomId,
-  p_turn_number: currentTurn + 1,
-  p_active_player: nextPlayer
-});
-
-// 2. Add idempotency keys
-interface GameEvent {
-  id: string;           // UUID v4
-  idempotency_key: string;  // Client generates this
-  event_type: string;
-  payload: object;
-}
-
-// 3. Server-side dedup
-ON CONFLICT (idempotency_key) DO NOTHING;
-
-// 4. Shared elimination state
-// Each question answer broadcasts new eliminatedIds
-// All clients converge to same state
-
-// 5. Turn timeout (optional for v1)
-p_turn_deadline: timestamp;  // Auto-forfeit if exceeded
-```
-
-#### Deliverables
-
-- [ ] Turn tracking fully wired to Supabase
-- [ ] Event idempotency keys implemented
-- [ ] Shared elimination state broadcasts
-- [ ] Full game state recovery on rejoin
-- [ ] Event deduplication on server-side
+- [ ] Turn timeout / auto-forfeit (nice-to-have)
+- [ ] Round-based gating (currently free-form simultaneous play)
 
 ---
 
-### Layer 2: On-Chain Commit-Reveal 🟡 SECOND
+### Layer 2: On-Chain Commit-Reveal ✅ COMPLETE
 
-> *Deploy Cairo contract, wire up real commit/reveal, post-game verification.*
+> *Minimal CommitReveal contract deployed on Starknet Mainnet.*
 
-#### Problems
+#### Delivered (commit 529ba6a)
 
-1. **Cairo contract has TODO stubs**
-   - Hash verification logic not implemented
-   - `GAME_CONTRACT = '0x0'` placeholder
+1. **CommitReveal contract deployed** — `0x077cbfa4dab07b9bd3e167b37ec2066683caeb9a267f72ec744f73b3c8d48b21`
+2. **`commit(game_id, commitment)`** — Stores Pedersen hash on-chain at game start
+3. **`reveal(game_id, character_id, salt)`** — Verifies hash on-chain at game end, reverts if tampered
+4. **Frontend wired** — Auto-commit on character select, auto-reveal on result screen
+5. **Session policies updated** — Cartridge Controller policies match commit/reveal entrypoints
 
-2. **Answer verification is client-side**
-   - Opponent can lie about answers
-   - No on-chain verification
+#### Remaining
 
-3. **RLS is wide open**
-   - Supabase RLS: `for all using (true)`
-   - Anyone can read/write any game row
-
-#### Fixes Required
-
-```cairo
-// contracts/src/game.cairo
-
-// Submit commitment before game starts
-@external
-func submit_commitment{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-}(character_id: felt, commitment_hash: felt) {
-    // Store pedersen(character_id, salt) on-chain
-    // Emit commitment event
-}
-
-// Reveal after game ends
-@external
-func reveal_character{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-}(character_id: felt, salt: felt) {
-    // Verify pedersen(character_id, salt) == commitment_hash
-    // Store revealed character
-}
-```
-
-#### Deliverables
-
-- [ ] Deploy Cairo game contract
-- [ ] Wire `submitCommitmentOnChain()` with real hash
-- [ ] Wire `revealCharacterOnChain()` with verification
-- [ ] Lock commitment after game starts
-- [ ] Supabase RLS rules tightened
+- [ ] Supabase RLS tightening (currently wide open)
+- [ ] Wager/deposit contract (Phase 3, separate contract)
 
 ---
 
@@ -503,16 +421,16 @@ VITE_GAME_CONTRACT=0x0  # TODO: deploy
 
 ## TODO by Priority
 
-### Critical (Block L1)
-- [ ] Fix turn_number/active_player_num DB writes
-- [ ] Add idempotency keys to events
-- [ ] Implement server-side dedup
-- [ ] Broadcast shared elimination state
-- [ ] Full state recovery on rejoin
+### Critical (Block L1) — ✅ DONE
+- [x] Fix turn_number/active_player_num DB writes
+- [x] Add idempotency keys to events
+- [x] Implement server-side dedup
+- [x] Broadcast shared elimination state
+- [x] Full state recovery on rejoin
 
-### High (Block L2)
-- [ ] Deploy Cairo contract
-- [ ] Wire real commit/reveal calls
+### High (Block L2) — ✅ DONE
+- [x] Deploy Cairo contract
+- [x] Wire real commit/reveal calls
 - [ ] Tighten Supabase RLS
 
 ### Medium (Block L3)
