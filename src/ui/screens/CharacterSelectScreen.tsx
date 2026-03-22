@@ -112,8 +112,8 @@ export function CharacterSelectScreen() {
       // so both players' commitments are indexed by the same key.
       const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : session;
 
-      // On-chain commit is Phase 2 — skip for online MVP to avoid blocking wallet popup.
-      // Only fire for local NFT mode (pass-and-play with owned NFTs).
+      // On-chain commit for local NFT mode only (component stays mounted).
+      // Online mode fires on-chain commit from useOnlineGameSync (component unmounts here).
       if (mode === 'nft' && ownedNFTs.length > 0) {
         const stored = getCommitment(player, session);
         if (stored) {

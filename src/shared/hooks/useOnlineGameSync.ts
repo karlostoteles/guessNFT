@@ -31,7 +31,7 @@ import {
 } from '@/services/supabase/gameService';
 import type { SupabaseGame, SupabaseGameEvent } from '@/services/supabase/types';
 import { supabase } from '@/services/supabase/client';
-import { getCommitment } from '@/services/starknet/commitReveal';
+import { getCommitment, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
 export function useOnlineGameSync(): { opponentDisconnected: boolean } {
   const phase = useGameStore((s) => s.phase);
@@ -172,6 +172,11 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
     submitCommitment(gameId, onlinePlayerNum, commitment.commitment, myAddress(), 1)
       .then(() => checkAndAdvanceIfReady(gameId))
       .catch(console.error);
+
+    // Fire on-chain commit non-blocking (doesn't block game flow)
+    submitCommitmentOnChain(commitment.commitment, gameId)
+      .then((txHash) => console.log('[commitReveal] On-chain commit tx:', txHash))
+      .catch((err) => console.warn('[commitReveal] On-chain commit failed (non-blocking):', err.message));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode, onlineGameId, onlinePlayerNum]);
