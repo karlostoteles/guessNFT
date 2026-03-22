@@ -10,12 +10,10 @@
  * The old broadcast-based event system (QUESTION_ASKED, ANSWER_GIVEN,
  * ELIMINATION_UPDATE) is removed. The DB row is the single source of truth.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '@/core/store/gameStore';
 import { GamePhase } from '@/core/store/types';
 import type { PlayerId, QuestionRecord } from '@/core/store/types';
-
-const DISCONNECT_TIMEOUT_S = 60;
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { QUESTIONS } from '@/core/data/questions';
 import {
@@ -33,7 +31,7 @@ import type { SupabaseGame, SupabaseGameEvent } from '@/services/supabase/types'
 import { supabase } from '@/services/supabase/client';
 import { getCommitment, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
-export function useOnlineGameSync(): { opponentDisconnected: boolean } {
+export function useOnlineGameSync(): Record<string, never> {
   const phase = useGameStore((s) => s.phase);
   const mode = useGameStore((s) => s.mode);
   const onlineGameId = useGameStore((s) => s.onlineGameId);
@@ -52,7 +50,6 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
   const myGuessTimestampRef = useRef<number>(0);
   const processedEventIds = useRef<Set<string>>(new Set());
   const recoveryAttemptedRef = useRef(false);
-  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
 
   const myAddress = () => {
     try {
@@ -117,45 +114,6 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
       supabase.removeChannel(gameSub);
       supabase.removeChannel(eventSub);
     };
-  }, [mode, onlineGameId, onlinePlayerNum]);
-
-  // ─── Presence heartbeat ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
-
-    const presenceChannel = supabase.channel(`presence:${onlineGameId}`);
-    let opponentLastSeen = Date.now();
-    setOpponentDisconnected(false);
-
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const allPresences = Object.values(presenceChannel.presenceState()).flat() as unknown as { player_num: number | string }[];
-        const opponentPresent = allPresences.some(
-          (p) => Number(p.player_num) !== Number(onlinePlayerNum)
-        );
-        if (opponentPresent) {
-          opponentLastSeen = Date.now();
-          setOpponentDisconnected(false);
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({ player_num: onlinePlayerNum });
-        }
-      });
-
-    const checkInterval = setInterval(() => {
-      if ((Date.now() - opponentLastSeen) / 1000 > DISCONNECT_TIMEOUT_S) {
-        setOpponentDisconnected(true);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(checkInterval);
-      presenceChannel.untrack();
-      supabase.removeChannel(presenceChannel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGameId, onlinePlayerNum]);
 
   // ─── Push commitment to Supabase ─────────────────────────────────────────
@@ -509,5 +467,5 @@ export function useOnlineGameSync(): { opponentDisconnected: boolean } {
     }
   }
 
-  return { opponentDisconnected };
+  return {};
 }

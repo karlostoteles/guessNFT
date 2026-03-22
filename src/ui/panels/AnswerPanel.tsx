@@ -1,34 +1,18 @@
-import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useCurrentQuestion, useGameActions, useGameMode } from '@/core/store/selectors';
 
-const ONLINE_ANSWER_TIMEOUT_MS = 15_000;
-
 export function AnswerPanel() {
   const question = useCurrentQuestion();
   const mode = useGameMode();
   const { answerQuestion } = useGameActions();
-  const [waitingMs, setWaitingMs] = useState(0);
-
-  // Timer for online waiting indicator
-  useEffect(() => {
-    if (mode !== 'online') return;
-    setWaitingMs(0);
-    const start = Date.now();
-    const interval = setInterval(() => setWaitingMs(Date.now() - start), 200);
-    return () => clearInterval(interval);
-  }, [mode, question?.questionId]);
 
   if (!question) return null;
 
-  // Online mode: show "waiting for opponent's answer" with timeout indicator
+  // Online mode: show "waiting for opponent's answer" indicator
   if (mode === 'online') {
-    const progress = Math.min(waitingMs / ONLINE_ANSWER_TIMEOUT_MS, 1);
-    const timedOut = waitingMs >= ONLINE_ANSWER_TIMEOUT_MS;
-
     const content = (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -63,30 +47,10 @@ export function AnswerPanel() {
           </div>
           <div style={{
             fontSize: 12,
-            color: timedOut ? '#FCA5A5' : 'rgba(255,255,254,0.3)',
+            color: 'rgba(255,255,254,0.3)',
             fontWeight: 600,
-            marginBottom: 8,
           }}>
-            {timedOut ? 'Opponent may be disconnected...' : 'Waiting for opponent\u2019s answer...'}
-          </div>
-          {/* Progress bar */}
-          <div style={{
-            width: '100%',
-            height: 3,
-            background: 'rgba(255,255,255,0.08)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}>
-            <motion.div
-              style={{
-                height: '100%',
-                background: timedOut
-                  ? 'linear-gradient(90deg, #E05555, #FCA5A5)'
-                  : 'linear-gradient(90deg, #E8A444, #F0C674)',
-                borderRadius: 2,
-                width: `${progress * 100}%`,
-              }}
-            />
+            Waiting for opponent{'\u2019'}s answer...
           </div>
         </div>
       </motion.div>

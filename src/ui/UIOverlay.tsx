@@ -1,11 +1,6 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { usePhase, useGameMode, useGameActions } from '@/core/store/selectors';
+import { AnimatePresence } from 'framer-motion';
+import { usePhase } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
-import { COLORS } from '@/core/rules/constants';
-import { Button } from './common/Button';
-import { Card } from './common/Card';
-import { finishGame } from '@/services/supabase/gameService';
-import { useOnlineGameId, useOnlinePlayerNum } from '@/core/store/selectors';
 import { MenuScreen } from './screens/MenuScreen';
 import { CharacterSelectScreen } from './screens/CharacterSelectScreen';
 import { OnlineWaitingScreen } from './screens/OnlineWaitingScreen';
@@ -30,18 +25,11 @@ import { useNFTTraitLoader } from '@/shared/hooks/useNFTTraitLoader';
 
 export function UIOverlay() {
   const phase = usePhase();
-  const mode = useGameMode();
-  const onlineGameId = useOnlineGameId();
-  const onlinePlayerNum = useOnlinePlayerNum();
-  const { resetGame } = useGameActions();
 
   // Mount the online sync hook for the lifetime of the overlay
-  const { opponentDisconnected } = useOnlineGameSync();
+  useOnlineGameSync();
   // Enrich stub NFT characters with real traits when owned NFTs are available
   useNFTTraitLoader();
-
-  const showDisconnectWarning = opponentDisconnected && mode === 'online' &&
-    phase !== GamePhase.MENU && phase !== GamePhase.GAME_OVER && phase !== GamePhase.GUESS_RESULT;
 
   return (
     <div style={{
@@ -53,48 +41,6 @@ export function UIOverlay() {
     }}>
       <EndGameVignette />
       <TurnIndicator />
-
-      {/* Opponent disconnect warning */}
-      <AnimatePresence>
-        {showDisconnectWarning && (
-          <motion.div
-            key="disconnect-warning"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            style={{
-              position: 'fixed',
-              top: 60,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 90,
-              pointerEvents: 'auto',
-            }}
-          >
-            <Card style={{ padding: '16px 24px', textAlign: 'center', maxWidth: 340 }}>
-              <div style={{ fontSize: 13, color: COLORS.no, fontWeight: 700, marginBottom: 8 }}>
-                Opponent disconnected
-              </div>
-              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 16 }}>
-                They may have closed the tab. You can wait or claim the win.
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                <Button variant="secondary" size="sm" onClick={() => { /* just dismiss — presence may reconnect */ }}>
-                  Wait
-                </Button>
-                <Button variant="accent" size="sm" onClick={() => {
-                  if (onlineGameId && onlinePlayerNum) {
-                    finishGame(onlineGameId, onlinePlayerNum).catch(console.error);
-                  }
-                  resetGame();
-                }}>
-                  Claim Win
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Unified Settings / Wallet Menu — top-left corner */}
       <HeaderMenu />
