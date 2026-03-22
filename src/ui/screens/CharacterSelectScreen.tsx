@@ -112,8 +112,9 @@ export function CharacterSelectScreen() {
       // so both players' commitments are indexed by the same key.
       const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : session;
 
-      // Submit commitment on-chain only if player owns NFTs (skip for random-pick / nft-free)
-      if (isNFTMode && mode !== 'nft-free' && ownedNFTs.length > 0) {
+      // On-chain commit is Phase 2 — skip for online MVP to avoid blocking wallet popup.
+      // Only fire for local NFT mode (pass-and-play with owned NFTs).
+      if (mode === 'nft' && ownedNFTs.length > 0) {
         const stored = getCommitment(player, session);
         if (stored) {
           try {
@@ -121,7 +122,6 @@ export function CharacterSelectScreen() {
             setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 2000);
           } catch (commitErr: any) {
-            // On-chain commit is non-blocking for MVP — log and continue
             console.warn('[commitReveal] On-chain commit failed, continuing:', commitErr.message);
           }
         }
