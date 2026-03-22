@@ -268,9 +268,15 @@ export function useOnlineGameSync(): Record<string, never> {
   }, [phase, currentQuestion?.questionId]);
 
   // ─── Write elimination to DB after AUTO_ELIMINATING phase starts ────────
+  // Only the active player (asker) writes — prevents both sides racing.
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase !== GamePhase.AUTO_ELIMINATING) return;
+
+    // Only the active player writes elimination
+    const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
+    if (activePlayer !== myPlayerKey) return;
+
     if (turnNumber <= lastWrittenEliminationTurnRef.current) return;
     lastWrittenEliminationTurnRef.current = turnNumber;
 
@@ -282,16 +288,37 @@ export function useOnlineGameSync(): Record<string, never> {
     }).catch(console.error);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum]);
+  }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum, activePlayer]);
+
+  // ─── Write TURN_TRANSITION phase to DB so non-active player follows ────
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+    if (phase !== GamePhase.TURN_TRANSITION) return;
+
+    // The NEW active player drives TURN_TRANSITION and writes to DB
+    const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
+    if (activePlayer !== myPlayerKey) return;
+
+    updateGameState(onlineGameId, {
+      current_phase: 'TURN_TRANSITION',
+    }).catch(console.error);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, mode, onlineGameId, onlinePlayerNum, activePlayer]);
 
   // ─── Push turn swap to DB ───────────────────────────────────────────────
+  // Only the NEW active player pushes — they own this turn now.
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase === GamePhase.MENU || phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2 || phase === GamePhase.ONLINE_WAITING) return;
+
+    const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
+    if (activePlayer !== myPlayerKey) return;
+
     if (turnNumber <= lastPushedTurnRef.current) return;
     lastPushedTurnRef.current = turnNumber;
 
-    const activePlayerNum: 1 | 2 = activePlayer === 'player1' ? 1 : 2;
+    const activePlayerNum: 1 | 2 = onlinePlayerNum as 1 | 2;
     updateTurn(onlineGameId, activePlayerNum, turnNumber).catch((err) =>
       console.error('[sync] updateTurn failed', err)
     );

@@ -712,12 +712,11 @@ export const useGameStore = create<GameState & GameActions>()(
           state.phase === GamePhase.ONLINE_WAITING
         ) return;
 
-        // Sync phase from DB
-        if (game.current_phase) {
-          state.phase = game.current_phase as GamePhase;
-        }
+        // Am I the active player (the one driving phase transitions)?
+        const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
+        const iAmActive = state.activePlayer === myPlayerKey;
 
-        // Sync question + answer
+        // Sync question + answer (always — data doesn't conflict)
         if (game.current_question) {
           const q = game.current_question as unknown as QuestionRecord;
           if (game.current_answer !== null && game.current_answer !== undefined) {
@@ -738,11 +737,9 @@ export const useGameStore = create<GameState & GameActions>()(
             );
             if (existing) existing.answer = q.answer;
           }
-        } else {
-          state.currentQuestion = null;
         }
 
-        // Sync elimination arrays
+        // Sync elimination arrays (always — data is additive)
         if (game.eliminated_p1) {
           state.players.player1.eliminatedCharacterIds = game.eliminated_p1;
         }
@@ -750,7 +747,7 @@ export const useGameStore = create<GameState & GameActions>()(
           state.players.player2.eliminatedCharacterIds = game.eliminated_p2;
         }
 
-        // Sync turn / active player
+        // Sync turn / active player from DB (always)
         if (game.active_player_num) {
           const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
           state.activePlayer = nextPlayer;
@@ -758,6 +755,15 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         if (game.turn_number) {
           state.turnNumber = game.turn_number;
+        }
+
+        // Sync phase from DB — only for the NON-ACTIVE player.
+        // The active player drives phases locally via auto-advance timers
+        // and writes to DB. The non-active player follows DB updates.
+        // This prevents race conditions where both players advance
+        // independently and late DB updates push phases backwards.
+        if (game.current_phase && !iAmActive) {
+          state.phase = game.current_phase as GamePhase;
         }
       }),
 
