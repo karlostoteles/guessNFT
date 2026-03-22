@@ -7,7 +7,7 @@
  * Renders as a small chip at the bottom of the screen so the 3D board is
  * fully visible while waiting. P1 (creator) sees a compact room code to copy.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOnlineRoomCode, useOnlinePlayerNum } from '@/core/store/selectors';
 
@@ -15,6 +15,13 @@ export function OnlineWaitingScreen() {
   const roomCode  = useOnlineRoomCode();
   const playerNum = useOnlinePlayerNum();
   const [copied, setCopied] = useState(false);
+  const [showCommitToast, setShowCommitToast] = useState(true);
+
+  // Auto-dismiss the commit toast after 3 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setShowCommitToast(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleCopy = () => {
     if (!roomCode) return;
@@ -147,6 +154,48 @@ export function OnlineWaitingScreen() {
           Share this code with your opponent · tap to copy
         </div>
       )}
+
+      {/* Commit confirmation toast */}
+      <AnimatePresence>
+        {showCommitToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            style={{
+              position: 'fixed',
+              top: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(15,14,23,0.95)',
+              border: '2px solid rgba(76,175,80,0.6)',
+              borderRadius: 12,
+              padding: '10px 20px',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 16px rgba(76,175,80,0.15)',
+              zIndex: 40,
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#4CAF50',
+            }}>
+              Character Locked &amp; Committed
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: 'rgba(255,255,254,0.4)',
+              marginTop: 2,
+            }}>
+              On-chain commitment submitting...
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

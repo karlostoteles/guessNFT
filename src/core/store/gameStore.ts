@@ -233,11 +233,19 @@ export const useGameStore = create<GameState & GameActions>()(
               state.cpuQuestion = null;
               state.phase = GamePhase.TURN_TRANSITION;
             } else if (state.mode === 'online') {
-              // Online strict turn-based: swap active player after each Q&A cycle
-              const next = getOpponent(state.activePlayer);
-              state.activePlayer = next;
-              state.boardRotation = next === 'player1' ? 0 : Math.PI;
-              state.turnNumber += 1;
+              // Online: only the QUESTIONER (player who asked) drives the turn swap.
+              // The answerer advances through visual phases but does NOT swap —
+              // they receive the new activePlayer/turnNumber via DB sync.
+              const iAmQuestioner =
+                (state.onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+                (state.onlinePlayerNum === 2 && state.activePlayer === 'player2');
+
+              if (iAmQuestioner) {
+                const next = getOpponent(state.activePlayer);
+                state.activePlayer = next;
+                state.boardRotation = next === 'player1' ? 0 : Math.PI;
+                state.turnNumber += 1;
+              }
               state.currentQuestion = null;
               state.phase = GamePhase.TURN_TRANSITION;
             } else {
@@ -255,11 +263,17 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
           case GamePhase.GUESS_WRONG: {
             if (state.mode === 'online') {
-              // Online strict turn-based: swap active player after wrong guess
-              const next = getOpponent(state.activePlayer);
-              state.activePlayer = next;
-              state.boardRotation = next === 'player1' ? 0 : Math.PI;
-              state.turnNumber += 1;
+              // Online: only the GUESSER drives the turn swap.
+              const iAmGuesser =
+                (state.onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+                (state.onlinePlayerNum === 2 && state.activePlayer === 'player2');
+
+              if (iAmGuesser) {
+                const next = getOpponent(state.activePlayer);
+                state.activePlayer = next;
+                state.boardRotation = next === 'player1' ? 0 : Math.PI;
+                state.turnNumber += 1;
+              }
               state.currentQuestion = null;
               state.guessedCharacterId = null;
               state.phase = GamePhase.TURN_TRANSITION;
@@ -743,6 +757,11 @@ export const useGameStore = create<GameState & GameActions>()(
           state.players.player2.eliminatedCharacterIds = game.eliminated_p2;
         }
 
+        // Sync phase from DB — only allow FORWARD transitions within a turn,
+        // OR any transition when the DB has a newer turn (new cycle resets phase order).
+        // IMPORTANT: check turn before mutating it, so the "newer turn" branch works.
+        const isNewerTurn = !!(game.turn_number && game.turn_number > state.turnNumber);
+
         // Sync turn / active player from DB — only if DB turn is >= local
         if (game.turn_number && game.turn_number >= state.turnNumber) {
           state.turnNumber = game.turn_number;
@@ -753,9 +772,7 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Sync phase from DB — only allow FORWARD transitions within a turn.
-        // This prevents late-arriving DB updates from pushing phases backwards
-        // (the root cause of "both players stuck" loops).
+        // Phase sync: forward-only within same turn, any direction on newer turn
         if (game.current_phase) {
           const PHASE_ORDER: Record<string, number> = {
             QUESTION_SELECT: 0,
@@ -771,11 +788,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const dbOrder = PHASE_ORDER[game.current_phase] ?? -1;
           const localOrder = PHASE_ORDER[state.phase] ?? -1;
 
-          // Accept DB phase if: newer turn (reset cycle) OR forward in same turn
-          if (
-            (game.turn_number && game.turn_number > state.turnNumber) ||
-            dbOrder > localOrder
-          ) {
+          if (isNewerTurn || dbOrder > localOrder) {
             state.phase = game.current_phase as GamePhase;
           }
         }

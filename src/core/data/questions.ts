@@ -150,9 +150,51 @@ export const NFT_QUESTIONS: Question[] = [
     matchFn: (c) => nftEyes(c).includes('schizo'),
   },
   {
+    id: 'nq_eyes_crying', zone: 'face', category: 'face', icon: '😢',
+    text: 'Does your character have crying eyes?',
+    traitKey: 'nft_eyes', traitValue: 'crying',
+    matchFn: (c) => nftEyes(c).includes('crying'),
+  },
+  {
+    id: 'nq_eyes_dead', zone: 'face', category: 'face', icon: '💀',
+    text: 'Does your character have dead eyes?',
+    traitKey: 'nft_eyes', traitValue: 'dead',
+    matchFn: (c) => nftEyes(c).includes('dead'),
+  },
+  {
+    id: 'nq_eyes_bloodshot', zone: 'face', category: 'face', icon: '🩸',
+    text: 'Does your character have bloodshot eyes?',
+    traitKey: 'nft_eyes', traitValue: 'blood_shot',
+    matchFn: (c) => nftEyes(c).includes('blood'),
+  },
+  {
+    id: 'nq_eyes_green', zone: 'face', category: 'face', icon: '💚',
+    text: 'Does your character have green-pilled or green eyes?',
+    traitKey: 'nft_eyes', traitValue: 'green',
+    matchFn: (c) => nftEyes(c).includes('green'),
+  },
+  {
+    id: 'nq_eyes_purple', zone: 'face', category: 'face', icon: '💜',
+    text: 'Does your character have purple eyes?',
+    traitKey: 'nft_eyes', traitValue: 'purple',
+    matchFn: (c) => nftEyes(c).includes('purple'),
+  },
+  {
+    id: 'nq_eyes_reptilian', zone: 'face', category: 'face', icon: '🐍',
+    text: 'Does your character have reptilian red eyes?',
+    traitKey: 'nft_eyes', traitValue: 'reptilian',
+    matchFn: (c) => nftEyes(c).includes('reptilian'),
+  },
+  {
+    id: 'nq_eyes_confusion', zone: 'face', category: 'face', icon: '😵',
+    text: 'Does your character have confusion eyes?',
+    traitKey: 'nft_eyes', traitValue: 'confusion',
+    matchFn: (c) => nftEyes(c).includes('confusion'),
+  },
+  {
     // Covers: Fire Devil, Stoned Red, Bionic, Ekubo, Whirlpool, Hazelnut — rare/weird eyes
     id: 'nq_eyes_special', zone: 'face', category: 'face', icon: '🤖',
-    text: 'Does your character have special or demonic eyes? (fire, stoned, bionic…)',
+    text: 'Does your character have special or demonic eyes? (fire, stoned, bionic...)',
     traitKey: 'nft_eyes', traitValue: 'special',
     matchFn: (c) => {
       const e = nftEyes(c);

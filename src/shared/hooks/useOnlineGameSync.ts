@@ -267,14 +267,21 @@ export function useOnlineGameSync(): Record<string, never> {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentQuestion?.questionId]);
 
-  // ─── Write elimination to DB after AUTO_ELIMINATING phase starts ────────
+  // ─── Write elimination to DB after AUTO_ELIMINATING (questioner only) ───
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase !== GamePhase.AUTO_ELIMINATING) return;
+
+    // Only the questioner writes eliminations — they're the one who applied them
+    const state = useGameStore.getState();
+    const iAmQuestioner =
+      (onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+      (onlinePlayerNum === 2 && state.activePlayer === 'player2');
+    if (!iAmQuestioner) return;
+
     if (turnNumber <= lastWrittenEliminationTurnRef.current) return;
     lastWrittenEliminationTurnRef.current = turnNumber;
 
-    const state = useGameStore.getState();
     updateGameState(onlineGameId, {
       current_phase: 'AUTO_ELIMINATING',
       eliminated_p1: state.players.player1.eliminatedCharacterIds,
@@ -284,14 +291,21 @@ export function useOnlineGameSync(): Record<string, never> {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum]);
 
-  // ─── Push turn swap to DB ───────────────────────────────────────────────
+  // ─── Push turn swap to DB (only from the player who drove the swap) ────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase === GamePhase.MENU || phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2 || phase === GamePhase.ONLINE_WAITING) return;
     if (turnNumber <= lastPushedTurnRef.current) return;
+
+    // Only the player who incremented turnNumber should push it.
+    // After swap, activePlayer is the OPPONENT of whoever asked/guessed.
+    // So the pusher's onlinePlayerNum should NOT match activePlayer (they just handed off).
+    const activePlayerNum: 1 | 2 = activePlayer === 'player1' ? 1 : 2;
+    const iDroveTheSwap = activePlayerNum !== onlinePlayerNum;
+    if (!iDroveTheSwap) return;
+
     lastPushedTurnRef.current = turnNumber;
 
-    const activePlayerNum: 1 | 2 = activePlayer === 'player1' ? 1 : 2;
     updateTurn(onlineGameId, activePlayerNum, turnNumber).catch((err) =>
       console.error('[sync] updateTurn failed', err)
     );
