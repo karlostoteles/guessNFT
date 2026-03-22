@@ -11,6 +11,18 @@ import {
 } from './starkzapService';
 import { fetchAllOwnedNFTs } from './nftService';
 
+/** Race a promise against a timeout. Rejects if timeout fires first. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const NFT_FETCH_TIMEOUT_MS = 8_000;
+
 /**
  * Hook for connecting/disconnecting wallet via starkzap.
  */
@@ -34,10 +46,14 @@ export function useWalletConnection() {
         state.setUsername(walletInfo.username);
       }
 
-      // Fetch NFTs
+      // Fetch NFTs — timeout after 8s so login isn't blocked by slow RPC
       state.setStatus('loading_nfts');
       try {
-        const nfts = await fetchAllOwnedNFTs(walletInfo.address);
+        const nfts = await withTimeout(
+          fetchAllOwnedNFTs(walletInfo.address),
+          NFT_FETCH_TIMEOUT_MS,
+          'NFT fetch',
+        );
         state.setOwnedNFTs(nfts);
         state.setStatus('ready');
       } catch (err) {
@@ -64,7 +80,11 @@ export function useWalletConnection() {
 
     state.setStatus('loading_nfts');
     try {
-      const nfts = await fetchAllOwnedNFTs(address);
+      const nfts = await withTimeout(
+        fetchAllOwnedNFTs(address),
+        NFT_FETCH_TIMEOUT_MS,
+        'NFT refresh',
+      );
       state.setOwnedNFTs(nfts);
     } catch (err) {
       console.warn('[wallet] NFT refresh failed:', err);
