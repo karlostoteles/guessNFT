@@ -124,12 +124,33 @@ export async function updateTurn(
     .update({
       active_player_num: activePlayerNum,
       turn_number: turnNumber,
+      current_phase: 'QUESTION_SELECT',
+      current_question: null,
+      current_answer: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', gameId);
 
   if (error) {
     console.error('[gameService] updateTurn failed:', error.message);
+  }
+}
+
+/**
+ * Generic game state update — used by the server-authoritative state machine
+ * to push phase, question, answer, and elimination state to the DB.
+ */
+export async function updateGameState(
+  gameId: string,
+  updates: Partial<SupabaseGame>
+): Promise<void> {
+  const { error } = await supabase
+    .from('games')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] updateGameState failed:', error.message);
   }
 }
 

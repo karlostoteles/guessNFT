@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { GamePhase, GameState, GameActions, PlayerId } from './types';
+import { GamePhase, GameState, GameActions, PlayerId, QuestionRecord } from './types';
 import { QUESTIONS } from '@/core/data/questions';
 import { CHARACTERS } from '@/core/data/characters';
 import type { Character } from '@/core/data/characters';
@@ -330,7 +330,25 @@ export const useGameStore = create<GameState & GameActions>()(
         const q = QUESTIONS.find((q) => q.id === questionId);
         if (!q) return;
 
-        // Local mode: auto-evaluate active player's question immediately
+        if (state.mode === 'online') {
+          // Online mode: do NOT auto-evaluate. Set answer=null, phase=ANSWER_PENDING.
+          // The sync hook writes this to DB, and the opponent's client evaluates.
+          const record = {
+            questionId,
+            questionText: q.text,
+            traitKey: q.traitKey,
+            traitValue: q.traitValue,
+            answer: null as boolean | null,
+            askedBy: state.activePlayer,
+            turnNumber: state.turnNumber,
+          };
+          state.currentQuestion = record;
+          state.questionHistory.push(record);
+          state.phase = GamePhase.ANSWER_PENDING;
+          return;
+        }
+
+        // Offline mode: auto-evaluate active player's question immediately
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
         const secretChar = state.characters.find((c) => c.id === secretId);
@@ -611,11 +629,10 @@ export const useGameStore = create<GameState & GameActions>()(
 
     advanceToGameStart: () =>
       set((state) => {
-        // Called by sync hook when both players have committed — start the game
+        // Called by sync hook when both players have committed — start the game.
+        // P1 ALWAYS goes first. Both clients agree on this.
         state.commitmentStatus = 'both';
-        // Simultaneous mode: active player is always the local user
-        state.activePlayer = state.onlinePlayerNum === 2 ? 'player2' : 'player1';
-        // Rotation is 0 for P1, PI for P2
+        state.activePlayer = 'player1';
         state.boardRotation = state.onlinePlayerNum === 2 ? Math.PI : 0;
         state.phase = GamePhase.QUESTION_SELECT;
       }),
@@ -684,33 +701,63 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       }),
 
-    syncOnlineTurn: (activePlayerNum, turnNumber) =>
+    syncOnlineStateFromDB: (game) =>
       set((state) => {
         if (state.mode !== 'online') return;
-        // Only advance turn if we're not already past this turn number
-        if (turnNumber <= state.turnNumber) return;
+        // Don't sync during setup phases
+        if (
+          state.phase === GamePhase.MENU ||
+          state.phase === GamePhase.SETUP_P1 ||
+          state.phase === GamePhase.SETUP_P2 ||
+          state.phase === GamePhase.ONLINE_WAITING
+        ) return;
 
-        const nextPlayer: PlayerId = activePlayerNum === 1 ? 'player1' : 'player2';
-        const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
+        // Sync phase from DB
+        if (game.current_phase) {
+          state.phase = game.current_phase as GamePhase;
+        }
 
-        state.turnNumber = turnNumber;
-        state.activePlayer = nextPlayer;
-        state.boardRotation = nextPlayer === 'player1' ? 0 : Math.PI;
+        // Sync question + answer
+        if (game.current_question) {
+          const q = game.current_question as unknown as QuestionRecord;
+          if (game.current_answer !== null && game.current_answer !== undefined) {
+            q.answer = game.current_answer;
+          }
+          state.currentQuestion = q;
 
-        // Clear current question so the question select screen is unblocked
-        state.currentQuestion = null;
-        state.guessedCharacterId = null;
+          // Add to history if not already there
+          const exists = state.questionHistory.some(
+            (h) => h.questionId === q.questionId && h.turnNumber === q.turnNumber
+          );
+          if (!exists) {
+            state.questionHistory.push({ ...q });
+          } else if (q.answer !== null) {
+            // Update answer in existing history entry
+            const existing = state.questionHistory.find(
+              (h) => h.questionId === q.questionId && h.turnNumber === q.turnNumber
+            );
+            if (existing) existing.answer = q.answer;
+          }
+        } else {
+          state.currentQuestion = null;
+        }
 
-        // Only transition to QUESTION_SELECT if we're currently stuck waiting
-        const waitingPhases = [
-          GamePhase.AUTO_ELIMINATING,
-          GamePhase.TURN_TRANSITION,
-          GamePhase.ANSWER_REVEALED,
-          GamePhase.ANSWER_PENDING,
-          GamePhase.GUESS_WRONG,
-        ];
-        if (waitingPhases.includes(state.phase)) {
-          state.phase = GamePhase.QUESTION_SELECT;
+        // Sync elimination arrays
+        if (game.eliminated_p1) {
+          state.players.player1.eliminatedCharacterIds = game.eliminated_p1;
+        }
+        if (game.eliminated_p2) {
+          state.players.player2.eliminatedCharacterIds = game.eliminated_p2;
+        }
+
+        // Sync turn / active player
+        if (game.active_player_num) {
+          const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
+          state.activePlayer = nextPlayer;
+          state.boardRotation = nextPlayer === 'player1' ? 0 : Math.PI;
+        }
+        if (game.turn_number) {
+          state.turnNumber = game.turn_number;
         }
       }),
 

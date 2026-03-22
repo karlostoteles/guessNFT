@@ -25,6 +25,12 @@ export interface SupabaseGame {
   winner_player_num: number | null;
   turn_number: number;
   characters: any[] | null;
+  // Server-authoritative state machine columns
+  current_phase: string | null;
+  current_question: Record<string, any> | null;
+  current_answer: boolean | null;
+  eliminated_p1: string[] | null;
+  eliminated_p2: string[] | null;
   created_at: string;
   updated_at: string;
 }
