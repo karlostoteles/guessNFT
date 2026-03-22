@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Card } from '../common/Card';
-import { useCurrentQuestion, useCpuQuestion, useGameMode, useGameActions, useActivePlayer, useOnlinePlayerNum } from '@/core/store/selectors';
+import { useCurrentQuestion, useCpuQuestion, useGameMode, useGameActions } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 
 export function AnswerRevealed() {
@@ -10,15 +10,6 @@ export function AnswerRevealed() {
   const cpuQuestion = useCpuQuestion();
   const mode = useGameMode();
   const { advancePhase } = useGameActions();
-  const activePlayer = useActivePlayer();
-  const onlinePlayerNum = useOnlinePlayerNum();
-
-  // In online mode, only the active player (who asked the question) drives
-  // phase transitions. The non-active player follows via DB sync.
-  const isDriver = mode !== 'online' || (
-    (activePlayer === 'player1' && onlinePlayerNum === 1) ||
-    (activePlayer === 'player2' && onlinePlayerNum === 2)
-  );
 
   useEffect(() => {
     if (!question && !cpuQuestion) return;
@@ -33,10 +24,9 @@ export function AnswerRevealed() {
   }, []);
 
   useEffect(() => {
-    if (!isDriver) return; // Non-active player waits for DB sync
     const timer = setTimeout(advancePhase, 2000);
     return () => clearTimeout(timer);
-  }, [advancePhase, isDriver]);
+  }, [advancePhase]);
 
   if (!question && !cpuQuestion) return null;
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { usePhase, useActivePlayer, useGameActions, useGameMode, useTurnNumber, useEliminatedIds, useGameCharacters, useOnlinePlayerNum } from '@/core/store/selectors';
+import { usePhase, useActivePlayer, useGameActions, useGameMode, useTurnNumber, useEliminatedIds, useGameCharacters } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 
@@ -12,7 +12,6 @@ export function PhaseTransition() {
   const { advancePhase } = useGameActions();
   const characters = useGameCharacters();
   const eliminatedIds = useEliminatedIds(activePlayer);
-  const onlinePlayerNum = useOnlinePlayerNum();
 
   // Auto-advance ALL transitions
   const isSinglePlayer = mode === 'free' || mode === 'nft-free';
@@ -21,19 +20,11 @@ export function PhaseTransition() {
     (isSinglePlayer && (phase === GamePhase.HANDOFF_START ||
       phase === GamePhase.HANDOFF_TO_OPPONENT));
 
-  // In online mode, only the NEW active player (whose turn it now is) drives
-  // the TURN_TRANSITION advance. This prevents both players from racing.
-  const isOnlineDriver = mode !== 'online' || (
-    (activePlayer === 'player1' && onlinePlayerNum === 1) ||
-    (activePlayer === 'player2' && onlinePlayerNum === 2)
-  );
-
   useEffect(() => {
     if (!isAutoTransition) return;
-    if (!isOnlineDriver) return; // Non-active player waits for DB sync
     const timer = setTimeout(advancePhase, 1500);
     return () => clearTimeout(timer);
-  }, [isAutoTransition, isOnlineDriver, advancePhase]);
+  }, [isAutoTransition, advancePhase]);
 
   const isCPU = mode === 'free' && activePlayer === 'player2';
 

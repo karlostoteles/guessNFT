@@ -712,10 +712,6 @@ export const useGameStore = create<GameState & GameActions>()(
           state.phase === GamePhase.ONLINE_WAITING
         ) return;
 
-        // Am I the active player (the one driving phase transitions)?
-        const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
-        const iAmActive = state.activePlayer === myPlayerKey;
-
         // Sync question + answer (always — data doesn't conflict)
         if (game.current_question) {
           const q = game.current_question as unknown as QuestionRecord;
@@ -747,23 +743,41 @@ export const useGameStore = create<GameState & GameActions>()(
           state.players.player2.eliminatedCharacterIds = game.eliminated_p2;
         }
 
-        // Sync turn / active player from DB (always)
-        if (game.active_player_num) {
-          const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
-          state.activePlayer = nextPlayer;
-          state.boardRotation = nextPlayer === 'player1' ? 0 : Math.PI;
-        }
-        if (game.turn_number) {
+        // Sync turn / active player from DB — only if DB turn is >= local
+        if (game.turn_number && game.turn_number >= state.turnNumber) {
           state.turnNumber = game.turn_number;
+          if (game.active_player_num) {
+            const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
+            state.activePlayer = nextPlayer;
+            state.boardRotation = nextPlayer === 'player1' ? 0 : Math.PI;
+          }
         }
 
-        // Sync phase from DB — only for the NON-ACTIVE player.
-        // The active player drives phases locally via auto-advance timers
-        // and writes to DB. The non-active player follows DB updates.
-        // This prevents race conditions where both players advance
-        // independently and late DB updates push phases backwards.
-        if (game.current_phase && !iAmActive) {
-          state.phase = game.current_phase as GamePhase;
+        // Sync phase from DB — only allow FORWARD transitions within a turn.
+        // This prevents late-arriving DB updates from pushing phases backwards
+        // (the root cause of "both players stuck" loops).
+        if (game.current_phase) {
+          const PHASE_ORDER: Record<string, number> = {
+            QUESTION_SELECT: 0,
+            ANSWER_PENDING: 1,
+            ANSWER_REVEALED: 2,
+            AUTO_ELIMINATING: 3,
+            TURN_TRANSITION: 4,
+            GUESS_SELECT: 5,
+            GUESS_WRONG: 6,
+            GUESS_RESULT: 7,
+            GAME_OVER: 8,
+          };
+          const dbOrder = PHASE_ORDER[game.current_phase] ?? -1;
+          const localOrder = PHASE_ORDER[state.phase] ?? -1;
+
+          // Accept DB phase if: newer turn (reset cycle) OR forward in same turn
+          if (
+            (game.turn_number && game.turn_number > state.turnNumber) ||
+            dbOrder > localOrder
+          ) {
+            state.phase = game.current_phase as GamePhase;
+          }
         }
       }),
 

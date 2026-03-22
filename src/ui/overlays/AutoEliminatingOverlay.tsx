@@ -21,13 +21,6 @@ export function AutoEliminatingOverlay() {
   const { advancePhase } = useGameActions();
   const [progress, setProgress] = useState(0);
 
-  // In online mode, only the active player (who asked the question) drives
-  // phase transitions. The non-active player follows via DB sync.
-  const isDriver = mode !== 'online' || (
-    (activePlayer === 'player1' && onlinePlayerNum === 1) ||
-    (activePlayer === 'player2' && onlinePlayerNum === 2)
-  );
-
   const remaining = characters.length - eliminatedIds.length;
 
   useEffect(() => { sfx.tileFlip(); }, []);
@@ -38,9 +31,9 @@ export function AutoEliminatingOverlay() {
       const elapsed = Date.now() - start;
       setProgress(Math.min(elapsed / AUTO_ADVANCE_MS, 1));
     }, 30);
-    const timer = isDriver ? setTimeout(advancePhase, AUTO_ADVANCE_MS) : undefined;
-    return () => { clearInterval(interval); if (timer) clearTimeout(timer); };
-  }, [advancePhase, isDriver]);
+    const timer = setTimeout(advancePhase, AUTO_ADVANCE_MS);
+    return () => { clearInterval(interval); clearTimeout(timer); };
+  }, [advancePhase]);
 
   // Color for remaining tiles (blue→green)
   const ratio = characters.length > 0 ? remaining / characters.length : 1;
