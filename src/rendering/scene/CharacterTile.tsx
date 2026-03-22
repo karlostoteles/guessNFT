@@ -17,6 +17,8 @@ interface CharacterTileProps {
   tileH: number;
   pivotRef: (el: THREE.Group | null) => void;
   isHovered?: boolean;
+  /** When 2, tile faces the opposite camera (P2 perspective). */
+  onlinePlayerNum?: 1 | 2 | null;
 }
 
 function lerp(a: number, b: number, t: number) {
@@ -116,7 +118,7 @@ const CardBack = memo(({ tileW, tileH, depth }: {
 });
 
 export const CharacterTile = memo(({
-  characterId, characterName, texture, tileW, tileH, pivotRef, isHovered = false,
+  characterId, characterName, texture, tileW, tileH, pivotRef, isHovered = false, onlinePlayerNum,
 }: CharacterTileProps) => {
   const phase = usePhase();
   const { toggleElimination } = useGameActions();
@@ -158,7 +160,7 @@ export const CharacterTile = memo(({
   }, []);
 
   return (
-    <group ref={pivotRef}>
+    <group ref={pivotRef} rotation={onlinePlayerNum === 2 ? [0, Math.PI, 0] : [0, 0, 0]}>
       <group position={[0, tileH / 2, 0]}>
         <CardBorder tileW={tileW} tileH={tileH} isFlat={isFlat} depth={DEPTH} />
         {isFlat ? (

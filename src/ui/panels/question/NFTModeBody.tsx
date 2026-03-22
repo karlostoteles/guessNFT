@@ -32,17 +32,30 @@ export function NFTModeBody({
   askedIds, remaining, questionImpact, onAsk,
 }: NFTModeBodyProps) {
 
-  // Info-gain filtered question IDs
+  // Trait keys that have already been asked — hide other questions with the same traitKey
+  const askedTraitKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const q of NFT_QUESTIONS) {
+      if (askedIds.has(q.id)) keys.add(q.traitKey);
+    }
+    return keys;
+  }, [askedIds]);
+
+  // Info-gain filtered question IDs, excluding questions in already-asked trait categories
   const usefulIds = useMemo(() => {
     const ids = new Set<string>();
     for (const q of NFT_QUESTIONS) {
+      // Already asked — keep it visible (greyed out)
       if (askedIds.has(q.id)) { ids.add(q.id); continue; }
+      // Same traitKey already asked — hide (no point asking another variant)
+      if (askedTraitKeys.has(q.traitKey)) continue;
+      // Only show if it provides info gain
       const yesCount = remaining.filter((c) => evaluateQuestion(q, c)).length;
       if (yesCount > 0 && yesCount < remaining.length) ids.add(q.id);
     }
     if (ids.size === askedIds.size) NFT_QUESTIONS.forEach((q) => ids.add(q.id));
     return ids;
-  }, [remaining, askedIds]);
+  }, [remaining, askedIds, askedTraitKeys]);
 
   // Group questions by data-driven category
   const categoryQuestions = useMemo(() => {

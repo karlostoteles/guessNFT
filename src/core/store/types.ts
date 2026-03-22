@@ -82,14 +82,25 @@ export interface GameActions {
   cancelGuess: () => void;
   resetGame: () => void;
   goBackToSetupP1: () => void;
-  // Online-specific actions (called by useOnlineGameSync hook)
+  // Online-specific actions
+  goToOnlineWaiting: () => void;
   setOnlineGame: (gameId: string, roomCode: string, playerNum: 1 | 2, playerAddress: string) => void;
   recoverOnlineGame: (characters: Character[], currentAddress?: string) => void;
+  restoreFromEvents: (
+    turnNumber: number,
+    questionHistory: QuestionRecord[],
+    myEliminatedIds: string[],
+    opponentEliminatedIds: string[],
+    mySecretCharacterId: string | null,
+  ) => void;
   advanceToGameStart: () => void;
   receiveOpponentQuestion: (questionId: string, answer: boolean) => void;
   applyOpponentAnswer: (answer: boolean) => void;
   receiveOpponentGuess: (characterId: string, isCorrect: boolean, winnerPlayerNum: 1 | 2 | null) => void;
+  receiveOpponentElimination: (eliminatedIds: string[]) => void;
   applyGuessResult: (isCorrect: boolean, winner: PlayerId | null) => void;
+  /** Master sync: snap local state from the authoritative DB row. */
+  syncOnlineStateFromDB: (game: import('@/services/supabase/types').SupabaseGame) => void;
   /** Enrich stub NFT characters with real trait attributes from fetchTraitsBatch(). */
   enrichNFTCharacters: (traitMap: Map<string, NFTAttribute[]>) => void;
   // Settings toggle

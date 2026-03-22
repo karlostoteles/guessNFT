@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { GamePhase, GameState, GameActions, PlayerId } from './types';
+import { GamePhase, GameState, GameActions, PlayerId, QuestionRecord } from './types';
 import { QUESTIONS } from '@/core/data/questions';
 import { CHARACTERS } from '@/core/data/characters';
 import type { Character } from '@/core/data/characters';
@@ -85,6 +85,13 @@ export const useGameStore = create<GameState & GameActions>()(
         state.phase = GamePhase.SETUP_P1;
       }),
 
+    // Advance to ONLINE_WAITING after on-chain commit succeeds (called from CharacterSelectScreen)
+    goToOnlineWaiting: () =>
+      set((state) => {
+        state.commitmentStatus = 'partial';
+        state.phase = GamePhase.ONLINE_WAITING;
+      }),
+
     selectSecretCharacter: (player, characterId) =>
       set((state) => {
         state.players[player].secretCharacterId = characterId;
@@ -94,9 +101,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         if (state.mode === 'online') {
-          // Online mode: after selecting, wait for opponent to also commit
-          state.commitmentStatus = state.commitmentStatus === 'partial' ? 'both' : 'partial';
-          state.phase = GamePhase.ONLINE_WAITING;
+          // Online mode: DON'T transition yet. CharacterSelectScreen handles
+          // the on-chain commit, waits for confirmation, then calls goToOnlineWaiting().
           return;
         }
 
@@ -131,8 +137,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         if (state.mode === 'online') {
-          state.commitmentStatus = state.commitmentStatus === 'partial' ? 'both' : 'partial';
-          state.phase = GamePhase.ONLINE_WAITING;
+          // Online mode: DON'T transition yet. CharacterSelectScreen handles
+          // the on-chain commit, waits for confirmation, then calls goToOnlineWaiting().
           return;
         }
 
@@ -174,8 +180,9 @@ export const useGameStore = create<GameState & GameActions>()(
               const eliminated = state.players[state.activePlayer].eliminatedCharacterIds;
               const fullQuestion = QUESTIONS.find((qn) => qn.id === q.questionId);
               if (fullQuestion) {
+                const elimSet = new Set(eliminated);
                 for (const char of state.characters) {
-                  if (eliminated.includes(char.id)) continue;
+                  if (elimSet.has(char.id)) continue;
                   const matchesQuestion = evaluateQuestion(fullQuestion, char);
                   const shouldEliminate = q.answer ? !matchesQuestion : matchesQuestion;
                   if (shouldEliminate) {
@@ -190,8 +197,9 @@ export const useGameStore = create<GameState & GameActions>()(
               const cpuEliminated = state.players.player2.eliminatedCharacterIds;
               const fullCpuQ = QUESTIONS.find((qn) => qn.id === cpuQ.questionId);
               if (fullCpuQ) {
+                const cpuElimSet = new Set(cpuEliminated);
                 for (const char of state.characters) {
-                  if (cpuEliminated.includes(char.id)) continue;
+                  if (cpuElimSet.has(char.id)) continue;
                   const matchesQuestion = evaluateQuestion(fullCpuQ, char);
                   const shouldEliminate = cpuQ.answer ? !matchesQuestion : matchesQuestion;
                   if (shouldEliminate) {
@@ -201,8 +209,9 @@ export const useGameStore = create<GameState & GameActions>()(
               }
 
               // CPU auto-win: if down to 1 remaining, auto-guess
+              const cpuElimSetFinal = new Set(cpuEliminated);
               const cpuRemaining = state.characters.filter(
-                (c) => !cpuEliminated.includes(c.id)
+                (c) => !cpuElimSetFinal.has(c.id)
               );
               if (cpuRemaining.length === 1) {
                 state.guessedCharacterId = cpuRemaining[0].id;
@@ -221,11 +230,27 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
           }
           case GamePhase.AUTO_ELIMINATING: {
-            if (state.mode === 'free' || state.mode === 'nft-free' || state.mode === 'online') {
-              // Simultaneous mode: P1 (or local online player) always stays active, no player switching
+            if (state.mode === 'free' || state.mode === 'nft-free') {
+              // Simultaneous mode: P1 always stays active, no player switching
               state.turnNumber += 1;
               state.currentQuestion = null;
               state.cpuQuestion = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+            } else if (state.mode === 'online') {
+              // Online: only the QUESTIONER (player who asked) drives the turn swap.
+              // The answerer advances through visual phases but does NOT swap —
+              // they receive the new activePlayer/turnNumber via DB sync.
+              const iAmQuestioner =
+                (state.onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+                (state.onlinePlayerNum === 2 && state.activePlayer === 'player2');
+
+              if (iAmQuestioner) {
+                const next = getOpponent(state.activePlayer);
+                state.activePlayer = next;
+                state.boardRotation = next === 'player1' ? 0 : Math.PI;
+                state.turnNumber += 1;
+              }
+              state.currentQuestion = null;
               state.phase = GamePhase.TURN_TRANSITION;
             } else {
               const next = getOpponent(state.activePlayer);
@@ -241,17 +266,36 @@ export const useGameStore = create<GameState & GameActions>()(
             state.phase = GamePhase.QUESTION_SELECT;
             break;
           case GamePhase.GUESS_WRONG: {
-            if (state.mode === 'free' || state.mode === 'nft-free' || state.mode === 'online') {
+            if (state.mode === 'online') {
+              // Online: only the GUESSER drives the turn swap.
+              const iAmGuesser =
+                (state.onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+                (state.onlinePlayerNum === 2 && state.activePlayer === 'player2');
+
+              if (iAmGuesser) {
+                const next = getOpponent(state.activePlayer);
+                state.activePlayer = next;
+                state.boardRotation = next === 'player1' ? 0 : Math.PI;
+                state.turnNumber += 1;
+              }
+              state.currentQuestion = null;
+              state.guessedCharacterId = null;
+              state.phase = GamePhase.TURN_TRANSITION;
+              break;
+            }
+
+            if (state.mode === 'free' || state.mode === 'nft-free') {
               // Simultaneous mode: local player stays active, no player switching
               state.turnNumber += 1;
               state.currentQuestion = null;
               state.cpuQuestion = null;
               state.guessedCharacterId = null;
 
-              if (state.mode === 'free' || state.mode === 'nft-free') {
+              {
                 // Opponent (CPU) gets a free question because player risked it and failed!
                 const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-                const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+                const cpuElimSet = new Set(cpuEliminated);
+                const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
                 const cpuAskedIds = new Set(
                   state.questionHistory
                     .filter((r) => r.askedBy === 'player2')
@@ -281,8 +325,6 @@ export const useGameStore = create<GameState & GameActions>()(
                 } else {
                   state.phase = GamePhase.TURN_TRANSITION;
                 }
-              } else {
-                state.phase = GamePhase.TURN_TRANSITION;
               }
             } else {
               const next = getOpponent(state.activePlayer);
@@ -306,7 +348,25 @@ export const useGameStore = create<GameState & GameActions>()(
         const q = QUESTIONS.find((q) => q.id === questionId);
         if (!q) return;
 
-        // Local mode: auto-evaluate active player's question immediately
+        if (state.mode === 'online') {
+          // Online mode: do NOT auto-evaluate. Set answer=null, phase=ANSWER_PENDING.
+          // The sync hook writes this to DB, and the opponent's client evaluates.
+          const record = {
+            questionId,
+            questionText: q.text,
+            traitKey: q.traitKey,
+            traitValue: q.traitValue,
+            answer: null as boolean | null,
+            askedBy: state.activePlayer,
+            turnNumber: state.turnNumber,
+          };
+          state.currentQuestion = record;
+          state.questionHistory.push(record);
+          state.phase = GamePhase.ANSWER_PENDING;
+          return;
+        }
+
+        // Offline mode: auto-evaluate active player's question immediately
         const opponent = getOpponent(state.activePlayer);
         const secretId = state.players[opponent].secretCharacterId;
         const secretChar = state.characters.find((c) => c.id === secretId);
@@ -328,7 +388,8 @@ export const useGameStore = create<GameState & GameActions>()(
         // Free/nft-free mode: CPU simultaneously picks and answers its own question
         if (state.mode === 'free' || state.mode === 'nft-free') {
           const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          const cpuElimSet = new Set(cpuEliminated);
+          const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
           const cpuAskedIds = new Set(
             state.questionHistory
               .filter((r) => r.askedBy === 'player2')
@@ -393,7 +454,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
     cancelGuess: () =>
       set((state) => {
-        if (state.currentQuestion && state.mode !== 'free' && state.mode !== 'nft-free') {
+        if (state.mode === 'online') {
+          // Online mode: cancelling a guess just returns to question select.
+          // Never swap activePlayer or increment turn here — that would
+          // desynchronize from the authoritative DB turn state.
+          state.guessedCharacterId = null;
+          state.phase = GamePhase.QUESTION_SELECT;
+        } else if (state.currentQuestion && state.mode !== 'free' && state.mode !== 'nft-free') {
           // Non-free modes: cancelling after asking ends the turn
           const next = getOpponent(state.activePlayer);
           state.activePlayer = next;
@@ -414,18 +481,18 @@ export const useGameStore = create<GameState & GameActions>()(
         state.guessedCharacterId = characterId;
 
         if (state.mode === 'online') {
-          // In true simultaneous online mode, we instantly check against opponent's locally-known secret.
-          // Note: The sync hook already verifies Game Over conditions. 
+          // Online: one guess per game. Wrong guess = you lose.
           const opponent = state.activePlayer === 'player1' ? 'player2' : 'player1';
           const opponentSecretId = state.players[opponent].secretCharacterId;
           const isCorrect = characterId === opponentSecretId;
 
           if (isCorrect) {
             state.winner = state.activePlayer;
-            state.phase = GamePhase.GUESS_RESULT;
           } else {
-            state.phase = GamePhase.GUESS_WRONG;
+            // Wrong guess → guesser loses, opponent wins
+            state.winner = opponent;
           }
+          state.phase = GamePhase.GUESS_RESULT;
           return;
         }
 
@@ -437,7 +504,8 @@ export const useGameStore = create<GameState & GameActions>()(
         if (state.mode === 'free' || state.mode === 'nft-free') {
           // Check if CPU simultaneously wants to risk it this round
           const cpuEliminated = state.players.player2.eliminatedCharacterIds;
-          const cpuRemaining = state.characters.filter((c) => !cpuEliminated.includes(c.id));
+          const cpuElimSet = new Set(cpuEliminated);
+          const cpuRemaining = state.characters.filter((c) => !cpuElimSet.has(c.id));
           let cpuRiskTarget: string | null = null;
           if (cpuRemaining.length === 1) {
             cpuRiskTarget = cpuRemaining[0].id;
@@ -555,13 +623,34 @@ export const useGameStore = create<GameState & GameActions>()(
         }));
       }),
 
+    restoreFromEvents: (turnNumber, questionHistory, myEliminatedIds, opponentEliminatedIds, mySecretCharacterId) =>
+      set((state) => {
+        const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
+        const opponentKey: PlayerId = state.onlinePlayerNum === 1 ? 'player2' : 'player1';
+
+        state.turnNumber = turnNumber;
+        state.questionHistory = questionHistory;
+        state.players[myPlayerKey].eliminatedCharacterIds = myEliminatedIds;
+        state.players[opponentKey].eliminatedCharacterIds = opponentEliminatedIds;
+
+        // Restore secret character from localStorage commitment if available
+        if (mySecretCharacterId) {
+          state.players[myPlayerKey].secretCharacterId = mySecretCharacterId;
+        }
+
+        state.commitmentStatus = 'both';
+        state.activePlayer = myPlayerKey;
+        state.boardRotation = state.onlinePlayerNum === 2 ? Math.PI : 0;
+        state.currentQuestion = null;
+        state.phase = GamePhase.QUESTION_SELECT;
+      }),
+
     advanceToGameStart: () =>
       set((state) => {
-        // Called by sync hook when both players have committed — start the game
+        // Called by sync hook when both players have committed — start the game.
+        // P1 ALWAYS goes first. Both clients agree on this.
         state.commitmentStatus = 'both';
-        // Simultaneous mode: active player is always the local user
-        state.activePlayer = state.onlinePlayerNum === 2 ? 'player2' : 'player1';
-        // Rotation is 0 for P1, PI for P2
+        state.activePlayer = 'player1';
         state.boardRotation = state.onlinePlayerNum === 2 ? Math.PI : 0;
         state.phase = GamePhase.QUESTION_SELECT;
       }),
@@ -595,13 +684,31 @@ export const useGameStore = create<GameState & GameActions>()(
 
     receiveOpponentGuess: (characterId, isCorrect, winnerPlayerNum) =>
       set((state) => {
+        // Online: one guess per game. Right or wrong, game ends.
         state.guessedCharacterId = characterId;
         if (isCorrect && winnerPlayerNum !== null) {
-          // If opponent guessed right, game over.
           state.winner = winnerPlayerNum === 1 ? 'player1' : 'player2';
-          state.phase = GamePhase.GUESS_RESULT;
         } else {
-          // Opponent guessed wrong — ignore. It doesn't affect our local simultaneous turn.
+          // Opponent guessed wrong → I win
+          const myPlayerKey: PlayerId = state.onlinePlayerNum === 1 ? 'player1' : 'player2';
+          state.winner = myPlayerKey;
+        }
+        state.phase = GamePhase.GUESS_RESULT;
+      }),
+
+    receiveOpponentElimination: (eliminatedIds) =>
+      set((state) => {
+        // Opponent broadcasts their eliminatedIds — merge into their player slot
+        // In online mode, opponent is derived from onlinePlayerNum, not activePlayer
+        const opponent: PlayerId = state.onlinePlayerNum
+          ? (state.onlinePlayerNum === 1 ? 'player2' : 'player1')
+          : (state.activePlayer === 'player1' ? 'player2' : 'player1');
+        const current = state.players[opponent].eliminatedCharacterIds;
+        const currentSet = new Set(current);
+        for (const id of eliminatedIds) {
+          if (!currentSet.has(id)) {
+            current.push(id);
+          }
         }
       }),
 
@@ -612,6 +719,85 @@ export const useGameStore = create<GameState & GameActions>()(
           state.phase = GamePhase.GUESS_RESULT;
         } else {
           state.phase = GamePhase.GUESS_WRONG;
+        }
+      }),
+
+    syncOnlineStateFromDB: (game) =>
+      set((state) => {
+        if (state.mode !== 'online') return;
+        // Don't sync during setup phases
+        if (
+          state.phase === GamePhase.MENU ||
+          state.phase === GamePhase.SETUP_P1 ||
+          state.phase === GamePhase.SETUP_P2 ||
+          state.phase === GamePhase.ONLINE_WAITING
+        ) return;
+
+        // Sync question + answer (always — data doesn't conflict)
+        if (game.current_question) {
+          const q = game.current_question as unknown as QuestionRecord;
+          if (game.current_answer !== null && game.current_answer !== undefined) {
+            q.answer = game.current_answer;
+          }
+          state.currentQuestion = q;
+
+          // Add to history if not already there
+          const exists = state.questionHistory.some(
+            (h) => h.questionId === q.questionId && h.turnNumber === q.turnNumber
+          );
+          if (!exists) {
+            state.questionHistory.push({ ...q });
+          } else if (q.answer !== null) {
+            // Update answer in existing history entry
+            const existing = state.questionHistory.find(
+              (h) => h.questionId === q.questionId && h.turnNumber === q.turnNumber
+            );
+            if (existing) existing.answer = q.answer;
+          }
+        }
+
+        // Sync elimination arrays (always — data is additive)
+        if (game.eliminated_p1) {
+          state.players.player1.eliminatedCharacterIds = game.eliminated_p1;
+        }
+        if (game.eliminated_p2) {
+          state.players.player2.eliminatedCharacterIds = game.eliminated_p2;
+        }
+
+        // Sync phase from DB — only allow FORWARD transitions within a turn,
+        // OR any transition when the DB has a newer turn (new cycle resets phase order).
+        // IMPORTANT: check turn before mutating it, so the "newer turn" branch works.
+        const isNewerTurn = !!(game.turn_number && game.turn_number > state.turnNumber);
+
+        // Sync turn / active player from DB — only if DB turn is >= local
+        if (game.turn_number && game.turn_number >= state.turnNumber) {
+          state.turnNumber = game.turn_number;
+          if (game.active_player_num) {
+            const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
+            state.activePlayer = nextPlayer;
+            state.boardRotation = nextPlayer === 'player1' ? 0 : Math.PI;
+          }
+        }
+
+        // Phase sync: forward-only within same turn, any direction on newer turn
+        if (game.current_phase) {
+          const PHASE_ORDER: Record<string, number> = {
+            QUESTION_SELECT: 0,
+            ANSWER_PENDING: 1,
+            ANSWER_REVEALED: 2,
+            AUTO_ELIMINATING: 3,
+            TURN_TRANSITION: 4,
+            GUESS_SELECT: 5,
+            GUESS_WRONG: 6,
+            GUESS_RESULT: 7,
+            GAME_OVER: 8,
+          };
+          const dbOrder = PHASE_ORDER[game.current_phase] ?? -1;
+          const localOrder = PHASE_ORDER[state.phase] ?? -1;
+
+          if (isNewerTurn || dbOrder > localOrder) {
+            state.phase = game.current_phase as GamePhase;
+          }
         }
       }),
 

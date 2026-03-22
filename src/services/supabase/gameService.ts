@@ -46,6 +46,7 @@ export async function joinGame(
     throw new Error('You created this game — share the code with a friend!');
   }
 
+  // Guard: only update if still 'waiting' — prevents two simultaneous joins
   const { data, error } = await supabase
     .from('games')
     .update({
@@ -54,6 +55,7 @@ export async function joinGame(
       updated_at: new Date().toISOString(),
     })
     .eq('id', existing.id)
+    .eq('status', 'waiting')
     .select()
     .single();
 
@@ -67,8 +69,11 @@ export async function sendEvent(
   playerNum: 1 | 2,
   playerAddress: string,
   turnNumber: number,
-  payload: Record<string, any> = {}
+  payload: Record<string, any> = {},
+  idempotencyKey?: string
 ): Promise<void> {
+  const key = idempotencyKey ?? crypto.randomUUID();
+
   const { error } = await supabase.from('game_events').insert({
     game_id: gameId,
     event_type: eventType,
@@ -76,9 +81,13 @@ export async function sendEvent(
     player_address: playerAddress,
     turn_number: turnNumber,
     payload,
+    idempotency_key: key,
   });
 
-  if (error) throw new Error(`Failed to send event ${eventType}: ${error.message}`);
+  // Unique constraint on idempotency_key → duplicate is safe to ignore
+  if (error && !error.message.includes('duplicate') && !error.code?.includes('23505')) {
+    throw new Error(`Failed to send event ${eventType}: ${error.message}`);
+  }
 }
 
 export async function submitCommitment(
@@ -90,27 +99,36 @@ export async function submitCommitment(
 ): Promise<void> {
   const field = playerNum === 1 ? 'player1_commitment' : 'player2_commitment';
 
-  await supabase
+  const { error } = await supabase
     .from('games')
     .update({ [field]: commitment, updated_at: new Date().toISOString() })
     .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] submitCommitment failed:', error.message);
+  }
 
   await sendEvent(gameId, 'CHARACTER_COMMITTED', playerNum, playerAddress, turnNumber, {
     commitment,
   });
 
-  // Check if both committed — if so, transition to in_progress
+  // Check if both commitments are now set → transition to 'in_progress'
   const { data: game } = await supabase
     .from('games')
-    .select('player1_commitment, player2_commitment')
+    .select('player1_commitment, player2_commitment, status')
     .eq('id', gameId)
     .single();
 
-  if (game?.player1_commitment && game?.player2_commitment) {
-    await supabase
+  if (game && game.player1_commitment && game.player2_commitment && game.status === 'ready') {
+    const { error: statusErr } = await supabase
       .from('games')
       .update({ status: 'in_progress', updated_at: new Date().toISOString() })
-      .eq('id', gameId);
+      .eq('id', gameId)
+      .eq('status', 'ready');
+
+    if (statusErr) {
+      console.error('[gameService] Failed to transition to in_progress:', statusErr.message);
+    }
   }
 }
 
@@ -119,28 +137,59 @@ export async function updateTurn(
   activePlayerNum: 1 | 2,
   turnNumber: number
 ): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('games')
     .update({
       active_player_num: activePlayerNum,
       turn_number: turnNumber,
+      current_phase: 'QUESTION_SELECT',
+      current_question: null,
+      current_answer: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] updateTurn failed:', error.message);
+  }
+}
+
+/**
+ * Generic game state update — used by the server-authoritative state machine
+ * to push phase, question, answer, and elimination state to the DB.
+ */
+export async function updateGameState(
+  gameId: string,
+  updates: Partial<SupabaseGame>
+): Promise<void> {
+  const { error } = await supabase
+    .from('games')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', gameId);
+
+  if (error) {
+    console.error('[gameService] updateGameState failed:', error.message);
+  }
 }
 
 export async function finishGame(
   gameId: string,
   winnerPlayerNum: 1 | 2
 ): Promise<void> {
-  await supabase
+  // Guard: only finish if still in_progress — prevents both players racing
+  const { error } = await supabase
     .from('games')
     .update({
       status: 'finished',
       winner_player_num: winnerPlayerNum,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', gameId);
+    .eq('id', gameId)
+    .eq('status', 'in_progress');
+
+  if (error) {
+    console.error('[gameService] finishGame failed:', error.message);
+  }
 }
 
 export async function revealCharacter(

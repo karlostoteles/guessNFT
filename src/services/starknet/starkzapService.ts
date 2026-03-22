@@ -36,13 +36,10 @@ function getSDK(): StarkZap {
 export async function connectWallet(policies?: Array<{ target: string; method: string }>): Promise<ConnectedWalletInfo> {
   const starkzap = getSDK();
 
-  // Default policies for game contract
+  // Default policies for CommitReveal contract
   const defaultPolicies = policies || [
-    { target: GAME_CONTRACT, method: 'create_game' },
-    { target: GAME_CONTRACT, method: 'commit_character' },
-    { target: GAME_CONTRACT, method: 'reveal_character' },
-    { target: GAME_CONTRACT, method: 'deposit_wager' },
-    { target: GAME_CONTRACT, method: 'opponent_won' },
+    { target: GAME_CONTRACT, method: 'commit' },
+    { target: GAME_CONTRACT, method: 'reveal' },
   ];
 
   wallet = await starkzap.connectCartridge({
@@ -99,38 +96,14 @@ export function getWalletAddress(): string | null {
 // ============================================================
 
 export interface GameContractCalls {
-  /**
-   * Create a new game on-chain.
-   */
-  createGame: (gameId: string, player2Address: string) => Promise<string>;
+  /** Commit character choice: pedersen(char_id, salt) */
+  commit: (gameId: string, commitment: string) => Promise<string>;
 
-  /**
-   * Commit a character choice (commitment = pedersen(char, salt)).
-   */
-  commitCharacter: (gameId: string, commitment: string) => Promise<string>;
+  /** Reveal character + salt — contract verifies hash on-chain */
+  reveal: (gameId: string, characterIdFelt: string, salt: string) => Promise<string>;
 
-  /**
-   * Reveal the character choice.
-   */
-  revealCharacter: (gameId: string, characterId: string, salt: string) => Promise<string>;
-
-  /**
-   * Get a player's commitment.
-   */
+  /** Read a player's stored commitment */
   getCommitment: (gameId: string, playerAddress: string) => Promise<string>;
-
-  /**
-   * Get game state.
-   */
-  getGame: (gameId: string) => Promise<{
-    player1: string;
-    player2: string;
-    p1_commitment: string;
-    p2_commitment: string;
-    p1_revealed_char: string;
-    p2_revealed_char: string;
-    winner: string;
-  }>;
 }
 
 /**
@@ -138,25 +111,12 @@ export interface GameContractCalls {
  */
 export function getGameContract(): GameContractCalls {
   return {
-    async createGame(gameId: string, player2Address: string): Promise<string> {
+    async commit(gameId: string, commitment: string): Promise<string> {
       const w = getWallet();
       const tx = await w.execute([
         {
           contractAddress: GAME_CONTRACT,
-          entrypoint: 'create_game',
-          calldata: [gameId, player2Address],
-        },
-      ]);
-      await tx.wait();
-      return tx.hash;
-    },
-
-    async commitCharacter(gameId: string, commitment: string): Promise<string> {
-      const w = getWallet();
-      const tx = await w.execute([
-        {
-          contractAddress: GAME_CONTRACT,
-          entrypoint: 'commit_character',
+          entrypoint: 'commit',
           calldata: [gameId, commitment],
         },
       ]);
@@ -164,13 +124,13 @@ export function getGameContract(): GameContractCalls {
       return tx.hash;
     },
 
-    async revealCharacter(gameId: string, characterId: string, salt: string): Promise<string> {
+    async reveal(gameId: string, characterIdFelt: string, salt: string): Promise<string> {
       const w = getWallet();
       const tx = await w.execute([
         {
           contractAddress: GAME_CONTRACT,
-          entrypoint: 'reveal_character',
-          calldata: [gameId, characterId, salt],
+          entrypoint: 'reveal',
+          calldata: [gameId, characterIdFelt, salt],
         },
       ]);
       await tx.wait();
@@ -185,26 +145,6 @@ export function getGameContract(): GameContractCalls {
         calldata: [gameId, playerAddress],
       });
       return result[0];
-    },
-
-    async getGame(gameId: string) {
-      const w = getWallet();
-      const result = await w.callContract({
-        contractAddress: GAME_CONTRACT,
-        entrypoint: 'get_game',
-        calldata: [gameId],
-      });
-
-      // Parse the response - Game struct fields
-      return {
-        player1: result[0],
-        player2: result[1],
-        p1_commitment: result[2],
-        p2_commitment: result[3],
-        p1_revealed_char: result[4],
-        p2_revealed_char: result[5],
-        winner: result[8], // After p1_wager (u256 = 2 slots) and p2_wager (u256 = 2 slots)
-      };
     },
   };
 }

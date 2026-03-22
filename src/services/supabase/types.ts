@@ -4,6 +4,7 @@ export type OnlineEventType =
   | 'CHARACTER_COMMITTED'
   | 'QUESTION_ASKED'
   | 'ANSWER_GIVEN'
+  | 'ELIMINATION_UPDATE'
   | 'GUESS_MADE'
   | 'GUESS_RESULT'
   | 'CHARACTER_REVEALED';
@@ -24,6 +25,12 @@ export interface SupabaseGame {
   winner_player_num: number | null;
   turn_number: number;
   characters: any[] | null;
+  // Server-authoritative state machine columns
+  current_phase: string | null;
+  current_question: Record<string, any> | null;
+  current_answer: boolean | null;
+  eliminated_p1: string[] | null;
+  eliminated_p2: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,5 +43,6 @@ export interface SupabaseGameEvent {
   player_address: string;
   turn_number: number;
   payload: Record<string, any>;
+  idempotency_key?: string;
   created_at: string;
 }

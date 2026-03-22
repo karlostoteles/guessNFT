@@ -6,6 +6,18 @@ import { useWalletStore } from './walletStore';
 import { connectCartridgeWallet, resetSDK } from './sdk';
 import { fetchAllOwnedNFTs } from './nftService';
 
+/** Race a promise against a timeout. Rejects if timeout fires first. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const NFT_FETCH_TIMEOUT_MS = 5_000;
+
 /**
  * Hook for connecting/disconnecting wallet.
  */
@@ -40,14 +52,18 @@ export function useWalletConnection() {
         // Username is optional
       }
 
-      // Fetch NFTs
+      // Fetch NFTs with a short timeout — don't block login
       state.setStatus('loading_nfts');
       try {
-        const nfts = await fetchAllOwnedNFTs(address);
+        const nfts = await withTimeout(
+          fetchAllOwnedNFTs(address),
+          NFT_FETCH_TIMEOUT_MS,
+          'NFT fetch',
+        );
         state.setOwnedNFTs(nfts);
         state.setStatus('ready');
       } catch (err) {
-        console.warn('[wallet] NFT fetch failed, wallet still connected:', err);
+        console.warn('[wallet] NFT fetch failed/timed out, wallet still connected:', err);
         state.setOwnedNFTs([]);
         state.setStatus('ready'); // Wallet is connected even if NFT fetch fails
       }

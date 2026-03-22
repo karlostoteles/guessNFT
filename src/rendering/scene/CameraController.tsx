@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CAMERA, computeAdaptiveCamera } from '@/core/rules/constants';
-import { usePhase, useGameCharacters, useActivePlayer, useEliminatedIds } from '@/core/store/selectors';
+import { usePhase, useGameCharacters, useActivePlayer, useEliminatedIds, useOnlinePlayerNum } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 
 export function CameraController() {
@@ -15,6 +15,9 @@ export function CameraController() {
   const characters    = useGameCharacters();
   const activePlayer  = useActivePlayer();
   const eliminatedIds = useEliminatedIds(activePlayer);
+  const onlinePlayerNum = useOnlinePlayerNum();
+
+  const isP2 = onlinePlayerNum === 2;
 
   useFrame(() => {
     if (phase === GamePhase.MENU) {
@@ -24,7 +27,10 @@ export function CameraController() {
       // Adaptive: zoom in as tiles shrink
       const activeCount = Math.max(1, characters.length - eliminatedIds.length);
       const cam = computeAdaptiveCamera(activeCount);
-      targetPos.current.set(...cam.position);
+      // P2: slight Y offset — board is rotated 180° on Y, tilt makes the
+      // perspective slightly different from P2's side
+      const yOffset = isP2 ? -0.8 : 0;
+      targetPos.current.set(cam.position[0], cam.position[1] + yOffset, cam.position[2]);
       targetLookAt.current.set(...cam.lookAt);
     }
 

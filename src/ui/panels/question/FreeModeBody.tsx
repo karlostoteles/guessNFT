@@ -30,17 +30,27 @@ export function FreeModeBody({ askedIds, remaining, questionImpact, onAsk }: Fre
   const [freeCategory, setFreeCategory] = useState<FreeCategory | null>(null);
   const isMobile = useIsMobile();
 
-  // Info-gain filtered question IDs
+  // Trait keys already asked — hide sibling questions in the same trait
+  const askedTraitKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const q of FREE_QUESTIONS) {
+      if (askedIds.has(q.id)) keys.add(q.traitKey);
+    }
+    return keys;
+  }, [askedIds]);
+
+  // Info-gain filtered question IDs, excluding same-trait siblings
   const usefulIds = useMemo(() => {
     const ids = new Set<string>();
     for (const q of FREE_QUESTIONS) {
       if (askedIds.has(q.id)) { ids.add(q.id); continue; }
+      if (askedTraitKeys.has(q.traitKey)) continue;
       const yesCount = remaining.filter((c) => evaluateQuestion(q, c)).length;
       if (yesCount > 0 && yesCount < remaining.length) ids.add(q.id);
     }
     if (ids.size === askedIds.size) FREE_QUESTIONS.forEach((q) => ids.add(q.id));
     return ids;
-  }, [remaining, askedIds]);
+  }, [remaining, askedIds, askedTraitKeys]);
 
   // Category stats
   const categoryStats = useMemo(() => {

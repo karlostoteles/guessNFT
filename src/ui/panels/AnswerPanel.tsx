@@ -9,11 +9,57 @@ export function AnswerPanel() {
   const mode = useGameMode();
   const { answerQuestion } = useGameActions();
 
-  // In online mode, all answering is automatic via the sync hook in the background.
-  if (mode === 'online') return null;
-
   if (!question) return null;
 
+  // Online mode: show "waiting for opponent's answer" indicator
+  if (mode === 'online') {
+    const content = (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        style={{
+          position: 'fixed',
+          bottom: 28,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 30,
+          pointerEvents: 'none',
+          width: 'min(420px, calc(100vw - 32px))',
+        }}
+      >
+        <div style={{
+          background: 'rgba(12, 11, 20, 0.92)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(232,164,68,0.25)',
+          borderRadius: 16,
+          padding: '14px 24px',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            fontSize: 13,
+            color: 'rgba(255,255,254,0.5)',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 600,
+            marginBottom: 6,
+          }}>
+            {question.questionText}
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: 'rgba(255,255,254,0.3)',
+            fontWeight: 600,
+          }}>
+            Waiting for opponent{'\u2019'}s answer...
+          </div>
+        </div>
+      </motion.div>
+    );
+
+    return createPortal(content, document.body);
+  }
+
+  // Local/free mode: show answer buttons
   const content = (
     <motion.div
       initial={{ opacity: 0 }}

@@ -1,6 +1,4 @@
-# Starknet Foundry configuration
-
-[sncast.guessnft_deployer]
-account = "guessnft_deployer"
+[sncast.default]
+account = "native_mainnet"
 accounts-file = "~/.starknet_accounts/starknet_open_zeppelin_accounts.json"
-network = "sepolia"
+url = "https://api.cartridge.gg/x/starknet/mainnet"

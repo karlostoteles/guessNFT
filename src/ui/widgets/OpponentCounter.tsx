@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useActivePlayer, useEliminatedIds, useGameCharacters, usePhase } from '@/core/store/selectors';
+import { useActivePlayer, useEliminatedIds, useGameCharacters, usePhase, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 
 /**
@@ -9,8 +9,12 @@ export function OpponentCounter() {
     const phase = usePhase();
     const activePlayer = useActivePlayer();
     const characters = useGameCharacters();
+    const mode = useGameMode();
+    const onlinePlayerNum = useOnlinePlayerNum();
 
-    const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
+    const opponent = (mode === 'online' && onlinePlayerNum)
+        ? (onlinePlayerNum === 1 ? 'player2' : 'player1')
+        : (activePlayer === 'player1' ? 'player2' : 'player1');
     const eliminatedByOpponent = useEliminatedIds(opponent);
 
     const total = characters.length;

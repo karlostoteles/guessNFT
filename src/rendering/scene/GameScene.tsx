@@ -9,7 +9,7 @@ import { CameraController } from './CameraController';
 import { SlotGridOverlay } from './SlotGridOverlay';
 import { useCharacterTextures, useCardBackTexture } from '@/shared/hooks/useCharacterTextures';
 import { useAdaptiveGrid } from '@/shared/hooks/useAdaptiveGrid';
-import { useBoardRotation, useGameCharacters } from '@/core/store/selectors';
+import { useBoardRotation, useGameCharacters, useOnlinePlayerNum } from '@/core/store/selectors';
 import { BOARD } from '@/core/rules/constants';
 import { useCPUPlayer } from '@/shared/hooks/useCPUPlayer';
 
@@ -21,7 +21,12 @@ export function GameScene() {
   const textures = useCharacterTextures(layout.tileW);
   const cardBackTexture = useCardBackTexture();
   const boardRotation = useBoardRotation();
+  const onlinePlayerNum = useOnlinePlayerNum();
   const boardRef = useRef<THREE.Group>(null);
+
+  // P2 sees the board from the opposite side (Y-rotated 180°).
+  // That means the X-axis tilt is also perceived in reverse — invert it for P2.
+  const tiltAngle = onlinePlayerNum === 2 ? -BOARD.tiltAngle : BOARD.tiltAngle;
 
   useFrame((_, delta) => {
     if (boardRef.current) {
@@ -36,7 +41,7 @@ export function GameScene() {
       <CameraController />
       <Environment />
 
-      <group rotation={[BOARD.tiltAngle, 0, 0]}>
+      <group rotation={[tiltAngle, 0, 0]}>
         <group ref={boardRef}>
           <Board width={layout.gridW} depth={layout.gridD} />
           <SlotGridOverlay />

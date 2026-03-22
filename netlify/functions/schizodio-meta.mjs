@@ -65,7 +65,7 @@ export const handler = async (event) => {
 
   try {
     const resp = await fetch(`https://schizodio.art/nft/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WhoisWhoGame/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; guessNFT/1.0)' },
     });
 
     if (!resp.ok) {

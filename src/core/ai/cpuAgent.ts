@@ -1,5 +1,5 @@
 /**
- * CPU Opponent Agent for WhoisWho.
+ * CPU Opponent Agent for guessNFT.
  *
  * Strategy: binary search — always picks the question that splits
  * remaining characters as close to 50/50 as possible.

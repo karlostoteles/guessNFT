@@ -754,6 +754,7 @@ function IndividualGrid({ textures, tileW }: CharacterGridProps) {
               texture={texture}
               tileW={layout.tileW}
               tileH={layout.tileH}
+              onlinePlayerNum={onlinePlayerNum}
               pivotRef={(el) => {
                 if (el) pivotRefs.current.set(char.id, el);
                 else pivotRefs.current.delete(char.id);

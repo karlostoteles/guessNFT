@@ -1,4 +1,4 @@
--- WhoisWho — Supabase Schema
+-- guessNFT — Supabase Schema
 -- Run this entire file in your Supabase SQL editor (Dashboard > SQL Editor)
 
 -- ─── Tables ───────────────────────────────────────────────────────────────────

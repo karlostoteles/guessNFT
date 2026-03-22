@@ -27,7 +27,9 @@ export function RiskItButton() {
     const { startGuess } = useGameActions();
 
     // Track opponent's remaining tiles for danger detection
-    const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
+    const opponent = (mode === 'online' && onlinePlayerNum)
+        ? (onlinePlayerNum === 1 ? 'player2' : 'player1')
+        : (activePlayer === 'player1' ? 'player2' : 'player1');
     const opponentEliminatedIds = useEliminatedIds(opponent);
     const opponentRemaining = characters.length - opponentEliminatedIds.length;
 

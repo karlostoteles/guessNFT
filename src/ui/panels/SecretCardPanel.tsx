@@ -8,8 +8,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { usePhase, useGameMode, useOnlinePlayerNum, useQuestionHistory } from '@/core/store/selectors';
-import { useGameStore } from '@/core/store/gameStore';
+import { usePhase, useGameMode, useOnlinePlayerNum, useQuestionHistory, usePlayerState, useGameCharacters } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { QUESTIONS_BY_ID } from '@/core/data/questions';
 import { renderPortraitCanvas } from '@/rendering/canvas/PortraitRenderer';
@@ -41,9 +40,9 @@ export function SecretCardPanel() {
     : 'player1';
   const opponent = myPlayer === 'player1' ? 'player2' : 'player1';
 
-  const players = useGameStore(s => s.players);
-  const characters = useGameStore(s => s.characters);
-  const secretId = players[myPlayer].secretCharacterId;
+  const myPlayerState = usePlayerState(myPlayer);
+  const characters = useGameCharacters();
+  const secretId = myPlayerState.secretCharacterId;
   const myChar = secretId ? characters.find(c => c.id === secretId) : null;
 
   const opponentTraits = useMemo(() => {

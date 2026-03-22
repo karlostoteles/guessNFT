@@ -147,6 +147,7 @@ export function OnlineWaitingScreen() {
           Share this code with your opponent · tap to copy
         </div>
       )}
+
     </motion.div>
   );
 }

@@ -2,12 +2,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../common/Card';
 import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
-import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
+import { usePhase, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum, useGameSessionId, useOnlineGameId } from '@/core/store/selectors';
 import { GamePhase, PlayerId } from '@/core/store/types';
 import { useOwnedNFTs } from '@/services/starknet/walletStore';
-import { nftToCharacter } from '@/core/data/nftCharacterAdapter';
-import { useGameStore } from '@/core/store/gameStore';
-import { depositWagerOnChain, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
+import { getCommitment, submitCommitmentOnChain } from '@/services/starknet/commitReveal';
 
 // Deterministic accent colour from character id
 function idToColor(id: string): string {
@@ -19,19 +17,26 @@ function idToColor(id: string): string {
   return `hsl(${hue.toFixed(0)}, 65%, 42%)`;
 }
 
+const EXPLORER_URL = 'https://starkscan.co/tx/';
+
 export function CharacterSelectScreen() {
   const phase = usePhase();
   const mode = useGameMode();
   const onlinePlayerNum = useOnlinePlayerNum();
-  const { selectSecretCharacter, resetGame, goBackToSetupP1 } = useGameActions();
+  const { selectSecretCharacter, resetGame, goBackToSetupP1, goToOnlineWaiting } = useGameActions();
+  const gameSessionId = useGameSessionId();
+  const onlineGameId = useOnlineGameId();
   const [lockingIn, setLockingIn] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  // On-chain commit state for online mode
+  const [commitStatus, setCommitStatus] = useState<'idle' | 'submitting' | 'confirmed' | 'error'>('idle');
+  const [commitTxHash, setCommitTxHash] = useState<string | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   // All game characters (full 999-stub board for nft/online, meme chars for free)
   const allCharacters = useGameCharacters();
   // Owned NFTs from wallet — these have real imageUrls
   const ownedNFTs = useOwnedNFTs();
-  const bypassActive = useMemo(() => localStorage.getItem('whoiswho_bypass') === '1', []);
-
   const isNFTMode = mode === 'online' || mode === 'nft' || mode === 'nft-free';
 
   // The player this screen is selecting for
@@ -45,33 +50,39 @@ export function CharacterSelectScreen() {
       ? 'Your Character'
       : player === 'player1' ? 'Player 1' : 'Player 2';
 
-  // Build the selectable character list for NFT modes
+  // Build the selectable character list for NFT modes.
+  // CRITICAL: Use the board's character objects (allCharacters) as the single source of
+  // truth for traits. Owned NFTs are only used to filter which characters can be selected
+  // and to provide imageUrl for display. This ensures the selected secret character has
+  // the exact same traits as its board counterpart (both derived from schizodio.json bitmap).
   const nftModeChars = useMemo(() => {
     if (!isNFTMode) return null;
+
+    // Build a map of tokenId → imageUrl from owned NFTs
+    const imageMap = new Map(ownedNFTs.map(nft => [`nft_${nft.tokenId}`, nft.imageUrl]));
+
     if (ownedNFTs.length > 0) {
-      // Use owned NFTs with real imageUrls — IDs match the board stubs
-      return ownedNFTs.map(nft => nftToCharacter(nft));
+      // Player owns NFTs — show only owned ones (enriched with real images)
+      const ownedIds = new Set(ownedNFTs.map(nft => `nft_${nft.tokenId}`));
+      return allCharacters
+        .filter(c => ownedIds.has(c.id))
+        .map(c => ({
+          ...c,
+          imageUrl: imageMap.get(c.id) || (c as any).imageUrl,
+          tokenId: c.id.replace('nft_', ''),
+        }));
     }
-    return null; // bypass case handled separately
-  }, [isNFTMode, ownedNFTs]);
 
-  // Bypass + no NFTs: auto-assign a random character (not applicable in nft-free — full collection is shown)
-  const isBypassNoNFT = isNFTMode && bypassActive && ownedNFTs.length === 0 && mode !== 'nft-free';
-  const [bypassAssigned, setBypassAssigned] = useState<{ id: string; name: string } | null>(null);
+    // No owned NFTs — show full board for random pick (online/nft-free modes)
+    if (mode === 'online' || mode === 'nft-free') {
+      return allCharacters.map(c => ({
+        ...c,
+        tokenId: c.id.replace('nft_', ''),
+      }));
+    }
 
-  useEffect(() => {
-    if (!isBypassNoNFT || bypassAssigned) return;
-    // Pick a random character from all 999 that isn't already taken
-    const gameState = useGameStore.getState();
-    const takenIds = new Set([
-      gameState.players.player1.secretCharacterId,
-      gameState.players.player2.secretCharacterId,
-    ].filter(Boolean) as string[]);
-    const pool = allCharacters.filter(c => !takenIds.has(c.id));
-    if (pool.length === 0) return;
-    const random = pool[Math.floor(Math.random() * pool.length)];
-    setBypassAssigned({ id: random.id, name: random.name });
-  }, [isBypassNoNFT, bypassAssigned, allCharacters]);
+    return null;
+  }, [isNFTMode, ownedNFTs, allCharacters, mode]);
 
   // For free mode: use allCharacters (meme chars) with canvas previews
   const freeModeChars = !isNFTMode ? allCharacters : null;
@@ -94,115 +105,82 @@ export function CharacterSelectScreen() {
   }, [displayChars, search]);
 
   // ── Character Lock-In Flow ───────────────────────────────────────────────
-  const handleSelect = async (charId: string, tokenId?: string) => {
+  const handleSelect = async (charId: string, _tokenId?: string) => {
     if (lockingIn) return;
     try {
       setLockingIn(charId);
 
-      // Update local storage commitment first so it's ready.
+      // Store secret + create commitment locally
       selectSecretCharacter(player, charId);
 
-      const session = useGameStore.getState().gameSessionId;
+      const session = gameSessionId;
+      const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : session;
 
-      // Handle on-chain wager if needed
-      if (isNFTMode && mode !== 'nft-free') {
-        // TokenId fallback: if charId is "nft_123", it becomes "123"
-        const finalTokenId = tokenId || charId.replace('nft_', '');
+      if (mode === 'online') {
+        // ONLINE: on-chain commit is BLOCKING — must confirm before proceeding
+        const stored = getCommitment(player, session);
+        if (!stored) throw new Error('Commitment not found after select');
 
-        const commitmentsStr = localStorage.getItem('whoiswho_commitments') || '{}';
-        const cMap = JSON.parse(commitmentsStr);
-        const myCommitment = cMap[session]?.[player]?.commitment;
+        setCommitStatus('submitting');
+        setCommitError(null);
 
-        if (myCommitment) {
-          await submitCommitmentOnChain(myCommitment, session);
+        const txHash = await submitCommitmentOnChain(stored.commitment, onChainGameId);
+        setCommitTxHash(txHash);
+        setCommitStatus('confirmed');
 
-          await depositWagerOnChain(session, finalTokenId);
+        // Brief pause so user sees confirmation, then advance to waiting
+        await new Promise((r) => setTimeout(r, 1500));
+        goToOnlineWaiting();
+
+      } else if (mode === 'nft' && ownedNFTs.length > 0) {
+        // NFT local: same blocking commit
+        const stored = getCommitment(player, session);
+        if (stored) {
+          try {
+            const txHash = await submitCommitmentOnChain(stored.commitment, onChainGameId);
+            setCommitTxHash(txHash);
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 2000);
+          } catch (commitErr: any) {
+            console.warn('[commitReveal] On-chain commit failed, continuing:', commitErr.message);
+          }
         }
       }
+      // Free mode: phase already advanced by selectSecretCharacter
 
     } catch (err: any) {
-      console.error(err);
-      alert('Failed to lock in character: ' + err.message);
-      // Revert phase on failure if necessary, but MVP can just alert
+      console.error('[commitReveal] Commit failed:', err);
+      setCommitStatus('error');
+      setCommitError(err.message || 'Transaction failed');
     } finally {
-      // The phase advances globally so this component unmounts,
-      // but clear anyway if it failed.
       setLockingIn(null);
     }
   };
 
-  // ── Bypass / no-NFT auto-pick screen ──────────────────────────────────────
-  if (isBypassNoNFT) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'auto', zIndex: 20, padding: 24,
-        }}
-      >
-        <Card style={{ width: 'min(380px, 100%)', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🎲</div>
-          <div style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 800, fontSize: 20, color: '#E8A444', marginBottom: 8,
-          }}>
-            Access Code Player
-          </div>
-          <div style={{
-            fontSize: 13, color: 'rgba(255,255,254,0.45)', lineHeight: 1.6, marginBottom: 24,
-          }}>
-            You don't own any SCHIZODIOs, so a random one from the collection will be assigned as your secret character.
-          </div>
-          {bypassAssigned ? (
-            <>
-              <div style={{
-                background: 'rgba(232,164,68,0.1)',
-                border: '2px solid rgba(232,164,68,0.3)',
-                borderRadius: 12,
-                padding: '16px 24px',
-                marginBottom: 24,
-              }}>
-                <div style={{ fontSize: 12, color: 'rgba(232,164,68,0.6)', marginBottom: 4, letterSpacing: '0.08em' }}>YOUR SCHIZODIO</div>
-                <div style={{
-                  fontFamily: "'Space Grotesk', monospace",
-                  fontSize: 28, fontWeight: 800, color: '#E8A444', letterSpacing: '0.05em',
-                }}>
-                  {bypassAssigned.name}
-                </div>
-              </div>
-              <motion.button
-                onClick={() => handleSelect(bypassAssigned.id)}
-                disabled={!!lockingIn}
-                whileHover={!lockingIn ? { scale: 1.04, filter: 'brightness(1.1)' } : {}}
-                whileTap={{ scale: 0.97 }}
-                style={{
-                  background: 'linear-gradient(135deg, #E8A444, #C47B1A)',
-                  border: 'none',
-                  borderRadius: 12,
-                  padding: '14px 32px',
-                  color: '#0F0E17',
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontWeight: 700, fontSize: 15, cursor: 'pointer',
-                  width: '100%',
-                }}
-              >
-                {lockingIn ? 'Locking on-chain...' : `Lock In ${bypassAssigned.name} →`}
-              </motion.button>
-            </>
-          ) : (
-            <div style={{ color: 'rgba(255,255,254,0.3)', fontSize: 14 }}>Assigning…</div>
-          )}
-        </Card>
-      </motion.div>
-    );
-  }
+  // Retry on-chain commit after failure
+  const handleRetryCommit = async () => {
+    const session = gameSessionId;
+    const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : session;
+    const stored = getCommitment(player, session);
+    if (!stored) return;
 
-  // ── Normal picker (owned NFTs for nft/online, meme chars for free) ─────────
+    setCommitStatus('submitting');
+    setCommitError(null);
+
+    try {
+      const txHash = await submitCommitmentOnChain(stored.commitment, onChainGameId);
+      setCommitTxHash(txHash);
+      setCommitStatus('confirmed');
+      await new Promise((r) => setTimeout(r, 1500));
+      goToOnlineWaiting();
+    } catch (err: any) {
+      console.error('[commitReveal] Retry failed:', err);
+      setCommitStatus('error');
+      setCommitError(err.message || 'Transaction failed');
+    }
+  };
+
+  // ── Character picker (owned NFTs for nft/online, meme chars for free) ─────
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -271,6 +249,43 @@ export function CharacterSelectScreen() {
           </div>
         </div>
 
+        {/* Random Pick — prominent shortcut for online/nft-free */}
+        {(mode === 'online' || mode === 'nft-free') && (
+          <div style={{ flexShrink: 0, marginBottom: 8 }}>
+            <motion.button
+              onClick={() => {
+                const pool = displayChars;
+                if (pool.length === 0) return;
+                const pick = pool[Math.floor(Math.random() * pool.length)];
+                handleSelect(pick.id, (pick as any).tokenId);
+              }}
+              disabled={!!lockingIn}
+              whileHover={!lockingIn ? { scale: 1.02 } : {}}
+              whileTap={!lockingIn ? { scale: 0.98 } : {}}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(91,33,182,0.2))',
+                border: '1px solid rgba(124,58,237,0.4)',
+                borderRadius: 10,
+                color: '#A78BFA',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: lockingIn ? 'wait' : 'pointer',
+                outline: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                opacity: lockingIn ? 0.5 : 1,
+              }}
+            >
+              &#x1F3B2; Random Pick
+            </motion.button>
+          </div>
+        )}
+
         {/* Search (only for large collections) */}
         {isLarge && (
           <div style={{ marginBottom: 14, flexShrink: 0 }}>
@@ -333,13 +348,140 @@ export function CharacterSelectScreen() {
               textAlign: 'center', padding: '40px 0',
               color: 'rgba(255,255,254,0.3)', fontSize: 14,
             }}>
-              {isNFTMode && ownedNFTs.length === 0 && mode !== 'nft-free'
-                ? 'No SCHIZODIOs found in your wallet'
-                : `No tokens match "${search}"`
-              }
+              {search ? `No tokens match "${search}"` : 'No characters available'}
             </div>
           )}
         </div>
+
+        {/* On-chain commit status overlay */}
+        <AnimatePresence>
+          {(commitStatus === 'submitting' || commitStatus === 'confirmed' || commitStatus === 'error' || showSuccess) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.7)',
+                backdropFilter: 'blur(8px)',
+                pointerEvents: commitStatus === 'error' ? 'auto' : 'none',
+                zIndex: 30,
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                style={{
+                  background: 'rgba(15,14,23,0.95)',
+                  border: `2px solid ${commitStatus === 'error' ? 'rgba(224,85,85,0.6)' : commitStatus === 'confirmed' ? 'rgba(76,175,80,0.6)' : 'rgba(232,164,68,0.4)'}`,
+                  borderRadius: 16,
+                  padding: '24px 36px',
+                  textAlign: 'center',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+                  maxWidth: 360,
+                  pointerEvents: 'auto',
+                }}
+              >
+                {commitStatus === 'submitting' && (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 1.2, ease: 'linear' }}
+                      style={{ fontSize: 32, marginBottom: 12, display: 'inline-block' }}
+                    >
+                      &#x23F3;
+                    </motion.div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: '#E8A444',
+                    }}>
+                      Committing On-Chain...
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,254,0.4)', marginTop: 6 }}>
+                      Confirm the transaction in your wallet
+                    </div>
+                  </>
+                )}
+
+                {(commitStatus === 'confirmed' || showSuccess) && (
+                  <>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>&#x2705;</div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: '#4CAF50',
+                    }}>
+                      Commitment Confirmed!
+                    </div>
+                    {commitTxHash && (
+                      <a
+                        href={`${EXPLORER_URL}${commitTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-block',
+                          marginTop: 8,
+                          fontSize: 12,
+                          fontFamily: "'Space Grotesk', monospace",
+                          color: '#60CDFF',
+                          textDecoration: 'underline',
+                          pointerEvents: 'auto',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        View on Starkscan
+                      </a>
+                    )}
+                  </>
+                )}
+
+                {commitStatus === 'error' && (
+                  <>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>&#x274C;</div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: '#E05555',
+                    }}>
+                      Commit Failed
+                    </div>
+                    {commitError && (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,254,0.4)', marginTop: 4, wordBreak: 'break-word' }}>
+                        {commitError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleRetryCommit}
+                      style={{
+                        marginTop: 16,
+                        padding: '8px 24px',
+                        background: 'linear-gradient(135deg, #E8A444, #D4903A)',
+                        border: 'none',
+                        borderRadius: 10,
+                        color: '#fff',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 700,
+                        fontSize: 14,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
     </motion.div>
   );

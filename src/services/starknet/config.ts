@@ -8,16 +8,13 @@ export const RPC_URL = 'https://api.cartridge.gg/x/starknet/mainnet';
 // Starknet Mainnet chain ID
 export const SN_MAIN_CHAIN_ID = '0x534e5f4d41494e';
 
-// Game contract address — deployed when Phase 2 is ready
-// Replace with actual address after deploying the Cairo/Dojo contract (Phase 2)
-export const GAME_CONTRACT = '0x03b713795ebb479acd01fb4043ff2c365f97bd9ef5b54b764f41d2dad3dcf98f';
+// CommitReveal contract — deployed on Starknet Mainnet
+export const GAME_CONTRACT = '0x077cbfa4dab07b9bd3e167b37ec2066683caeb9a267f72ec744f73b3c8d48b21';
 
 // Session policies for Cartridge Controller
 // Phase 1: empty — read-only operations don't need sessions
 // Phase 2: will include game contract methods (commit, reveal, ask, guess)
 export const SESSION_POLICIES: Array<{ target: string; method: string }> = [
-  { target: GAME_CONTRACT, method: 'create_game' },
-  { target: GAME_CONTRACT, method: 'commit_character' },
-  { target: GAME_CONTRACT, method: 'deposit_wager' },
-  { target: GAME_CONTRACT, method: 'opponent_won' },
+  { target: GAME_CONTRACT, method: 'commit' },
+  { target: GAME_CONTRACT, method: 'reveal' },
 ];

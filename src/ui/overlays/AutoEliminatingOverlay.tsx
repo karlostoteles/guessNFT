@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useCurrentQuestion, useActivePlayer, useEliminatedIds, useGameActions, useGameCharacters } from '@/core/store/selectors';
+import { useCurrentQuestion, useActivePlayer, useEliminatedIds, useGameActions, useGameCharacters, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
 import { sfx } from '@/shared/audio/sfx';
 
 const AUTO_ADVANCE_MS = 2200;
@@ -8,8 +8,16 @@ const AUTO_ADVANCE_MS = 2200;
 export function AutoEliminatingOverlay() {
   const question = useCurrentQuestion();
   const activePlayer = useActivePlayer();
-  const eliminatedIds = useEliminatedIds(activePlayer);
+  const mode = useGameMode();
+  const onlinePlayerNum = useOnlinePlayerNum();
   const characters = useGameCharacters();
+
+  // In online mode, show the active player's own eliminated tiles (their board state).
+  // activePlayer is the one who ASKED the question, so their eliminations are updating.
+  const myPlayerKey: 'player1' | 'player2' = (mode === 'online' && onlinePlayerNum)
+    ? (onlinePlayerNum === 1 ? 'player1' : 'player2')
+    : activePlayer;
+  const eliminatedIds = useEliminatedIds(myPlayerKey);
   const { advancePhase } = useGameActions();
   const [progress, setProgress] = useState(0);
 

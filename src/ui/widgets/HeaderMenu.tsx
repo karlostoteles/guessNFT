@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useGameStore } from '@/core/store/gameStore';
-import { useGameActions, usePhase } from '@/core/store/selectors';
+import { useGameActions, usePhase, useSoundEnabled, useDangerZoneEnabled } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { sfx } from '@/shared/audio/sfx';
 
@@ -17,11 +16,9 @@ import type { SchizodioNFT } from '@/services/starknet/types';
  */
 export function HeaderMenu() {
     const phase = usePhase();
-    const resetGame = useGameActions().resetGame;
-    const setSoundEnabled = useGameStore((state) => state.setSoundEnabled);
-    const setDangerZoneEnabled = useGameStore((state) => state.setDangerZoneEnabled);
-    const soundEnabled = useGameStore((state) => state.soundEnabled);
-    const dangerZoneEnabled = useGameStore((state) => state.dangerZoneEnabled);
+    const { resetGame, setSoundEnabled, setDangerZoneEnabled } = useGameActions();
+    const soundEnabled = useSoundEnabled();
+    const dangerZoneEnabled = useDangerZoneEnabled();
 
     // Wallet State
     const status = useWalletStatus();

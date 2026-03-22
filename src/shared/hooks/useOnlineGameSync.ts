@@ -1,17 +1,19 @@
 /**
- * useOnlineGameSync
+ * useOnlineGameSync — Server-Authoritative State Machine
  *
- * Manages real-time Supabase sync for online 1v1 games.
- * - Subscribes to game_events (opponent's actions) and the games table (status changes)
- * - Sends events when the local player takes actions
- * - Translates incoming events into game store actions
+ * All game state flows through the Supabase `games` row:
+ *   - Active player writes phase/question/elimination to DB
+ *   - Non-active player reads from DB via postgres_changes realtime
+ *   - Guesses use game_events (INSERT-based) for latency
+ *   - Presence channel detects disconnects
  *
- * Must be mounted for the duration of an online game.
+ * The old broadcast-based event system (QUESTION_ASKED, ANSWER_GIVEN,
+ * ELIMINATION_UPDATE) is removed. The DB row is the single source of truth.
  */
 import { useEffect, useRef } from 'react';
 import { useGameStore } from '@/core/store/gameStore';
 import { GamePhase } from '@/core/store/types';
-import type { PlayerId } from '@/core/store/types';
+import type { PlayerId, QuestionRecord } from '@/core/store/types';
 import { evaluateQuestion } from '@/core/rules/evaluateQuestion';
 import { QUESTIONS } from '@/core/data/questions';
 import {
@@ -20,12 +22,16 @@ import {
   sendEvent,
   finishGame,
   submitCommitment,
+  updateTurn,
+  updateGameState,
+  getGame,
+  getPastEvents,
 } from '@/services/supabase/gameService';
 import type { SupabaseGame, SupabaseGameEvent } from '@/services/supabase/types';
 import { supabase } from '@/services/supabase/client';
 import { getCommitment } from '@/services/starknet/commitReveal';
 
-export function useOnlineGameSync() {
+export function useOnlineGameSync(): Record<string, never> {
   const phase = useGameStore((s) => s.phase);
   const mode = useGameStore((s) => s.mode);
   const onlineGameId = useGameStore((s) => s.onlineGameId);
@@ -33,16 +39,20 @@ export function useOnlineGameSync() {
   const currentQuestion = useGameStore((s) => s.currentQuestion);
   const guessedCharacterId = useGameStore((s) => s.guessedCharacterId);
   const turnNumber = useGameStore((s) => s.turnNumber);
+  const activePlayer = useGameStore((s) => s.activePlayer);
 
-  // Refs to avoid stale closures in event handlers
-  const sentQuestionRef = useRef<string | null>(null);
+  // Refs for dedup and state tracking
+  const lastWrittenQuestionRef = useRef<string | null>(null);
+  const lastWrittenEliminationTurnRef = useRef<number>(0);
+  const lastPushedTurnRef = useRef<number>(0);
+  const lastAnsweredQuestionRef = useRef<string | null>(null);
   const sentGuessRef = useRef<string | null>(null);
-  const sentAnswerForRef = useRef<string | null>(null); // question_id we already answered
+  const myGuessTimestampRef = useRef<number>(0);
+  const processedEventIds = useRef<Set<string>>(new Set());
+  const recoveryAttemptedRef = useRef(false);
 
   const myAddress = () => {
     try {
-      // Dynamic require avoids a circular import: walletStore is also consumed by
-      // gameStore (via commitReveal), and a static import here would create a cycle.
       const { useWalletStore } = require('@/services/starknet/walletStore');
       return useWalletStore.getState().address ?? 'anonymous';
     } catch {
@@ -51,12 +61,11 @@ export function useOnlineGameSync() {
   };
 
   // ─── Helper: poll game status and advance if in_progress ─────────────────
-  // Used as a fallback when Supabase realtime is slow or not configured.
   async function checkAndAdvanceIfReady(gameId: string) {
     try {
       const { data: game } = await supabase
         .from('games')
-        .select('status')
+        .select('*')
         .eq('id', gameId)
         .single();
       if (game?.status === 'in_progress') {
@@ -70,9 +79,33 @@ export function useOnlineGameSync() {
     }
   }
 
-  // ─── Subscribe to realtime when in online game ────────────────────────────
+  // ─── Reset all refs when returning to menu (game ended/reset) ───────────
+  useEffect(() => {
+    if (phase === GamePhase.MENU) {
+      lastWrittenQuestionRef.current = null;
+      lastWrittenEliminationTurnRef.current = 0;
+      lastPushedTurnRef.current = 0;
+      lastAnsweredQuestionRef.current = null;
+      sentGuessRef.current = null;
+      myGuessTimestampRef.current = 0;
+      processedEventIds.current.clear();
+      recoveryAttemptedRef.current = false;
+    }
+  }, [phase]);
+
+  // ─── Subscribe to DB changes + events ────────────────────────────────────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+
+    // Reset all refs for a fresh game session
+    lastWrittenQuestionRef.current = null;
+    lastWrittenEliminationTurnRef.current = 0;
+    lastPushedTurnRef.current = 0;
+    lastAnsweredQuestionRef.current = null;
+    sentGuessRef.current = null;
+    myGuessTimestampRef.current = 0;
+    processedEventIds.current.clear();
+    recoveryAttemptedRef.current = false;
 
     const gameSub = subscribeToGame(onlineGameId, handleGameUpdate);
     const eventSub = subscribeToEvents(onlineGameId, handleEvent);
@@ -83,7 +116,7 @@ export function useOnlineGameSync() {
     };
   }, [mode, onlineGameId, onlinePlayerNum]);
 
-  // ─── Push commitment to Supabase when character is selected (ONLINE_WAITING) ─
+  // ─── Push commitment to Supabase (on-chain commit already done in CharacterSelectScreen) ──
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase !== GamePhase.ONLINE_WAITING) return;
@@ -93,189 +126,322 @@ export function useOnlineGameSync() {
     const commitment = getCommitment(myPlayerKey, state.gameSessionId);
     if (!commitment) return;
 
-    const gameId = onlineGameId;   // capture for async closure
-    const playerNum = onlinePlayerNum;
-
-    submitCommitment(
-      gameId,
-      playerNum,
-      commitment.commitment,
-      myAddress(),
-      1 // turn 0 / setup
-    ).then(() => {
-      // Direct check as fallback — the player who committed last will see 'in_progress'
-      // immediately without waiting for realtime to deliver the update.
-      return checkAndAdvanceIfReady(gameId);
-    }).catch(console.error);
+    const gameId = onlineGameId;
+    submitCommitment(gameId, onlinePlayerNum, commitment.commitment, myAddress(), 1)
+      .then(() => checkAndAdvanceIfReady(gameId))
+      .catch(console.error);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode, onlineGameId, onlinePlayerNum]);
 
-  // ─── Poll for game start while on ONLINE_WAITING ──────────────────────────
-  // Belt-and-suspenders fallback: every 3 s, check if the game has started.
-  // This handles the case where Supabase Postgres Changes realtime is not
-  // enabled on the 'games' table or the update event was missed.
+  // ─── Poll for game start ─────────────────────────────────────────────────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
     if (phase !== GamePhase.ONLINE_WAITING) return;
 
     const gameId = onlineGameId;
-    const intervalId = setInterval(() => {
-      checkAndAdvanceIfReady(gameId);
-    }, 3000);
-
+    const intervalId = setInterval(() => checkAndAdvanceIfReady(gameId), 3000);
     return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, mode, onlineGameId, onlinePlayerNum]);
 
-  // ─── Send QUESTION_ASKED when I ask a question ────────────────────────────
+  // ─── Recovery on rejoin ──────────────────────────────────────────────────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
-    if (phase !== GamePhase.ANSWER_REVEALED) return;
-    if (!currentQuestion) return;
+    if (phase !== GamePhase.ONLINE_WAITING) return;
+    if (recoveryAttemptedRef.current) return;
+    recoveryAttemptedRef.current = true;
 
-    const state = useGameStore.getState();
+    const gameId = onlineGameId;
+    const playerNum = onlinePlayerNum;
+
+    (async () => {
+      try {
+        const game = await getGame(gameId);
+        if (!game) return;
+        if (game.status === 'finished') {
+          const winnerKey = game.winner_player_num === 1 ? 'player1' : game.winner_player_num === 2 ? 'player2' : null;
+          useGameStore.setState({ winner: winnerKey, phase: GamePhase.GAME_OVER });
+          return;
+        }
+        if (game.status !== 'in_progress') return;
+
+        // Recover from DB state directly (server-authoritative)
+        const state = useGameStore.getState();
+        const myPlayerKey: PlayerId = playerNum === 1 ? 'player1' : 'player2';
+        const commitment = getCommitment(myPlayerKey, state.gameSessionId);
+        const mySecretId = commitment?.characterId ?? state.players[myPlayerKey].secretCharacterId;
+
+        // Rebuild question history from events (DB row only has current question)
+        const events = await getPastEvents(gameId);
+        const questionHistory: QuestionRecord[] = [];
+
+        for (const evt of events) {
+          const evtPlayerKey: PlayerId = evt.player_num === 1 ? 'player1' : 'player2';
+          if (evt.event_type === 'QUESTION_ASKED') {
+            const { question_id } = evt.payload as { question_id: string };
+            const q = QUESTIONS.find((qn) => qn.id === question_id);
+            if (q) {
+              const answerEvt = events.find(
+                (e) => e.event_type === 'ANSWER_GIVEN' &&
+                  (e.payload as any).question_id === question_id
+              );
+              questionHistory.push({
+                questionId: question_id,
+                questionText: q.text,
+                traitKey: q.traitKey,
+                traitValue: q.traitValue,
+                answer: answerEvt ? (answerEvt.payload as any).answer as boolean : null,
+                askedBy: evtPlayerKey,
+                turnNumber: evt.turn_number,
+              });
+            }
+          }
+          processedEventIds.current.add(evt.idempotency_key ?? evt.id);
+        }
+
+        // Use DB elimination arrays (authoritative)
+        const myEliminated = playerNum === 1 ? (game.eliminated_p1 || []) : (game.eliminated_p2 || []);
+        const oppEliminated = playerNum === 1 ? (game.eliminated_p2 || []) : (game.eliminated_p1 || []);
+
+        state.restoreFromEvents(
+          game.turn_number || 1,
+          questionHistory,
+          myEliminated,
+          oppEliminated,
+          mySecretId ?? null,
+        );
+
+        // Snap to DB phase/activePlayer
+        if (game.current_phase) {
+          useGameStore.setState({ phase: game.current_phase as GamePhase });
+        }
+        if (game.active_player_num) {
+          const nextPlayer: PlayerId = game.active_player_num === 1 ? 'player1' : 'player2';
+          useGameStore.setState({
+            activePlayer: nextPlayer,
+            boardRotation: nextPlayer === 'player1' ? 0 : Math.PI,
+          });
+        }
+
+        console.log(`[sync] Recovered: turn=${game.turn_number}, phase=${game.current_phase}, questions=${questionHistory.length}`);
+      } catch (err) {
+        console.error('[sync] Recovery failed', err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, mode, onlineGameId, onlinePlayerNum]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DB WRITE EFFECTS — active player pushes state changes to DB
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ─── Write question to DB when I ask one ────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+    if (phase !== GamePhase.ANSWER_PENDING || !currentQuestion) return;
+
     const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
-
-    // Only send if I asked the question and haven't sent it yet
     if (currentQuestion.askedBy !== myPlayerKey) return;
-    if (sentQuestionRef.current === currentQuestion.questionId) return;
+    if (lastWrittenQuestionRef.current === currentQuestion.questionId) return;
+    lastWrittenQuestionRef.current = currentQuestion.questionId;
 
-    sentQuestionRef.current = currentQuestion.questionId;
+    // Write question + phase to DB — opponent will see it via realtime
+    updateGameState(onlineGameId, {
+      current_phase: 'ANSWER_PENDING',
+      current_question: currentQuestion as any,
+    }).catch(console.error);
 
+    // Also log as event for history recovery
+    const idemKey = `q_${onlineGameId}_${onlinePlayerNum}_${currentQuestion.questionId}`;
     sendEvent(
-      onlineGameId,
-      'QUESTION_ASKED',
-      onlinePlayerNum,
-      myAddress(),
-      currentQuestion.turnNumber,
-      { question_id: currentQuestion.questionId }
+      onlineGameId, 'QUESTION_ASKED', onlinePlayerNum, myAddress(),
+      currentQuestion.turnNumber, { question_id: currentQuestion.questionId }, idemKey
     ).catch(console.error);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentQuestion?.questionId]);
 
-  // ─── Send GUESS_MADE when I make a guess ──────────────────────────────────
+  // ─── Write elimination to DB after AUTO_ELIMINATING (questioner only) ───
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
-    if (phase !== GamePhase.ANSWER_PENDING) return;
+    if (phase !== GamePhase.AUTO_ELIMINATING) return;
+
+    // Only the questioner writes eliminations — they're the one who applied them
+    const state = useGameStore.getState();
+    const iAmQuestioner =
+      (onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
+      (onlinePlayerNum === 2 && state.activePlayer === 'player2');
+    if (!iAmQuestioner) return;
+
+    if (turnNumber <= lastWrittenEliminationTurnRef.current) return;
+    lastWrittenEliminationTurnRef.current = turnNumber;
+
+    updateGameState(onlineGameId, {
+      current_phase: 'AUTO_ELIMINATING',
+      eliminated_p1: state.players.player1.eliminatedCharacterIds,
+      eliminated_p2: state.players.player2.eliminatedCharacterIds,
+    }).catch(console.error);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum]);
+
+  // ─── Push turn swap to DB (only from the player who drove the swap) ────
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+    if (phase === GamePhase.MENU || phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2 || phase === GamePhase.ONLINE_WAITING) return;
+    if (turnNumber <= lastPushedTurnRef.current) return;
+
+    // Only the player who incremented turnNumber should push it.
+    // After swap, activePlayer is the OPPONENT of whoever asked/guessed.
+    // So the pusher's onlinePlayerNum should NOT match activePlayer (they just handed off).
+    const activePlayerNum: 1 | 2 = activePlayer === 'player1' ? 1 : 2;
+    const iDroveTheSwap = activePlayerNum !== onlinePlayerNum;
+    if (!iDroveTheSwap) return;
+
+    lastPushedTurnRef.current = turnNumber;
+
+    updateTurn(onlineGameId, activePlayerNum, turnNumber).catch((err) =>
+      console.error('[sync] updateTurn failed', err)
+    );
+  }, [turnNumber, phase, mode, onlineGameId, onlinePlayerNum, activePlayer]);
+
+  // ─── Send GUESS_MADE when I make a guess ────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
+    // Online: every guess ends the game (GUESS_RESULT only, no GUESS_WRONG)
+    if (phase !== GamePhase.GUESS_RESULT) return;
     if (!guessedCharacterId) return;
     if (sentGuessRef.current === guessedCharacterId) return;
 
-    const state = useGameStore.getState();
-    const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
-
-    // Check this is a guess (not a question answer pending)
-    if (currentQuestion) return; // It's a question, not a guess
-
     sentGuessRef.current = guessedCharacterId;
 
+    const idemKey = `g_${onlineGameId}_${onlinePlayerNum}_${guessedCharacterId}_t${turnNumber}`;
     sendEvent(
-      onlineGameId,
-      'GUESS_MADE',
-      onlinePlayerNum,
-      myAddress(),
-      turnNumber,
-      { character_id: guessedCharacterId }
+      onlineGameId, 'GUESS_MADE', onlinePlayerNum, myAddress(), turnNumber,
+      { character_id: guessedCharacterId }, idemKey
     ).catch(console.error);
+
+    // Game always ends on a guess — write result to DB
+    const state = useGameStore.getState();
+    const winnerPlayerNum: 1 | 2 = state.winner === 'player1' ? 1 : 2;
+    finishGame(onlineGameId, winnerPlayerNum).catch(console.error);
+    updateGameState(onlineGameId, { current_phase: 'GUESS_RESULT' }).catch(console.error);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guessedCharacterId, phase]);
 
-  // ─── Handle game meta updates (status changes) ────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INCOMING: Handle DB row updates (server-authoritative state machine)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   function handleGameUpdate(game: SupabaseGame) {
     const state = useGameStore.getState();
+
+    // Game start
     if (game.status === 'in_progress' && state.phase === GamePhase.ONLINE_WAITING) {
       state.advanceToGameStart();
+      return;
     }
+
+    // Game finished
+    if (game.status === 'finished') {
+      if (state.phase !== GamePhase.GAME_OVER && state.phase !== GamePhase.GUESS_RESULT) {
+        const winnerKey = game.winner_player_num === 1 ? 'player1' : game.winner_player_num === 2 ? 'player2' : null;
+        useGameStore.setState({ winner: winnerKey, phase: GamePhase.GUESS_RESULT });
+      }
+      return;
+    }
+
+    // Skip sync during setup
+    if (state.phase === GamePhase.ONLINE_WAITING || state.phase === GamePhase.MENU) return;
+
+    // Auto-answer: if DB says ANSWER_PENDING and the question was asked by the opponent,
+    // I (the answerer) evaluate and write the answer back to DB.
+    const myPlayerNum = state.onlinePlayerNum;
+    const myPlayerKey: PlayerId = myPlayerNum === 1 ? 'player1' : 'player2';
+
+    if (game.current_phase === 'ANSWER_PENDING' && game.current_question) {
+      const question = game.current_question as unknown as QuestionRecord;
+
+      if (question.askedBy !== myPlayerKey && lastAnsweredQuestionRef.current !== question.questionId) {
+        lastAnsweredQuestionRef.current = question.questionId;
+
+        const mySecretId = state.players[myPlayerKey].secretCharacterId;
+        const myChar = state.characters.find((c) => c.id === mySecretId);
+        const q = QUESTIONS.find((q) => q.id === question.questionId);
+
+        if (q && myChar && state.onlineGameId) {
+          const answer = evaluateQuestion(q, myChar);
+          console.log(`[sync] Auto-answering question ${question.questionId}: ${answer}`);
+
+          updateGameState(state.onlineGameId, {
+            current_phase: 'ANSWER_REVEALED',
+            current_answer: answer,
+          }).catch(console.error);
+
+          // Also log as event for history recovery
+          const answerIdemKey = `a_${state.onlineGameId}_${myPlayerNum}_${question.questionId}`;
+          sendEvent(
+            state.onlineGameId, 'ANSWER_GIVEN', myPlayerNum!, myAddress(),
+            question.turnNumber, { answer, question_id: question.questionId }, answerIdemKey
+          ).catch(console.error);
+        }
+        return; // Don't sync yet — wait for the ANSWER_REVEALED update
+      }
+    }
+
+    // Master sync: snap local state from DB row
+    state.syncOnlineStateFromDB(game);
   }
 
-  // ─── Handle incoming events from opponent ─────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INCOMING: Handle game_events (only GUESS_MADE/GUESS_RESULT/COMMITTED)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   function handleEvent(event: SupabaseGameEvent) {
     const isFromMe = event.player_num === onlinePlayerNum;
-    if (isFromMe) return; // ignore own events (we already applied them locally)
+    if (isFromMe) return;
+
+    const eventKey = event.idempotency_key ?? event.id;
+    if (processedEventIds.current.has(eventKey)) return;
+    processedEventIds.current.add(eventKey);
 
     const state = useGameStore.getState();
 
     switch (event.event_type) {
       case 'CHARACTER_COMMITTED': {
-        // Opponent has committed their character.
-        // Check game status directly — this fires before (or instead of) the
-        // games-table realtime update, so it's the fastest path to advancing.
         if (state.phase === GamePhase.ONLINE_WAITING && state.onlineGameId) {
           checkAndAdvanceIfReady(state.onlineGameId);
         }
         break;
       }
 
-      case 'QUESTION_ASKED': {
-        const { question_id } = event.payload as { question_id: string };
-
-        // Avoid double-answering
-        if (sentAnswerForRef.current === question_id) return;
-        sentAnswerForRef.current = question_id;
-
-        // Find my character and evaluate the question against it
-        const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
-        const mySecretId = state.players[myPlayerKey].secretCharacterId;
-        const myChar = state.characters.find((c) => c.id === mySecretId);
-        const q = QUESTIONS.find((q) => q.id === question_id);
-
-        if (!q || !myChar) {
-          console.warn('[sync] Cannot evaluate question — missing data', { question_id, mySecretId });
-          return;
-        }
-
-        const answer = evaluateQuestion(q, myChar);
-        const opponentPlayerNum = onlinePlayerNum === 1 ? 2 : 1;
-
-        // Send answer back
-        sendEvent(
-          state.onlineGameId!,
-          'ANSWER_GIVEN',
-          opponentPlayerNum,
-          myAddress(),
-          event.turn_number,
-          { answer, question_id }
-        ).catch(console.error);
-
-        // Update local state: show the question + answer as if I received it
-        state.receiveOpponentQuestion(question_id, answer);
-        break;
-      }
-
-      case 'ANSWER_GIVEN': {
-        const { answer } = event.payload as { answer: boolean };
-        state.applyOpponentAnswer(answer);
-        break;
-      }
-
       case 'GUESS_MADE': {
-        const { character_id } = event.payload as { character_id: string };
+        const { character_id } = event.payload as {
+          character_id: string;
+        };
 
-        // Evaluate whether opponent guessed my character correctly
         const myPlayerKey: PlayerId = onlinePlayerNum === 1 ? 'player1' : 'player2';
         const mySecretId = state.players[myPlayerKey].secretCharacterId;
         const isCorrect = character_id === mySecretId;
+        const opponentPlayerNum = event.player_num as 1 | 2;
 
-        const opponentPlayerNum = (event.player_num as 1 | 2);
-        const winnerPlayerNum: 1 | 2 | null = isCorrect ? opponentPlayerNum : null;
+        // One guess per game: correct → opponent wins, wrong → I win
+        const winnerPlayerNum: 1 | 2 = isCorrect
+          ? opponentPlayerNum
+          : (onlinePlayerNum as 1 | 2);
 
-        // Tell opponent the result
+        // Send result back via event
+        const idemKey = `gr_${state.onlineGameId}_${onlinePlayerNum}_${character_id}_t${event.turn_number}`;
         sendEvent(
-          state.onlineGameId!,
-          'GUESS_RESULT',
-          onlinePlayerNum === 1 ? 2 : 1,
-          myAddress(),
-          event.turn_number,
-          { is_correct: isCorrect, winner_player_num: winnerPlayerNum }
+          state.onlineGameId!, 'GUESS_RESULT', onlinePlayerNum!, myAddress(),
+          event.turn_number, { is_correct: isCorrect, winner_player_num: winnerPlayerNum }, idemKey
         ).catch(console.error);
 
-        if (isCorrect) {
-          finishGame(state.onlineGameId!, opponentPlayerNum as 1 | 2).catch(console.error);
-        }
+        // Game always ends on a guess
+        finishGame(state.onlineGameId!, winnerPlayerNum).catch(console.error);
 
-        // Apply to my local state
         state.receiveOpponentGuess(character_id, isCorrect, winnerPlayerNum);
         break;
       }
@@ -285,22 +451,17 @@ export function useOnlineGameSync() {
           is_correct: boolean;
           winner_player_num: 1 | 2 | null;
         };
-
         const winner: PlayerId | null =
           winner_player_num === 1 ? 'player1' :
-            winner_player_num === 2 ? 'player2' :
-              null;
-
+            winner_player_num === 2 ? 'player2' : null;
         state.applyGuessResult(is_correct, winner);
         break;
       }
-
-      case 'CHARACTER_REVEALED':
-        // Show verification badge at game end (future enhancement)
-        break;
 
       default:
         break;
     }
   }
+
+  return {};
 }

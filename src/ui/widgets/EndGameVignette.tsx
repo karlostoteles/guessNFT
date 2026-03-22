@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useActivePlayer, useEliminatedIds, useGameCharacters, usePhase } from '@/core/store/selectors';
+import { useActivePlayer, useEliminatedIds, useGameCharacters, usePhase, useGameMode, useOnlinePlayerNum } from '@/core/store/selectors';
 import { GamePhase } from '@/core/store/types';
 import { sfx } from '@/shared/audio/sfx';
 
@@ -28,9 +28,13 @@ export function EndGameVignette() {
     const phase = usePhase();
     const activePlayer = useActivePlayer();
     const characters = useGameCharacters();
+    const mode = useGameMode();
+    const onlinePlayerNum = useOnlinePlayerNum();
 
     // Track OPPONENT's remaining tiles — danger = they're close to guessing YOUR pick
-    const opponent = activePlayer === 'player1' ? 'player2' : 'player1';
+    const opponent = (mode === 'online' && onlinePlayerNum)
+        ? (onlinePlayerNum === 1 ? 'player2' : 'player1')
+        : (activePlayer === 'player1' ? 'player2' : 'player1');
     const opponentEliminatedIds = useEliminatedIds(opponent);
     const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 

@@ -7,8 +7,9 @@ import { useCharacterPreviews } from '@/shared/hooks/useCharacterPreviews';
 import { GamePhase } from '@/core/store/types';
 import { COLORS } from '@/core/rules/constants';
 import { sfx } from '@/shared/audio/sfx';
-import { getCommitment, verifyReveal, opponentWonOnChain } from '@/services/starknet/commitReveal';
-import { useOnlinePlayerNum } from '@/core/store/selectors';
+import { getCommitment, verifyReveal, revealCharacterOnChain } from '@/services/starknet/commitReveal';
+import { useOnlinePlayerNum, useOnlineGameId } from '@/core/store/selectors';
+import { revealCharacter as revealCharacterSupabase } from '@/services/supabase/gameService';
 
 export function ResultScreen() {
   const winner = useWinner();
@@ -19,6 +20,7 @@ export function ResultScreen() {
 
   // Identify local player (must be before isMyWin)
   const playerNum = useOnlinePlayerNum();
+  const onlineGameId = useOnlineGameId();
   const myPlayer = mode === 'online' ? (playerNum === 2 ? 'player2' : 'player1') : 'player1';
 
   const isDraw = winner === null;
@@ -39,26 +41,79 @@ export function ResultScreen() {
   const [p1Verified, setP1Verified] = useState<boolean | null>(null);
   const [p2Verified, setP2Verified] = useState<boolean | null>(null);
 
-  const [conceding, setConceding] = useState(false);
-  const [conceded, setConceded] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [revealTxHash, setRevealTxHash] = useState<string | null>(null);
+  const [revealError, setRevealError] = useState<string | null>(null);
 
+  // Verify commitments client-side + submit on-chain reveal
   useEffect(() => {
-    if (mode !== 'nft') return;
-    if (p1State.secretCharacterId) {
-      const c = getCommitment('player1', gameSessionId);
-      if (c) setP1Verified(verifyReveal('player1', p1State.secretCharacterId, c.salt, gameSessionId));
+    if (mode !== 'nft' && mode !== 'online') return;
+
+    // Client-side verification — in online mode only verify local player
+    // (each client only stores their own commitment in localStorage)
+    if (mode === 'online') {
+      const mySecret = myPlayer === 'player1' ? p1State.secretCharacterId : p2State.secretCharacterId;
+      if (mySecret) {
+        const c = getCommitment(myPlayer, gameSessionId);
+        if (c) {
+          const verified = verifyReveal(myPlayer, mySecret, c.salt, gameSessionId);
+          if (myPlayer === 'player1') setP1Verified(verified);
+          else setP2Verified(verified);
+        }
+      }
+    } else {
+      // NFT local mode: verify both players
+      if (p1State.secretCharacterId) {
+        const c = getCommitment('player1', gameSessionId);
+        if (c) setP1Verified(verifyReveal('player1', p1State.secretCharacterId, c.salt, gameSessionId));
+      }
+      if (p2State.secretCharacterId) {
+        const c = getCommitment('player2', gameSessionId);
+        if (c) setP2Verified(verifyReveal('player2', p2State.secretCharacterId, c.salt, gameSessionId));
+      }
     }
-    if (p2State.secretCharacterId) {
-      const c = getCommitment('player2', gameSessionId);
-      if (c) setP2Verified(verifyReveal('player2', p2State.secretCharacterId, c.salt, gameSessionId));
+
+    // On-chain reveal for local player
+    const mySecret = myPlayer === 'player1' ? p1State.secretCharacterId : p2State.secretCharacterId;
+    if (!mySecret) return;
+
+    const stored = getCommitment(myPlayer, gameSessionId);
+    if (!stored) return;
+
+    // Also reveal to Supabase so opponent can verify
+    if (mode === 'online' && onlineGameId && playerNum) {
+      revealCharacterSupabase(
+        onlineGameId, playerNum, stored.characterId, stored.salt,
+        'local', // playerAddress not critical for reveal
+        0, // turnNumber not critical for reveal
+      ).catch((err) => console.error('[reveal] Supabase reveal failed:', err));
     }
-  }, [mode, gameSessionId, p1State.secretCharacterId, p2State.secretCharacterId]);
+
+    // Fire on-chain reveal (non-blocking — game result shows immediately)
+    // Use the shared onlineGameId for on-chain reveal so it matches the commit.
+    const onChainGameId = (mode === 'online' && onlineGameId) ? onlineGameId : gameSessionId;
+    setRevealing(true);
+    revealCharacterOnChain(stored.characterId, stored.salt, onChainGameId)
+      .then((txHash) => {
+        setRevealTxHash(txHash);
+        console.log('[commitReveal] On-chain reveal tx:', txHash);
+      })
+      .catch((err) => {
+        console.error('[commitReveal] On-chain reveal failed:', err);
+        setRevealError(err.message || 'Reveal failed');
+      })
+      .finally(() => setRevealing(false));
+  }, [mode, gameSessionId, p1State.secretCharacterId, p2State.secretCharacterId, myPlayer]);
 
   // Only render in final phases
   const isFinalPhase = phase === GamePhase.GUESS_RESULT || phase === GamePhase.GAME_OVER;
   if (!isFinalPhase) return null;
 
-  const winnerLabel = isDraw ? null : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
+  const winnerLabel = isDraw
+    ? null
+    : mode === 'online'
+      ? (winner === myPlayer ? 'You Win' : 'Opponent Wins')
+      : winner === 'player1' ? 'Player 1' : 'CPU / Player 2';
   const winnerColor = isDraw
     ? '#E8A444'
     : winner === 'player1' ? COLORS.player1.primary : COLORS.player2.primary;
@@ -66,7 +121,7 @@ export function ResultScreen() {
   const p1Secret = characters.find((c) => c.id === p1State.secretCharacterId);
   const p2Secret = characters.find((c) => c.id === p2State.secretCharacterId);
   const guessedChar = characters.find((c) => c.id === guessedId);
-  const showCommitProof = mode === 'nft' && (p1Verified !== null || p2Verified !== null);
+  const showCommitProof = (mode === 'nft' || mode === 'online') && (p1Verified !== null || p2Verified !== null);
 
   return (
     <motion.div
@@ -163,8 +218,20 @@ export function ResultScreen() {
             marginBottom: 32,
           }}>
             {[
-              { label: "P1's Secret", secret: p1Secret, color: COLORS.player1.primary },
-              { label: "P2's Secret", secret: p2Secret, color: COLORS.player2.primary },
+              {
+                label: mode === 'online'
+                  ? (myPlayer === 'player1' ? 'Your Secret' : "Opponent's Secret")
+                  : "P1's Secret",
+                secret: p1Secret,
+                color: COLORS.player1.primary,
+              },
+              {
+                label: mode === 'online'
+                  ? (myPlayer === 'player2' ? 'Your Secret' : "Opponent's Secret")
+                  : "P2's Secret",
+                secret: p2Secret,
+                color: COLORS.player2.primary,
+              },
             ].map(({ label, secret, color }) => secret && (
               <motion.div
                 key={secret.id}
@@ -203,69 +270,96 @@ export function ResultScreen() {
             ))}
           </div>
 
-          {/* Commit-reveal integrity badge (NFT mode only) */}
-          {showCommitProof && (
+          {/* Commit-reveal integrity badge */}
+          {showCommitProof && (() => {
+            // In online mode we can only verify our own commitment
+            const myVerified = myPlayer === 'player1' ? p1Verified : p2Verified;
+            const allVerified = mode === 'online' ? myVerified === true : (p1Verified === true && p2Verified === true);
+            const anyFailed = mode === 'online' ? myVerified === false : (p1Verified === false || p2Verified === false);
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginBottom: 20,
+                  padding: '8px 16px',
+                  background: allVerified
+                    ? 'rgba(76, 175, 80, 0.12)'
+                    : anyFailed
+                      ? 'rgba(224, 85, 85, 0.12)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${allVerified ? 'rgba(76,175,80,0.3)' : anyFailed ? 'rgba(224,85,85,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: 10,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>
+                  {allVerified ? '✅' : anyFailed ? '⚠️' : '🔒'}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  color: allVerified
+                    ? 'rgba(76,175,80,0.9)'
+                    : anyFailed
+                      ? 'rgba(224,85,85,0.9)'
+                      : 'rgba(255,255,254,0.5)',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                }}>
+                  {allVerified
+                    ? mode === 'online' ? 'Your commitment verified on-chain' : 'Commit-reveal verified — fair play confirmed'
+                    : anyFailed
+                      ? 'Commitment mismatch detected!'
+                      : 'Verifying commitment...'}
+                </span>
+              </motion.div>
+            );
+          })()}
+
+          {/* On-chain reveal status */}
+          {(mode === 'nft' || mode === 'online') && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.7 }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
                 marginBottom: 20,
-                padding: '8px 16px',
-                background: p1Verified && p2Verified
-                  ? 'rgba(76, 175, 80, 0.12)'
-                  : 'rgba(224, 85, 85, 0.12)',
-                border: `1px solid ${p1Verified && p2Verified ? 'rgba(76,175,80,0.3)' : 'rgba(224,85,85,0.3)'}`,
-                borderRadius: 10,
+                padding: '6px 14px',
+                background: revealTxHash
+                  ? 'rgba(76, 175, 80, 0.08)'
+                  : revealError
+                    ? 'rgba(224, 85, 85, 0.08)'
+                    : 'rgba(255, 255, 255, 0.04)',
+                border: `1px solid ${revealTxHash ? 'rgba(76,175,80,0.2)' : revealError ? 'rgba(224,85,85,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8,
               }}
             >
-              <span style={{ fontSize: 14 }}>
-                {p1Verified && p2Verified ? '✅' : '⚠️'}
-              </span>
               <span style={{
                 fontSize: 11,
-                color: p1Verified && p2Verified
-                  ? 'rgba(76,175,80,0.9)'
-                  : 'rgba(224,85,85,0.9)',
+                color: revealTxHash
+                  ? 'rgba(76,175,80,0.8)'
+                  : revealError
+                    ? 'rgba(224,85,85,0.8)'
+                    : 'rgba(255,255,254,0.4)',
                 fontWeight: 600,
                 letterSpacing: '0.04em',
               }}>
-                {p1Verified && p2Verified
-                  ? 'Commit-reveal verified — fair play confirmed'
-                  : 'Commitment mismatch detected!'}
+                {revealing
+                  ? 'Revealing on-chain...'
+                  : revealTxHash
+                    ? 'On-chain reveal confirmed'
+                    : revealError
+                      ? `Reveal failed: ${revealError}`
+                      : 'Preparing on-chain reveal...'}
               </span>
-            </motion.div>
-          )}
-
-          {(mode === 'nft' || mode === 'online') && !isDraw && winner !== myPlayer && !conceded && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} style={{ marginBottom: 20 }}>
-              <Button
-                variant={conceding ? 'secondary' : 'primary'}
-                size="lg"
-                disabled={conceding}
-                style={{ backgroundColor: conceding ? undefined : '#E05555', color: '#fff' }}
-                onClick={async () => {
-                  try {
-                    setConceding(true);
-                    await opponentWonOnChain(gameSessionId);
-                    setConceded(true);
-                  } catch (err) {
-                    console.error(err);
-                    alert('Failed to surrender NFT. Check console.');
-                  } finally {
-                    setConceding(false);
-                  }
-                }}
-              >
-                {conceding ? 'Transferring NFT...' : 'I Lost (Surrender NFT)'}
-              </Button>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-                Requires Cartridge Session authorization.
-              </div>
             </motion.div>
           )}
 
