@@ -237,19 +237,8 @@ export const useGameStore = create<GameState & GameActions>()(
               state.cpuQuestion = null;
               state.phase = GamePhase.TURN_TRANSITION;
             } else if (state.mode === 'online') {
-              // Online: only the QUESTIONER (player who asked) drives the turn swap.
-              // The answerer advances through visual phases but does NOT swap —
-              // they receive the new activePlayer/turnNumber via DB sync.
-              const iAmQuestioner =
-                (state.onlinePlayerNum === 1 && state.activePlayer === 'player1') ||
-                (state.onlinePlayerNum === 2 && state.activePlayer === 'player2');
-
-              if (iAmQuestioner) {
-                const next = getOpponent(state.activePlayer);
-                state.activePlayer = next;
-                state.boardRotation = next === 'player1' ? 0 : Math.PI;
-                state.turnNumber += 1;
-              }
+              // Online mode: We do NOT swap players or increment turns here anymore!
+              // The DB (via updateTurn) is the only thing allowed to do that.
               state.currentQuestion = null;
               state.phase = GamePhase.TURN_TRANSITION;
             } else {
@@ -439,12 +428,20 @@ export const useGameStore = create<GameState & GameActions>()(
 
     finishElimination: () =>
       set((state) => {
-        const next = getOpponent(state.activePlayer);
-        state.activePlayer = next;
-        state.boardRotation = next === 'player1' ? 0 : Math.PI;
-        state.turnNumber += 1;
-        state.currentQuestion = null;
-        state.phase = GamePhase.TURN_TRANSITION;
+        if (state.mode === 'online') {
+          // Online mode: animation finished. Do NOT swap turn locally because
+          // we are server-authoritative. The activePlayer and turnNumber will sync
+          // down from the Supabase row.
+          state.currentQuestion = null;
+          state.phase = GamePhase.TURN_TRANSITION;
+        } else {
+          const next = getOpponent(state.activePlayer);
+          state.activePlayer = next;
+          state.boardRotation = next === 'player1' ? 0 : Math.PI;
+          state.turnNumber += 1;
+          state.currentQuestion = null;
+          state.phase = GamePhase.TURN_TRANSITION;
+        }
       }),
 
     startGuess: () =>

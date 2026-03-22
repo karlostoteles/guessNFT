@@ -286,25 +286,32 @@ export function useOnlineGameSync(): Record<string, never> {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum]);
 
-  // ─── Push turn swap to DB (only from the player who drove the swap) ────
+  // ─── Push turn swap to DB (only from the player ending their turn) ────
   useEffect(() => {
     if (mode !== 'online' || !onlineGameId || !onlinePlayerNum) return;
-    if (phase === GamePhase.MENU || phase === GamePhase.SETUP_P1 || phase === GamePhase.SETUP_P2 || phase === GamePhase.ONLINE_WAITING) return;
+    if (phase !== GamePhase.TURN_TRANSITION) return;
+
+    // Only the currently active player pushes the turn swap to Supabase.
+    // (Because local gameStore doesn't swap activePlayer anymore, so it's still them)
+    const iAmActive =
+      (onlinePlayerNum === 1 && activePlayer === 'player1') ||
+      (onlinePlayerNum === 2 && activePlayer === 'player2');
+    
+    if (!iAmActive) return;
+
+    // Prevent duplicate pushes for the current turn
     if (turnNumber <= lastPushedTurnRef.current) return;
-
-    // Only the player who incremented turnNumber should push it.
-    // After swap, activePlayer is the OPPONENT of whoever asked/guessed.
-    // So the pusher's onlinePlayerNum should NOT match activePlayer (they just handed off).
-    const activePlayerNum: 1 | 2 = activePlayer === 'player1' ? 1 : 2;
-    const iDroveTheSwap = activePlayerNum !== onlinePlayerNum;
-    if (!iDroveTheSwap) return;
-
     lastPushedTurnRef.current = turnNumber;
 
-    updateTurn(onlineGameId, activePlayerNum, turnNumber).catch((err) =>
+    const nextPlayerNum: 1 | 2 = activePlayer === 'player1' ? 2 : 1;
+    const nextTurnNumber = turnNumber + 1;
+
+    console.log(`[sync] Pushing TURN_TRANSITION -> Turn ${nextTurnNumber}, Active P${nextPlayerNum}`);
+
+    updateTurn(onlineGameId, nextPlayerNum, nextTurnNumber).catch((err) =>
       console.error('[sync] updateTurn failed', err)
     );
-  }, [turnNumber, phase, mode, onlineGameId, onlinePlayerNum, activePlayer]);
+  }, [phase, turnNumber, mode, onlineGameId, onlinePlayerNum, activePlayer]);
 
   // ─── Send GUESS_MADE when I make a guess ────────────────────────────────
   useEffect(() => {
